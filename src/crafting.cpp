@@ -4487,14 +4487,16 @@ void drop_or_handle( const item &newit, Character &p )
 
 void remove_ammo( item &dis_item, Character &p )
 {
-    dis_item.remove_items_with( [&p]( const item & it ) {
-        if( it.is_irremovable() || !( it.is_gunmod() || it.is_toolmod() || ( it.is_magazine() &&
-                                      !it.is_tool() ) ) ) {
-            return false;
-        }
-        drop_or_handle( it, p );
-        return true;
+    // Handle the removed items only after the traversal: drop_or_handle can
+    // stow an item right back into a pocket of dis_item, and inserting into
+    // a pocket while remove_items_with is iterating it loops forever.
+    std::list<item> removed = dis_item.remove_items_with( []( const item & it ) {
+        return !it.is_irremovable() && ( it.is_gunmod() || it.is_toolmod() ||
+                                         ( it.is_magazine() && !it.is_tool() ) );
     } );
+    for( item &removed_item : removed ) {
+        drop_or_handle( removed_item, p );
+    }
 
     if( dis_item.has_flag( flag_NO_UNLOAD ) ) {
         return;
