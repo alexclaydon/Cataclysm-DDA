@@ -18,11 +18,7 @@
 class main_menu
 {
     public:
-        // Keycode mode, not keychar: CDDA turns SDL text input on whenever the
-        // active context prefers keychar (input_manager::get_input_event), and
-        // SteamOS reads active text input as "show the on-screen keyboard" --
-        // so a keychar main menu pops the OSK on every launch on the Deck.
-        main_menu() : ctxt( "MAIN_MENU" ) { }
+        main_menu() : ctxt( "MAIN_MENU", keyboard_mode::keychar ) { }
         // Shows the main menu and returns whether a game was started or not
         bool opening_screen();
 
