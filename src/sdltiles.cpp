@@ -5147,15 +5147,13 @@ static bool text_input_active_when_regaining_focus = false;
 // SDL wrappers (StartTextInput/StopTextInput/IsTextInputActive) live
 // in sdl_wrappers.cpp and take SDL_Window*.
 // TEMPORARY: trace what turns SDL text input on, since active text input is
-// what makes SteamOS raise the on-screen keyboard. Remove once the launch-time
-// culprit is identified and fixed.
+// what makes SteamOS raise the on-screen keyboard. The context that asked for
+// it is logged separately in input_context::handle_input. Remove once the
+// launch-time culprit is identified and fixed.
 static void osk_trace( const char *where )
 {
-    input_context *ctx = input_context::input_context_stack.empty()
-                         ? nullptr : input_context::input_context_stack.back();
     DebugLog( D_WARNING, DC_ALL )
             << "OSK-TRACE: " << where
-            << " ctx=" << ( ctx ? ctx->get_category() : std::string( "(none)" ) )
             << " already_active=" << IsTextInputActive( ::window.get() )
 #if !defined(__ANDROID__)
             << " window_focus=" << window_focus

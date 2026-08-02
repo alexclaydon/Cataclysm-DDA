@@ -22,6 +22,7 @@
 #include "coordinates.h"
 #include "cuboid_rectangle.h"
 #include "cursesdef.h"
+#include "debug.h"
 #include "game.h"
 #include "help.h"
 #include "imgui/imgui.h"
@@ -483,6 +484,18 @@ const std::string &input_context::handle_input( const int timeout )
     const std::string *result = &CATA_ERROR;
     while( true ) {
 
+        // TEMPORARY: a keychar context makes get_input_event turn SDL text
+        // input on, which is what raises the SteamOS on-screen keyboard. Log
+        // each distinct context that asks for keychar so the launch-time
+        // culprit can be named. Remove once the real fix lands.
+        if( input_manager::actual_keyboard_mode( preferred_keyboard_mode ) ==
+            keyboard_mode::keychar ) {
+            static std::string last_logged;
+            if( last_logged != category ) {
+                last_logged = category;
+                DebugLog( D_WARNING, DC_ALL ) << "OSK-TRACE: keychar context=" << category;
+            }
+        }
         next_action = inp_mngr.get_input_event( preferred_keyboard_mode );
         if( next_action.type == input_event_t::timeout ) {
             result = &TIMEOUT;
