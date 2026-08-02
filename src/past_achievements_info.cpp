@@ -72,8 +72,13 @@ void past_achievements_info::load()
         }
     }
 
-    // Ensure memorial data are also loaded for legacy dead character achievements
-    get_past_games();
+    // Ensure memorial data are also loaded for legacy dead character achievements.
+    // Never show the loading popup from here: this load is lazy, so it can be
+    // triggered from inside an in-progress imgui frame (e.g. can_pick() called
+    // while the character creator's tab bar is open), and the popup's nested
+    // ui_manager::redraw() then corrupts the imgui window stack. See the same
+    // guard in past_games_info::ensure_loaded().
+    get_past_games( false );
 }
 
 static past_achievements_info past_achievements;
