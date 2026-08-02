@@ -5146,8 +5146,26 @@ static bool text_input_active_when_regaining_focus = false;
 // loss/gain to avoid sending text input to wrong targets. The pure
 // SDL wrappers (StartTextInput/StopTextInput/IsTextInputActive) live
 // in sdl_wrappers.cpp and take SDL_Window*.
+// TEMPORARY: trace what turns SDL text input on, since active text input is
+// what makes SteamOS raise the on-screen keyboard. Remove once the launch-time
+// culprit is identified and fixed.
+static void osk_trace( const char *where )
+{
+    input_context *ctx = input_context::input_context_stack.empty()
+                         ? nullptr : input_context::input_context_stack.back();
+    DebugLog( D_WARNING, DC_ALL )
+            << "OSK-TRACE: " << where
+            << " ctx=" << ( ctx ? ctx->get_category() : std::string( "(none)" ) )
+            << " already_active=" << IsTextInputActive( ::window.get() )
+#if !defined(__ANDROID__)
+            << " window_focus=" << window_focus
+#endif
+            ;
+}
+
 static void focus_aware_start_text_input()
 {
+    osk_trace( "start_text_input" );
     // prevent sending spurious empty SDL_TEXTEDITING events
     if( IsTextInputActive( ::window.get() ) ) {
         return;
@@ -5551,6 +5569,7 @@ static void CheckMessages()
                     window_focus = true;
                     // Restore text input status
                     if( text_input_active_when_regaining_focus ) {
+                        osk_trace( "focus_gained_restore" );
                         StartTextInput( ::window.get() );
                     }
                     break;
