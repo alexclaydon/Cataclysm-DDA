@@ -10,6 +10,7 @@
 #include "coordinates.h"
 #include "debug.h"
 #include "enums.h"
+#include "map_scale_constants.h"
 #include "math_defines.h"
 #include "output.h"
 #include "string_formatter.h"
@@ -414,7 +415,11 @@ tripoint move_along_line( const tripoint &loc, const std::vector<tripoint> &line
     const auto slope = slope_of( line );
     res.x += distance * std::get<0>( slope );
     res.y += distance * std::get<1>( slope );
-    res.z += distance * std::get<2>( slope );
+    // The z slope is normalized against the full 3D length of the line, so a short shot at a
+    // target one z-level up yields a large z component. Extending that over the remaining
+    // range can push the endpoint clean off the top or bottom of the map.
+    res.z = std::clamp( static_cast<int>( res.z + distance * std::get<2>( slope ) ),
+                        -OVERMAP_DEPTH, OVERMAP_HEIGHT );
     return res;
 }
 
@@ -427,7 +432,9 @@ tripoint_bub_ms move_along_line( const tripoint_bub_ms &loc,
     const auto slope = slope_of( line );
     res.x() += distance * std::get<0>( slope );
     res.y() += distance * std::get<1>( slope );
-    res.z() += distance * std::get<2>( slope );
+    // See the tripoint overload above: clamp so overshoot can't leave the map's z range.
+    res.z() = std::clamp( static_cast<int>( res.z() + distance * std::get<2>( slope ) ),
+                          -OVERMAP_DEPTH, OVERMAP_HEIGHT );
     return res;
 }
 
