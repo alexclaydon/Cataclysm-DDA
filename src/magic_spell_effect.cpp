@@ -1378,7 +1378,8 @@ void spell_effect::spawn_summoned_monster( const spell &sp, Creature &caster,
 {
     std::set<tripoint_bub_ms> area = spell_effect_area( sp, target, caster );
     // this should never be negative, but this'll keep problems from happening
-    size_t num_mons = std::abs( sp.damage( caster ) );
+    const size_t requested_mons = std::abs( sp.damage( caster ) );
+    size_t num_mons = requested_mons;
     const time_duration summon_time = sp.duration_turns( caster );
     while( num_mons > 0 && !area.empty() ) {
         const size_t mon_spot = rng( 0, area.size() - 1 );
@@ -1387,11 +1388,20 @@ void spell_effect::spawn_summoned_monster( const spell &sp, Creature &caster,
         if( add_summoned_mon( *iter, summon_time, sp, caster ) ) {
             num_mons--;
             sp.make_sound( *iter, caster );
-        } else {
-            debugmsg( "failed to place monster" );
         }
         // whether or not we succeed in spawning a monster, we don't want to try this tripoint again
         area.erase( iter );
+    }
+    // Individual tiles being unplaceable is expected, not an error. The effect area is filtered
+    // by spell::is_valid_target(), which never considers whether a monster can actually stand
+    // somewhere, while placement is gated by can_place_monster() - walls, hazards and occupied
+    // tiles all survive the first filter and fail the second. Spells with "self" among their
+    // valid_targets are the systematic case: they include the caster's own tile, which
+    // can_place_monster() rejects unconditionally. The loop just moves on to another tile, so
+    // only report the genuinely interesting failure, where nothing could be summoned at all.
+    if( requested_mons > 0 && num_mons == requested_mons ) {
+        debugmsg( "spell %s failed to place any of its %zu summoned monster(s)",
+                  sp.id().str(), requested_mons );
     }
 }
 
