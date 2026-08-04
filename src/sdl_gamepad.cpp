@@ -135,6 +135,38 @@ static bool radial_left_open = false;
 static bool radial_right_open = false;
 static bool alt_modifier_held = false;
 
+// A radial is "open" once a stick has been deflected while LT is held. The
+// highlighted slot then latches: it survives the stick returning to centre,
+// so the right radial can be aimed with the right stick and confirmed with A
+// (same thumb) without the selection evaporating on the way.
+static bool any_radial_open()
+{
+    return radial_left_open || radial_right_open;
+}
+
+static void close_radials()
+{
+    radial_left_open = false;
+    radial_right_open = false;
+    radial_left_last_dir = direction::NONE;
+    radial_right_last_dir = direction::NONE;
+}
+
+// LT usually stays held after a slot is confirmed or cancelled, and a stick
+// resting off-centre keeps emitting jitter axis events — which would reopen
+// the wheel that was just dismissed. Make a still-deflected stick return to
+// centre before it can open another. Only sticks that are actually deflected
+// get locked, or a stick already at rest would need a pointless waggle to
+// wake up.
+static std::array<bool, max_sticks> radial_lockout = {{false, false}};
+
+static void dismiss_radials()
+{
+    close_radials();
+    radial_lockout[0] = left_stick_dir != direction::NONE;
+    radial_lockout[1] = right_stick_dir != direction::NONE;
+}
+
 // SDL3: callback signature changes to (void *userdata, SDL_TimerID timerID, Uint32 interval)
 #if SDL_MAJOR_VERSION >= 3
 static Uint32 timer_func( void *, SDL_TimerID, Uint32 interval )
@@ -351,6 +383,27 @@ int direction_to_radial_joy( direction dir, int stick_idx )
     }
 }
 
+// Fire the highlighted radial slot, if any, and close both wheels.
+// Returns true if something was actually sent, so the caller knows to
+// swallow the button rather than let it reach the game underneath.
+static bool commit_radial()
+{
+    int joy_code = -1;
+    if( radial_left_open && radial_left_last_dir != direction::NONE ) {
+        joy_code = direction_to_radial_joy( radial_left_last_dir, 0 );
+    } else if( radial_right_open && radial_right_last_dir != direction::NONE ) {
+        joy_code = direction_to_radial_joy( radial_right_last_dir, 1 );
+    }
+
+    dismiss_radials();
+
+    if( joy_code != -1 ) {
+        send_input( joy_code );
+        return true;
+    }
+    return false;
+}
+
 // Calculate 8-way direction from raw axis values using angle
 static direction angle_to_direction( const point &p )
 {
@@ -481,25 +534,11 @@ static bool handle_axis_event( SDL_Event &event )
                 triggers_state[idx] = 0;
                 alt_modifier_held = false;
 
-                // Trigger radial select on Alt release
-                if( radial_left_open && radial_left_last_dir != direction::NONE ) {
-                    int joy_code = direction_to_radial_joy( radial_left_last_dir, 0 );
-                    if( joy_code != -1 ) {
-                        send_input( joy_code );
-                    }
-                }
-                if( radial_right_open && radial_right_last_dir != direction::NONE ) {
-                    int joy_code = direction_to_radial_joy( radial_right_last_dir, 1 );
-                    if( joy_code != -1 ) {
-                        send_input( joy_code );
-                    }
-                }
-
-                // Reset radial menu states when LT is released
-                radial_left_open = false;
-                radial_right_open = false;
-                radial_left_last_dir = direction::NONE;
-                radial_right_last_dir = direction::NONE;
+                // Releasing LT abandons any open radial. Selection is committed
+                // with A instead (see handle_button_event), which keeps aiming
+                // and activating separate: releasing a trigger can jostle the
+                // stick, and there was previously no way to back out at all.
+                close_radials();
 
                 return true;
             }
@@ -538,7 +577,12 @@ static bool handle_axis_event( SDL_Event &event )
                 right_stick_dir = dir;
             }
 
-            if( alt_modifier_held ) {
+            // Back at centre, so this stick is free to open a wheel again.
+            if( dir == direction::NONE ) {
+                radial_lockout[i] = false;
+            }
+
+            if( alt_modifier_held && !radial_lockout[i] ) {
                 // When LT is held, sticks control radial menu state
                 direction &radial_last = ( i == 0 ) ? radial_left_last_dir : radial_right_last_dir;
                 bool &radial_open = ( i == 0 ) ? radial_left_open : radial_right_open;
@@ -620,7 +664,9 @@ static bool handle_axis_event( SDL_Event &event )
 }
 
 
-static void handle_button_event( SDL_Event &event )
+// Returns true if the UI needs repainting (the radial overlay is drawn in
+// the present path, so cancelling one has to force a frame or it lingers).
+static bool handle_button_event( SDL_Event &event )
 {
     // SDL3: event.cbutton becomes event.gbutton
 #if SDL_MAJOR_VERSION >= 3
@@ -635,7 +681,23 @@ static void handle_button_event( SDL_Event &event )
         if( button < max_buttons ) {
             cancel_task( all_tasks[button] );
         }
-        return;
+        return false;
+    }
+
+    // While a radial is open, A confirms the highlighted slot and B backs out.
+    // Both are swallowed so they don't also reach the screen underneath. This
+    // is gated on a radial being open rather than on LT being held, because LT
+    // gates the whole ALT layer — stairs, zoom, craft — and those chords must
+    // keep working whenever no wheel is up.
+    if( any_radial_open() ) {
+        if( button == CATA_BUTTON_A ) {
+            commit_radial();
+            return true;
+        }
+        if( button == CATA_BUTTON_B ) {
+            dismiss_radials();
+            return true;
+        }
     }
 
     // Button pressed - determine which input to send
@@ -749,6 +811,7 @@ static void handle_button_event( SDL_Event &event )
             schedule_task( all_tasks[button], now + repeat_delay, joy_code, 1, input_type );
         }
     }
+    return false;
 }
 
 static void handle_device_event( SDL_Event &event )
@@ -905,8 +968,7 @@ bool handle_event( SDL_Event &event )
     switch( event.type ) {
         case CATA_CONTROLLERBUTTONDOWN:
         case CATA_CONTROLLERBUTTONUP:
-            handle_button_event( event );
-            return false;
+            return handle_button_event( event );
         case CATA_CONTROLLERAXISMOTION:
             return handle_axis_event( event );
         case CATA_CONTROLLERDEVICEADDED:
