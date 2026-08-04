@@ -665,21 +665,14 @@ static void handle_button_event( SDL_Event &event )
         case CATA_BUTTON_Y:
             joy_code = JOY_Y;
             break;
+        // Shoulders stay first-class gamepad events in menus, like X and Y, so
+        // each screen can bind them itself. Tab cycling still works everywhere:
+        // NEXT_TAB/PREV_TAB carry gamepad RB/LB in the default context.
         case CATA_BUTTON_RIGHTSHOULDER:
-            if( is_in_menu() ) {
-                joy_code = '\t';
-                input_type = input_event_t::keyboard_char;
-            } else {
-                joy_code = JOY_RB;
-            }
+            joy_code = JOY_RB;
             break;
         case CATA_BUTTON_LEFTSHOULDER:
-            if( is_in_menu() ) {
-                joy_code = KEY_BTAB;
-                input_type = input_event_t::keyboard_char;
-            } else {
-                joy_code = JOY_LB;
-            }
+            joy_code = JOY_LB;
             break;
         case CATA_BUTTON_LEFTSTICK:
             joy_code = JOY_LS;
