@@ -2265,7 +2265,7 @@
     "id": "NEXT_TAB",
     "category": "VEH_INTERACT",
     "name": "Go to next tab",
-    "bindings": [ { "input_method": "keyboard_any", "key": "TAB" } ]
+    "bindings": [ { "input_method": "keyboard_any", "key": "TAB" }, { "input_method": "gamepad", "key": "RB" } ]
   },
   {
     "type": "keybinding",
@@ -2274,7 +2274,8 @@
     "name": "Go to previous tab",
     "bindings": [
       { "input_method": "keyboard_char", "key": "BACKTAB" },
-      { "input_method": "keyboard_code", "key": "TAB", "mod": [ "shift" ] }
+      { "input_method": "keyboard_code", "key": "TAB", "mod": [ "shift" ] },
+      { "input_method": "gamepad", "key": "LB" }
     ]
   },
   {
