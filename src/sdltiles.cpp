@@ -4967,6 +4967,15 @@ static void draw_gamepad_radial_menu()
         }
     }
 
+    // Selecting used to be implicit in releasing LT, which needed no explaining.
+    // Now that release backs out and A commits, the wheel has to say so — put it
+    // in the hub, which is otherwise empty space.
+    const std::string hint = _( "(A) select   (B) cancel" );
+    const point hint_draw( static_cast<int>( center.x / text_scale ) - ( font->width * utf8_width(
+                               hint ) / 2 ),
+                           static_cast<int>( center.y / text_scale ) - ( font->height / 2 ) );
+    font->OutputChar( renderer, geometry, hint, hint_draw, 8, 1.0f );
+
     // Restore scale
     RenderSetScale( renderer, 1.0f, 1.0f );
 }
