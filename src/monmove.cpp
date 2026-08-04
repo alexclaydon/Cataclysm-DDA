@@ -1701,7 +1701,7 @@ int monster::calc_movecost( const map &here, const tripoint_bub_ms &from,
             const vpart_position vp( const_cast<vehicle &>( *veh ), part );
             int veh_movecost = vp.get_movecost();
             int fieldcost = get_filtered_fieldcost( field );
-            if( ( veh_movecost <= 0 || fieldcost < 0 ) && where == from ) {
+            if( ( veh_movecost <= 0 || fieldcost < 0 ) && where == to ) {
                 debugmsg( "%s cannot move to %s. monster::calc_movecost expects to be called with valid destination.",
                           get_name(), veh_movecost ? veh->disp_name() :  field.displayed_field_type().id().str() );
                 return 0;
@@ -1773,7 +1773,8 @@ int monster::calc_movecost( const map &here, const tripoint_bub_ms &from,
                        ( from.z() != to.z() && terrain.has_flag( ter_furn_flag::TFLAG_DIFFICULT_Z ) ) ) {
                 if( climbs() || force ) {
                     cost += furniture.movecost * get_climb_mod();
-                } else if( where == to ) {
+                } else if( where == from ) {
+                    // stepping off climbable furniture needs no climbing; only entering does
                     cost += furniture.movecost;
                 } else {
                     debugmsg( "%s cannot climb over %s. monster::calc_movecost expects to be called with valid destination.",
