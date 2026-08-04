@@ -3429,7 +3429,11 @@ void consume_menu_uistate::serialize( JsonOut &json ) const
 {
     json.start_object();
     json.member( "consume_menu_selections", consume_menu_selections );
-    json.member( "consume_menu_selected_items", consume_menu_selected_items );
+    // consume_menu_selected_items is deliberately not persisted: item_locations name specific
+    // item instances, which routinely stop existing between sessions - not least because this
+    // menu's whole purpose is consuming them. Restoring them produced a pair of debugmsgs per
+    // dead entry ("UID not found in container contents" cascading into "parent location doesn't
+    // exist") on the next load. The selection is within-session state; let it lapse.
     json.member( "consume_menu_filter", consume_menu_filter );
     json.member( "collated", collated );
     json.member( "consume_menu_comestype", consume_menu_comestype );
@@ -3439,7 +3443,8 @@ void consume_menu_uistate::serialize( JsonOut &json ) const
 void consume_menu_uistate::deserialize( const JsonObject &jo )
 {
     jo.read( "consume_menu_selections", consume_menu_selections );
-    jo.read( "consume_menu_selected_items", consume_menu_selected_items );
+    // Not read back - see serialize(). Saves written before this change still carry the member;
+    // ignoring it is what clears the existing dangling entries, and the next save drops them.
     jo.read( "consume_menu_filter", consume_menu_filter );
     jo.read( "collated", collated );
     jo.read( "consume_menu_comestype", consume_menu_comestype );
