@@ -2211,7 +2211,7 @@ static void do_deathcam_action( const action_id &act, avatar &player_character )
         break;
 
         case ACTION_LOOK:
-            g->look_around();
+            g->look_around( /*persist_offset=*/true );
             break;
 
         case ACTION_KEYBINDINGS: // already handled by input context
