@@ -727,7 +727,9 @@ class game
                 const std::function<void( const std::string &msg )> &report ) const;
 
         // Look at nearby terrain ';', or select zone points
-        std::optional<tripoint_bub_ms> look_around();
+        // persist_offset: keep the panned camera on CONFIRM instead of
+        // restoring it. Only free look wants this; pickers must snap back.
+        std::optional<tripoint_bub_ms> look_around( bool persist_offset = false );
         /**
         * @brief
         *
@@ -745,7 +747,7 @@ class game
         look_around_result look_around( bool show_window, tripoint_bub_ms &center,
                                         const tripoint_bub_ms &start_point, bool has_first_point, bool select_zone, bool peeking,
                                         bool is_moving_zone = false, const tripoint_bub_ms &end_point = tripoint_bub_ms::zero,
-                                        bool change_lv = true );
+                                        bool change_lv = true, bool persist_offset = false );
         look_around_result look_around( look_around_params );
 
         // Shared method to print "look around" info
