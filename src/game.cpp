@@ -541,9 +541,16 @@ void game_ui::init_ui()
     TERMX = get_terminal_width();
     TERMY = get_terminal_height();
 
-    get_options().get_option( "TERMINAL_X" ).setValue( TERMX * get_scaling_factor() );
-    get_options().get_option( "TERMINAL_Y" ).setValue( TERMY * get_scaling_factor() );
-    get_options().save();
+    // Headless runs — --check-mods, --verify — load options but never call
+    // catacurses::init_interface(), so the terminal globals are still zero
+    // here. Writing them back would clamp the player's configured size to the
+    // option minimum and save it, which is how a mod check silently reset the
+    // terminal to 80x24 on every rebuild.
+    if( TERMX > 0 && TERMY > 0 ) {
+        get_options().get_option( "TERMINAL_X" ).setValue( TERMX * get_scaling_factor() );
+        get_options().get_option( "TERMINAL_Y" ).setValue( TERMY * get_scaling_factor() );
+        get_options().save();
+    }
 #else
     TERMY = getmaxy( catacurses::stdscr );
     TERMX = getmaxx( catacurses::stdscr );
