@@ -147,27 +147,33 @@ static bool any_radial_open()
     return radial_left_open || radial_right_open;
 }
 
+// A stick still deflected when a wheel closes has already been spent choosing
+// the slot. Anything that reads it again inherits that direction by accident:
+// a wheel slot holding a directional verb fires straight into it (smash on the
+// E slot smashes east instead of asking), a jitter event reopens the wheel just
+// dismissed, and sliding the stick afterwards walks you. So a spent stick
+// simply reports as centred until it physically re-centres — one rule, and
+// every consumer follows from it.
+static std::array<bool, max_sticks> stick_consumed = {{false, false}};
+
+static direction stick_dir( int idx )
+{
+    if( stick_consumed[idx] ) {
+        return direction::NONE;
+    }
+    return idx == 0 ? left_stick_dir : right_stick_dir;
+}
+
 static void close_radials()
 {
     radial_left_open = false;
     radial_right_open = false;
     radial_left_last_dir = direction::NONE;
     radial_right_last_dir = direction::NONE;
-}
-
-// LT usually stays held after a slot is confirmed or cancelled, and a stick
-// resting off-centre keeps emitting jitter axis events — which would reopen
-// the wheel that was just dismissed. Make a still-deflected stick return to
-// centre before it can open another. Only sticks that are actually deflected
-// get locked, or a stick already at rest would need a pointless waggle to
-// wake up.
-static std::array<bool, max_sticks> radial_lockout = {{false, false}};
-
-static void dismiss_radials()
-{
-    close_radials();
-    radial_lockout[0] = left_stick_dir != direction::NONE;
-    radial_lockout[1] = right_stick_dir != direction::NONE;
+    // Only sticks actually deflected are marked, or one already at rest would
+    // need a pointless waggle to wake up.
+    stick_consumed[0] = left_stick_dir != direction::NONE;
+    stick_consumed[1] = right_stick_dir != direction::NONE;
 }
 
 // SDL3: callback signature changes to (void *userdata, SDL_TimerID timerID, Uint32 interval)
@@ -480,12 +486,13 @@ static direction angle_to_direction( const point &p )
 // Helper to send directional movement input
 static void send_direction_movement()
 {
-    if( left_stick_dir == direction::NONE ) {
+    const direction dir = stick_dir( 0 );
+    if( dir == direction::NONE ) {
         return;
     }
 
     // Convert direction to old-style JOY movement for keybinding lookup
-    switch( left_stick_dir ) {
+    switch( dir ) {
         case direction::N:
             send_input( JOY_LS_UP );
             break;
@@ -555,8 +562,8 @@ static bool handle_axis_event( SDL_Event &event )
                     // Drop any open wheel on the way in. A and B are intercepted
                     // for the radial before the layer transform runs, so leaving
                     // one up would make layer-2 chords fire wheel slots instead.
-                    dismiss_radials();
-                } else if( left_stick_dir != direction::NONE ) {
+                    close_radials();
+                } else if( stick_dir( 0 ) != direction::NONE ) {
                     // Move in selected direction
                     send_direction_movement();
                     // Schedule repeat for continuous movement
@@ -633,12 +640,12 @@ static bool handle_axis_event( SDL_Event &event )
                 right_stick_dir = dir;
             }
 
-            // Back at centre, so this stick is free to open a wheel again.
+            // Physically back at centre, so the stick is live again.
             if( dir == direction::NONE ) {
-                radial_lockout[i] = false;
+                stick_consumed[i] = false;
             }
 
-            if( alt_modifier_held && !alt2_modifier_held && !radial_lockout[i] ) {
+            if( alt_modifier_held && !alt2_modifier_held && !stick_consumed[i] ) {
                 // When LT is held, sticks control radial menu state
                 direction &radial_last = ( i == 0 ) ? radial_left_last_dir : radial_right_last_dir;
                 bool &radial_open = ( i == 0 ) ? radial_left_open : radial_right_open;
@@ -662,6 +669,11 @@ static bool handle_axis_event( SDL_Event &event )
                 }
 
                 // Cancel any existing repeat tasks when entering radial mode
+                cancel_task( stick_task );
+            } else if( stick_consumed[i] ) {
+                // Spent on a wheel slot and not yet re-centred. Emitting octants
+                // here would walk the player (or reopen look on the right stick)
+                // just for sliding a thumb that never left the stick.
                 cancel_task( stick_task );
             } else {
                 int joy_code = -1;
@@ -748,14 +760,14 @@ static bool handle_button_event( SDL_Event &event )
     if( any_radial_open() ) {
         if( button == CATA_BUTTON_A ) {
             const int joy_code = highlighted_radial_slot();
-            dismiss_radials();
+            close_radials();
             if( joy_code != -1 ) {
                 send_input( joy_code );
             }
             return true;
         }
         if( button == CATA_BUTTON_B ) {
-            dismiss_radials();
+            close_radials();
             return true;
         }
     }
@@ -920,7 +932,7 @@ static void handle_scheduler_event( SDL_Event &/*event*/ )
         gamepad::task_t &task = all_tasks[i];
         if( task.counter && task.when <= now ) {
             // Check if this is the RT repeat task
-            if( i == triggers_task_index + 1 && left_stick_dir != direction::NONE ) {
+            if( i == triggers_task_index + 1 && stick_dir( 0 ) != direction::NONE ) {
                 // RT continuous movement - send direction
                 send_direction_movement();
             } else if( i >= sticks_task_index && i < triggers_task_index ) {
@@ -940,12 +952,12 @@ static void handle_scheduler_event( SDL_Event &/*event*/ )
 
 direction get_left_stick_direction()
 {
-    return left_stick_dir;
+    return stick_dir( 0 );
 }
 
 direction get_right_stick_direction()
 {
-    return right_stick_dir;
+    return stick_dir( 1 );
 }
 
 direction get_radial_left_direction()
