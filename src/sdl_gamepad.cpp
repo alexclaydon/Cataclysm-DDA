@@ -383,25 +383,22 @@ int direction_to_radial_joy( direction dir, int stick_idx )
     }
 }
 
-// Fire the highlighted radial slot, if any, and close both wheels.
-// Returns true if something was actually sent, so the caller knows to
-// swallow the button rather than let it reach the game underneath.
-static bool commit_radial()
+// The slot currently highlighted, or -1 if no wheel is up.
+//
+// Kept separate from the firing itself because the two commit paths want
+// different cleanup. Confirming with A leaves LT held, so a stick still off
+// centre has to be locked out or jitter reopens the wheel; releasing LT ends
+// the gesture outright, and locking there would make a deliberate re-press
+// feel dead.
+static int highlighted_radial_slot()
 {
-    int joy_code = -1;
     if( radial_left_open && radial_left_last_dir != direction::NONE ) {
-        joy_code = direction_to_radial_joy( radial_left_last_dir, 0 );
-    } else if( radial_right_open && radial_right_last_dir != direction::NONE ) {
-        joy_code = direction_to_radial_joy( radial_right_last_dir, 1 );
+        return direction_to_radial_joy( radial_left_last_dir, 0 );
     }
-
-    dismiss_radials();
-
-    if( joy_code != -1 ) {
-        send_input( joy_code );
-        return true;
+    if( radial_right_open && radial_right_last_dir != direction::NONE ) {
+        return direction_to_radial_joy( radial_right_last_dir, 1 );
     }
-    return false;
+    return -1;
 }
 
 // Calculate 8-way direction from raw axis values using angle
@@ -534,11 +531,15 @@ static bool handle_axis_event( SDL_Event &event )
                 triggers_state[idx] = 0;
                 alt_modifier_held = false;
 
-                // Releasing LT abandons any open radial. Selection is committed
-                // with A instead (see handle_button_event), which keeps aiming
-                // and activating separate: releasing a trigger can jostle the
-                // stick, and there was previously no way to back out at all.
+                // Releasing LT also fires the latched slot, keeping the original
+                // one-motion flick-and-release as the fast path. A does the same
+                // thing deliberately when you'd rather not commit on a release
+                // that might jostle the stick; B is the way out of a wheel.
+                const int joy_code = highlighted_radial_slot();
                 close_radials();
+                if( joy_code != -1 ) {
+                    send_input( joy_code );
+                }
 
                 return true;
             }
@@ -691,7 +692,11 @@ static bool handle_button_event( SDL_Event &event )
     // keep working whenever no wheel is up.
     if( any_radial_open() ) {
         if( button == CATA_BUTTON_A ) {
-            commit_radial();
+            const int joy_code = highlighted_radial_slot();
+            dismiss_radials();
+            if( joy_code != -1 ) {
+                send_input( joy_code );
+            }
             return true;
         }
         if( button == CATA_BUTTON_B ) {
