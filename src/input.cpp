@@ -723,6 +723,22 @@ void input_manager::init_keycode_mapping()
     add_gamepad_keycode_pair( JOY_R_RADIAL_NW, translate_marker_context( "key name",
                               "R_RADIAL_NW" ) );
 
+    // Second ALT layer (LT held, then RT)
+    add_gamepad_keycode_pair( JOY_ALT2_A,  translate_marker_context( "key name", "ALT2_A" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_B,  translate_marker_context( "key name", "ALT2_B" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_X,  translate_marker_context( "key name", "ALT2_X" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_Y,  translate_marker_context( "key name", "ALT2_Y" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_RB, translate_marker_context( "key name", "ALT2_RB" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_LB, translate_marker_context( "key name", "ALT2_LB" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_LS, translate_marker_context( "key name", "ALT2_LS" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_RS, translate_marker_context( "key name", "ALT2_RS" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_UP,    translate_marker_context( "key name", "ALT2_UP" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_DOWN,  translate_marker_context( "key name", "ALT2_DOWN" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_LEFT,  translate_marker_context( "key name", "ALT2_LEFT" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_RIGHT, translate_marker_context( "key name", "ALT2_RIGHT" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_START, translate_marker_context( "key name", "ALT2_START" ) );
+    add_gamepad_keycode_pair( JOY_ALT2_BACK,  translate_marker_context( "key name", "ALT2_BACK" ) );
+
     add_mouse_keycode_pair( MouseInput::LeftButtonPressed,
                             translate_marker_context( "key name", "MOUSE_LEFT_PRESSED" ) );
     add_mouse_keycode_pair( MouseInput::LeftButtonReleased,

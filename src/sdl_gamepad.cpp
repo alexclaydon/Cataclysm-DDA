@@ -134,6 +134,9 @@ static direction radial_right_last_dir = direction::NONE;
 static bool radial_left_open = false;
 static bool radial_right_open = false;
 static bool alt_modifier_held = false;
+// Layer 2: LT held, then RT pulled. RT can only mean this while LT is down —
+// on its own it stays the movement commit, which is far too busy to modify.
+static bool alt2_modifier_held = false;
 
 // A radial is "open" once a stick has been deflected while LT is held. The
 // highlighted slot then latches: it survives the stick returning to centre,
@@ -291,6 +294,45 @@ static void send_input( int ibtn, input_event_t itype = input_event_t::gamepad )
 
 
 // Helper to get ALT variant of a button code
+// Second layer, entered by pulling RT while LT is already held. Buttons with
+// no ALT2 twin fall through to their base code rather than to the ALT one:
+// silently dropping to layer 1 would make a chord fire something unrelated.
+static int get_alt2_button( int base_code )
+{
+    switch( base_code ) {
+        case JOY_A:
+            return JOY_ALT2_A;
+        case JOY_B:
+            return JOY_ALT2_B;
+        case JOY_X:
+            return JOY_ALT2_X;
+        case JOY_Y:
+            return JOY_ALT2_Y;
+        case JOY_LB:
+            return JOY_ALT2_LB;
+        case JOY_RB:
+            return JOY_ALT2_RB;
+        case JOY_LS:
+            return JOY_ALT2_LS;
+        case JOY_RS:
+            return JOY_ALT2_RS;
+        case JOY_UP:
+            return JOY_ALT2_UP;
+        case JOY_DOWN:
+            return JOY_ALT2_DOWN;
+        case JOY_LEFT:
+            return JOY_ALT2_LEFT;
+        case JOY_RIGHT:
+            return JOY_ALT2_RIGHT;
+        case JOY_START:
+            return JOY_ALT2_START;
+        case JOY_BACK:
+            return JOY_ALT2_BACK;
+        default:
+            return base_code;
+    }
+}
+
 static int get_alt_button( int base_code )
 {
     switch( base_code ) {
@@ -504,21 +546,30 @@ static bool handle_axis_event( SDL_Event &event )
             // Right trigger (RT)
             if( !state && trigger_pressed ) {
                 triggers_state[idx] = 1;
-                // Check if direction is selected
-                if( left_stick_dir != direction::NONE ) {
+                if( alt_modifier_held ) {
+                    // LT is already down, so RT is the layer-2 gate rather than
+                    // the movement commit. Deliberately swallowed: walking with
+                    // the alt layer open served no purpose, and this is what
+                    // buys the second layer without spending a new button.
+                    alt2_modifier_held = true;
+                    // Drop any open wheel on the way in. A and B are intercepted
+                    // for the radial before the layer transform runs, so leaving
+                    // one up would make layer-2 chords fire wheel slots instead.
+                    dismiss_radials();
+                } else if( left_stick_dir != direction::NONE ) {
                     // Move in selected direction
                     send_direction_movement();
                     // Schedule repeat for continuous movement
                     schedule_task( task, now + repeat_delay, -1, 1 );
                 } else {
-                    // No direction selected - send JOY_RT event (with ALT if held) and schedule repeat
-                    int joy_code = alt_modifier_held ? get_alt_button( JOY_RT ) : JOY_RT;
-                    send_input( joy_code );
-                    schedule_task( task, now + repeat_delay, joy_code, 1 );
+                    // No direction selected - send JOY_RT event and schedule repeat
+                    send_input( JOY_RT );
+                    schedule_task( task, now + repeat_delay, JOY_RT, 1 );
                 }
             }
             if( state && trigger_released ) {
                 triggers_state[idx] = 0;
+                alt2_modifier_held = false;
                 cancel_task( task );
             }
         } else {
@@ -530,6 +581,10 @@ static bool handle_axis_event( SDL_Event &event )
             if( state && trigger_released ) {
                 triggers_state[idx] = 0;
                 alt_modifier_held = false;
+                // Layer 2 is gated on LT as well, so it cannot outlive it —
+                // otherwise letting go of LT first would strand the pad in a
+                // layer with no visible way back out.
+                alt2_modifier_held = false;
 
                 // Releasing LT also fires the latched slot, keeping the original
                 // one-motion flick-and-release as the fast path. A does the same
@@ -583,7 +638,7 @@ static bool handle_axis_event( SDL_Event &event )
                 radial_lockout[i] = false;
             }
 
-            if( alt_modifier_held && !radial_lockout[i] ) {
+            if( alt_modifier_held && !alt2_modifier_held && !radial_lockout[i] ) {
                 // When LT is held, sticks control radial menu state
                 direction &radial_last = ( i == 0 ) ? radial_left_last_dir : radial_right_last_dir;
                 bool &radial_open = ( i == 0 ) ? radial_left_open : radial_right_open;
@@ -804,9 +859,14 @@ static bool handle_button_event( SDL_Event &event )
             break;
     }
 
-    // Apply ALT modifier if held (only for non-keyboard inputs)
-    if( joy_code != -1 && alt_modifier_held && input_type == input_event_t::gamepad ) {
-        joy_code = get_alt_button( joy_code );
+    // Apply ALT modifier if held (only for non-keyboard inputs). Layer 2 wins
+    // when both are down, since it can only be entered through layer 1.
+    if( joy_code != -1 && input_type == input_event_t::gamepad ) {
+        if( alt2_modifier_held ) {
+            joy_code = get_alt2_button( joy_code );
+        } else if( alt_modifier_held ) {
+            joy_code = get_alt_button( joy_code );
+        }
     }
 
     if( joy_code != -1 ) {
