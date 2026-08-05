@@ -546,9 +546,16 @@ void game_ui::init_ui()
 #if !defined(__ANDROID__)
     // On Android the grid follows the orientation, so a portrait grid must not
     // be stored as landscape size
-    get_options().get_option( "TERMINAL_X" ).setValue( TERMX * get_scaling_factor() );
-    get_options().get_option( "TERMINAL_Y" ).setValue( TERMY * get_scaling_factor() );
-    get_options().save();
+    // Headless runs — --check-mods, --verify — load options but never call
+    // catacurses::init_interface(), so the terminal globals are still zero
+    // here. Writing them back would clamp the player's configured size to the
+    // option minimum and save it, which is how a mod check silently reset the
+    // terminal to 80x24 on every rebuild.
+    if( TERMX > 0 && TERMY > 0 ) {
+        get_options().get_option( "TERMINAL_X" ).setValue( TERMX * get_scaling_factor() );
+        get_options().get_option( "TERMINAL_Y" ).setValue( TERMY * get_scaling_factor() );
+        get_options().save();
+    }
 #endif
 #else
     TERMY = getmaxy( catacurses::stdscr );
