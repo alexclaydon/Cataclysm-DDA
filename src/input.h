@@ -263,6 +263,23 @@ constexpr int JOY_R_RADIAL_SW = 256 + 77;
 constexpr int JOY_R_RADIAL_W  = 256 + 78;
 constexpr int JOY_R_RADIAL_NW = 256 + 79;
 
+// Second ALT layer (LT held, then RT pulled). No ALT2_RT — RT is the gate —
+// and no ALT2_LT, for the same reason LT has no ALT twin.
+constexpr int JOY_ALT2_A  = 256 + 80;
+constexpr int JOY_ALT2_B  = 256 + 81;
+constexpr int JOY_ALT2_X  = 256 + 82;
+constexpr int JOY_ALT2_Y  = 256 + 83;
+constexpr int JOY_ALT2_RB = 256 + 84;
+constexpr int JOY_ALT2_LB = 256 + 85;
+constexpr int JOY_ALT2_LS = 256 + 86;
+constexpr int JOY_ALT2_RS = 256 + 87;
+constexpr int JOY_ALT2_UP    = 256 + 88;
+constexpr int JOY_ALT2_DOWN  = 256 + 89;
+constexpr int JOY_ALT2_LEFT  = 256 + 90;
+constexpr int JOY_ALT2_RIGHT = 256 + 91;
+constexpr int JOY_ALT2_START = 256 + 92;
+constexpr int JOY_ALT2_BACK  = 256 + 93;
+
 
 /**
  * Manages the translation from action IDs to associated input.

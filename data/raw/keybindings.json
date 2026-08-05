@@ -3751,7 +3751,7 @@
     "bindings": [
       { "input_method": "keyboard_char", "key": "\"" },
       { "input_method": "keyboard_code", "key": "'", "mod": [ "shift" ] },
-      { "input_method": "gamepad", "key": "ALT_RT" }
+      { "input_method": "gamepad", "key": "ALT2_START" }
     ]
   },
   {
