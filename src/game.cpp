@@ -5956,11 +5956,11 @@ std::optional<std::vector<tripoint_bub_ms>> game::safe_route_to( Character &who,
     return shortest_route;
 }
 
-std::optional<tripoint_bub_ms> game::look_around()
+std::optional<tripoint_bub_ms> game::look_around( bool persist_offset )
 {
     tripoint_bub_ms center = u.pos_bub() + u.view_offset;
     look_around_result result = look_around( /*show_window=*/true, center, center, false, false,
-                                false );
+                                false, false, tripoint_bub_ms::zero, true, persist_offset );
     return result.position;
 }
 
@@ -5968,7 +5968,7 @@ look_around_result game::look_around(
     const bool show_window, tripoint_bub_ms &center, const tripoint_bub_ms &start_point,
     bool has_first_point,
     bool select_zone, bool peeking, bool is_moving_zone, const tripoint_bub_ms &end_point,
-    bool change_lv )
+    bool change_lv, bool persist_offset )
 {
     map &here = get_map();
 
@@ -6131,7 +6131,7 @@ look_around_result game::look_around(
     add_draw_callback( zone_cb );
 
     is_looking = true;
-    const tripoint_rel_ms prev_offset = u.view_offset;
+    tripoint_rel_ms prev_offset = u.view_offset;
 #if defined(TILES)
     const int prev_tileset_zoom = uistate.tileset_zoom;
     while( is_moving_zone && square_dist( start_point, end_point ) > 256 / get_zoom() &&
@@ -6246,6 +6246,10 @@ look_around_result game::look_around(
             center = u.pos_bub();
             lp = u.pos_bub();
             u.view_offset.z() = 0;
+            // Asking to recentre should stick however the player leaves, so
+            // forget the offset we came in with — otherwise QUIT would restore
+            // the very offset they just cleared.
+            prev_offset = tripoint_rel_ms::zero;
         } else if( action == "MOUSE_MOVE" || action == "TIMEOUT" ) {
             // This block is structured this way so that edge scroll can work
             // whether the mouse is moving at the edge or simply stationary
@@ -6298,7 +6302,12 @@ look_around_result game::look_around(
     }
 
     ctxt.reset_timeout();
-    u.view_offset = prev_offset;
+    // Free look leaves the camera where the player panned it if they confirmed
+    // with A; QUIT puts it back. Pickers never persist, or choosing a tile
+    // would park the camera on it.
+    if( !persist_offset || action != "CONFIRM" ) {
+        u.view_offset = prev_offset;
+    }
     zone_cb = nullptr;
     is_looking = false;
 
