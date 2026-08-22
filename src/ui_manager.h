@@ -230,6 +230,7 @@ class ui_adaptor
         static void invalidate( const rectangle<point> &rect, bool reenable_uis_below );
         static bool has_imgui();
         static void redraw();
+        static void redraw_all();
         static void redraw_invalidated();
         static void screen_resized();
         static size_t ui_stack_size();
@@ -288,6 +289,10 @@ void invalidate( const rectangle<point> &rect, bool reenable_uis_below );
  * calculated within the respective callbacks.
  **/
 void redraw();
+/**
+ * Invalidate every window in the UI stack and redraw all of them.
+ **/
+void redraw_all();
 /**
  * Redraw all invalidated windows without invalidating the top window.
  **/

@@ -1175,18 +1175,19 @@ class game
         map &m; // NOLINT(cata-serialize)
         // 'current_map' will be identical to 'm' as you can save only at the top of the main loop.
         ::current_map &current_map; // NOLINT(cata-serialize)
-        avatar &u;
         scent_map &scent;
         // scenario is saved in avatar::store
         const scenario *scen = nullptr; // NOLINT(cata-serialize)
 
-        event_bus &events();
         timed_event_manager &timed_events; // NOLINT(cata-serialize)
         memorial_logger &memorial();
 
         global_variables global_variables_instance;
         std::unordered_map<std::string, point_abs_om> unique_npcs;
     public:
+        // Public so the iOS app shell (CDDA_IOS builds) can reach them.
+        event_bus &events();
+        avatar &u;
         void update_unique_npc_location( const std::string &id, point_abs_om loc );
         point_abs_om get_unique_npc_location( const std::string &id );
         bool unique_npc_exists( const std::string &id );
