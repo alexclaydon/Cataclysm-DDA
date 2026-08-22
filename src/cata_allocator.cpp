@@ -4,8 +4,13 @@
 #define __has_feature(x) 0
 #endif
 
-// snmalloc isn't compatible with any sanitizers.
-#if !defined(__SANITIZE_ADDRESS__) && !__has_feature(address_sanitizer)
+// snmalloc isn't compatible with any sanitizers, and its Apple PAL needs
+// the mach_vm_* API, which iOS doesn't ship. Hosted on macOS (CDDA_GODOT,
+// a dylib in Godot), its operator new and delete bind only inside the
+// library: libc++'s own out-of-line code keeps the system allocator, so a
+// string grown there frees snmalloc memory with the system's free.
+#if !defined(__SANITIZE_ADDRESS__) && !__has_feature(address_sanitizer) \
+    && !(defined(CDDA_GODOT) && defined(__APPLE__))
 #define CATA_USE_SNMALLOC
 #endif
 
