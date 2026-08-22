@@ -4,8 +4,9 @@
 #define __has_feature(x) 0
 #endif
 
-// snmalloc isn't compatible with any sanitizers.
-#if !defined(__SANITIZE_ADDRESS__) && !__has_feature(address_sanitizer)
+// snmalloc isn't compatible with any sanitizers, and its Apple PAL needs
+// the mach_vm_* API, which iOS doesn't ship.
+#if !defined(__SANITIZE_ADDRESS__) && !__has_feature(address_sanitizer) && !defined(CDDA_IOS)
 #define CATA_USE_SNMALLOC
 #endif
 
