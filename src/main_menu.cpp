@@ -677,7 +677,9 @@ bool main_menu::opening_screen()
 #endif
 
     while( !start ) {
-        ui_manager::redraw();
+        // redraw_all: on iOS the layer under the menu otherwise keeps a stale
+        // cursor position after the resolution settles.
+        ui_manager::redraw_all();
         std::string action = ctxt.handle_input();
         input_event sInput = ctxt.get_raw_input();
 

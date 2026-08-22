@@ -48,6 +48,8 @@
 #include "game_ui.h"
 #if defined(CDDA_GODOT)
 #include "godot_host.h"
+// From SDL_main.h, which would also redefine main() (see InitSDL).
+extern "C" SDL_DECLSPEC void SDLCALL SDL_SetMainReady( void );
 #endif
 #include "hash_utils.h"
 #include "horde_entity.h"
@@ -273,8 +275,18 @@ static void InitSDL()
     // offscreen window never receives focus.
     SDL_SetHint( SDL_HINT_VIDEO_DRIVER, "offscreen" );
     SDL_SetHint( SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1" );
+#if defined(__APPLE__)
+    // macOS SDL backs a window surface with a GPU renderer by default, and
+    // in Godot's process that reaches Godot's own MoltenVK. Frames are read
+    // back from the software renderer's target, so a plain surface will do.
+    SDL_SetHint( SDL_HINT_FRAMEBUFFER_ACCELERATION, "0" );
+#endif
 #endif
 
+#if defined(CDDA_GODOT)
+    // Hosted, SDL never ran main(): on iOS SDL_Init refuses until told so.
+    SDL_SetMainReady();
+#endif
     throwErrorIf( !SDL_Init( init_flags ), "SDL_Init failed" );
     throwErrorIf( !TTF_Init(), "TTF_Init failed" );
     // There is no IMG_Init; the loading functions initialize on demand.
@@ -5887,7 +5899,7 @@ static void CheckMessages()
                         HideCursor();
                     }
                     keyboard_mode mode = keyboard_mode::keychar;
-#if !defined(__ANDROID__) && !(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1)
+#if !defined(__ANDROID__) && (!(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1) || defined(CDDA_GODOT))
                     if( !IsTextInputActive( ::window.get() ) ) {
                         mode = keyboard_mode::keycode;
                     }
@@ -5954,7 +5966,7 @@ static void CheckMessages()
                     }
 #endif
                     keyboard_mode mode = keyboard_mode::keychar;
-#if !defined(__ANDROID__) && !(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1)
+#if !defined(__ANDROID__) && (!(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1) || defined(CDDA_GODOT))
                     if( !IsTextInputActive( ::window.get() ) ) {
                         mode = keyboard_mode::keycode;
                     }
@@ -6418,6 +6430,16 @@ static void CheckMessages()
     }
     if( quit ) {
         catacurses::endwin();
+#if defined(CDDA_GODOT) && defined(__APPLE__)
+        // Hosted on macOS, a window close ends the process from here, as
+        // stock does, but quits SDL first on its own thread (macOS SDL's
+        // joystick and audio teardown crash from any other) and skips the
+        // exit handlers, which would tear down Godot under its running main
+        // thread.
+        deinitDebug();
+        SDL_Quit();
+        std::_Exit( 0 );
+#endif
         exit( 0 );
     }
 }
@@ -6769,7 +6791,7 @@ input_event input_manager::get_input_event( const keyboard_mode preferred_keyboa
     SDL_PumpEvents();
     drain_renderer_recovery();
 
-#if !defined(__ANDROID__) && !(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1)
+#if !defined(__ANDROID__) && (!(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1) || defined(CDDA_GODOT))
     if( actual_keyboard_mode( preferred_keyboard_mode ) == keyboard_mode::keychar ) {
         focus_aware_start_text_input();
     } else {
