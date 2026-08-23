@@ -56,6 +56,9 @@
 #include "game.h"
 #include "game_constants.h"
 #include "game_ui.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 #include "hash_utils.h"
 #include "horde_entity.h"
 #include "input.h"
@@ -171,6 +174,46 @@ static int TERMINAL_HEIGHT;
 static bool fullscreen;
 static int scaling_factor;
 
+#if defined(CDDA_GODOT)
+// A key held down (its repeats): Dark Forest's snapshot skip.
+static bool key_repeating = false;
+
+// Held walking, when the game falls behind it (ADR 0016): the 3D view's
+// snapshot, recorded on every redraw, costs each step more as the radius
+// grows (the whole square, every storey), and a held move waits for it.
+// While the held move's next step is already due (the pad's walking
+// repeat, a key's repeat queued) and nothing hostile is in view, a redraw
+// skips the recording, but never for longer than SNAPSHOT_GAP_MS since the
+// last one. So it skips as many steps as keep the walk at its pace: none
+// when the game keeps up. A skipped one is owed
+// (godot_host::snapshot_owed), paid by the next recording or by the play
+// loop's flush once input stops. A stopgap until the recording itself gets
+// cheaper.
+static constexpr uint32_t SNAPSHOT_GAP_MS = 250;
+
+static bool skip_map_snapshot()
+{
+    static tripoint_abs_ms recorded_at;
+    static uint32_t recorded_ms = 0;
+    static bool have_recorded = false;
+    const tripoint_abs_ms at = get_avatar().pos_abs();
+    const uint32_t now = GetTicks();
+    const bool flush = godot_host::take_snapshot_flush();
+    const bool key_due = key_repeating &&
+                         SDL_PeepEvents( nullptr, 0, SDL_PEEKEVENT, CATA_KEYDOWN, CATA_KEYDOWN ) > 0;
+    const bool skip = !flush && have_recorded && ( gamepad::move_due() || key_due ) &&
+                      g->mostseen == 0 && at.z() == recorded_at.z() &&
+                      square_dist( at, recorded_at ) <= 4 && now - recorded_ms < SNAPSHOT_GAP_MS;
+    if( !skip ) {
+        recorded_at = at;
+        recorded_ms = now;
+        have_recorded = true;
+    }
+    godot_host::set_snapshot_owed( skip );
+    return skip;
+}
+#endif
+
 using cata_cursesport::cursecell;
 
 //***********************************
@@ -235,6 +278,14 @@ static void InitSDL()
     // identifying itself when asking to inhibit screensaver via dbus under
     // Linux.
     SDL_SetHint( SDL_HINT_APP_NAME, _( "Cataclysm: Dark Days Ahead" ) );
+#endif
+
+#if defined(CDDA_GODOT)
+    // Hosted (godot_host.h): no window of our own. Render offscreen for the
+    // host to show, and keep gamepad events flowing even though the
+    // offscreen window never receives focus.
+    SDL_SetHint( SDL_HINT_VIDEO_DRIVER, "offscreen" );
+    SDL_SetHint( SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1" );
 #endif
 
 #if defined(__linux__) && SDL_MAJOR_VERSION < 3
@@ -602,7 +653,11 @@ static void WinCreate()
     // Track desired fullscreen mode separately; applied after window creation
     FullscreenMode desired_fullscreen = FullscreenMode::windowed;
 
-#if !defined(__ANDROID__) && !defined(EMSCRIPTEN)
+    // Hosted (CDDA_GODOT), the window is offscreen and the host owns the
+    // screen: always windowed at the terminal's size, whatever FULLSCREEN
+    // says, so Dark Forest can share the flat game's options.json
+    // (ADR 0007).
+#if !defined(__ANDROID__) && !defined(EMSCRIPTEN) && !defined(CDDA_GODOT)
     if( get_option<std::string>( "FULLSCREEN" ) == "fullscreen" ) {
         desired_fullscreen = FullscreenMode::fullscreen_exclusive;
         fullscreen = true;
@@ -656,6 +711,9 @@ static void WinCreate()
 
     ::window = CreateGameWindow( "", display, WindowWidth, WindowHeight, window_flags );
     throwErrorIf( !::window, "CreateWindow failed" );
+#if defined(CDDA_GODOT)
+    godot_host::set_window_id( SDL_GetWindowID( ::window.get() ) );
+#endif
 
     // Apply fullscreen after creation to preserve exclusive vs desktop distinction
     if( desired_fullscreen != FullscreenMode::windowed ) {
@@ -687,6 +745,11 @@ static void WinCreate()
     // layer via SDL_RENDER_DRIVER environment variable (env > SDL_SetHint).
     bool software_renderer = false;
     std::string renderer_name;
+#if defined(CDDA_GODOT)
+    // The offscreen driver has no GPU swapchain; frames are read back from
+    // the software renderer's target (godot_host::publish_frame).
+    software_renderer = true;
+#endif
 #else
     bool software_renderer = get_option<std::string>( "RENDERER" ).empty();
     std::string renderer_name;
@@ -840,6 +903,65 @@ static const SDL_Color &color_as_sdl( const unsigned char color )
 {
     return windowsPalette[color];
 }
+
+#if defined(CDDA_GODOT)
+// A sidebar panel's window as BBCode rows, its cells' text in runs of one
+// colour (the palette's), then the window blanked so the frame shows
+// nothing there (plan 0020). Trailing blanks dropped; '[' escaped.
+void godot_host::sidebar_capture( const std::string &id, const catacurses::window &w )
+{
+    cata_cursesport::WINDOW *const win = w.get<cata_cursesport::WINDOW>();
+    if( win == nullptr ) {
+        return;
+    }
+    std::vector<std::string> rows;
+    for( const cata_cursesport::curseline &line : win->line ) {
+        std::string row;
+        int fg = -1;
+        int bg = -1;
+        size_t kept = 0;  // row's length up to its last non-blank cell
+        int kept_bg = 0;  // that cell's run's background
+        bool open = false;
+        for( const cata_cursesport::cursecell &cell : line.chars ) {
+            if( cell.ch.empty() ) {
+                continue;  // a wide character's second half
+            }
+            const int cf = static_cast<int>( cell.FG );
+            const int cb = static_cast<int>( cell.BG );
+            if( cf != fg || cb != bg ) {
+                if( open ) {
+                    row += bg > 0 ? "[/bgcolor][/color]" : "[/color]";
+                }
+                const SDL_Color &c = color_as_sdl( static_cast<unsigned char>( cf ) );
+                row += string_format( "[color=#%02x%02x%02x]", c.r, c.g, c.b );
+                if( cb > 0 ) {
+                    const SDL_Color &b = color_as_sdl( static_cast<unsigned char>( cb ) );
+                    row += string_format( "[bgcolor=#%02x%02x%02x]", b.r, b.g, b.b );
+                }
+                fg = cf;
+                bg = cb;
+                open = true;
+            }
+            row += cell.ch == "[" ? "[lb]" : cell.ch;
+            if( cell.ch != " " || cb > 0 ) {
+                kept = row.size();
+                kept_bg = cb;
+            }
+        }
+        row.resize( kept );
+        if( open && kept > 0 ) {
+            row += kept_bg > 0 ? "[/bgcolor][/color]" : "[/color]";
+        }
+        rows.push_back( std::move( row ) );
+    }
+    while( !rows.empty() && rows.back().empty() ) {
+        rows.pop_back();
+    }
+    godot_host::sidebar_rows( id, std::move( rows ) );
+    werase( w );
+    wnoutrefresh( w );
+}
+#endif
 
 #if defined(__ANDROID__)
 void draw_terminal_size_preview();
@@ -1061,6 +1183,10 @@ void refresh_display()
     draw_virtual_joystick();
 #endif
     draw_gamepad_radial_menu();
+#if defined(CDDA_GODOT)
+    godot_host::set_glyph_style( gamepad::host_glyph_style() );
+    godot_host::publish_frame( renderer.get() );
+#endif
     RenderPresent( renderer );
 }
 
@@ -3664,6 +3790,15 @@ void cata_cursesport::curses_drawwindow( const catacurses::window &w )
         // Strings with colors do be drawn with map_font on top of tiles.
         std::multimap<point, formatted_text> overlay_strings;
 
+#if defined(CDDA_GODOT)
+        const bool snapshot = !skip_map_snapshot();
+        if( snapshot ) {
+            const tripoint_bub_ms you = get_avatar().pos_bub();
+            const tripoint_abs_ms you_abs = get_avatar().pos_abs();
+            godot_host::begin_map_snapshot( g->ter_view_p.x(), g->ter_view_p.y(), g->ter_view_p.z(),
+                                            you.x(), you.y(), you.z(), you_abs.x(), you_abs.y() );
+        }
+#endif
         // game::w_terrain can be drawn by the tilecontext.
         // skip the normal drawing code for it.
         tilecontext->draw(
@@ -3673,6 +3808,11 @@ void cata_cursesport::curses_drawwindow( const catacurses::window &w )
             TERRAIN_WINDOW_TERM_HEIGHT * font->height,
             overlay_strings,
             color_blocks );
+#if defined(CDDA_GODOT)
+        if( snapshot ) {
+            godot_host::end_map_snapshot();
+        }
+#endif
 
         // color blocks overlay
         if( !color_blocks.second.empty() ) {
@@ -4883,6 +5023,10 @@ void draw_virtual_joystick()
 
 static void draw_gamepad_radial_menu()
 {
+#if defined(CDDA_GODOT)
+    // No wheel this frame unless it draws below.
+    godot_host::set_radial_window( 0, 0, 0, 0 );
+#endif
     if( !gamepad::is_active() || !gamepad::is_alt_held() ) {
         return;
     }
@@ -4901,7 +5045,13 @@ static void draw_gamepad_radial_menu()
         return;
     }
 
-    input_context *ctxt = input_context::input_context_stack.back();
+    // The context waiting for input, which a slot's input will reach; the
+    // stack top can be another (in the inventory it was a "default" one, so
+    // every slot read "None").
+    input_context *ctxt = input_context::polling;
+    if( !ctxt ) {
+        ctxt = input_context::input_context_stack.back();
+    }
     if( !ctxt ) {
         return;
     }
@@ -4910,18 +5060,19 @@ static void draw_gamepad_radial_menu()
     int h;
     GetRendererOutputSize( renderer, &w, &h );
 
-    // Draw a semi-transparent black background over the whole screen
-    SetRenderDrawBlendMode( renderer, SDL_BLENDMODE_BLEND );
-    geometry->rect( renderer, { 0, 0, w, h }, { 0, 0, 0, 150 } );
-    SetRenderDrawBlendMode( renderer, SDL_BLENDMODE_NONE );
-
     const point center( w / 2, h / 2 );
+#if defined(CDDA_GODOT)
+    // A floating window, sized in front of the player rather than to fill
+    // a screen: compact, at the font's own size.
+    const float radius = h * 0.22f;
+    float text_scale = 1.0f;
+#else
     const float radius = h * 0.8f / 2.0f;
 
     // Scale font relative to window height.
     // Base scale 1.0 at 720p, for labels to be legible.
     float text_scale = static_cast<float>( h ) / 720.0f * 1.0f;
-    RenderSetScale( renderer, text_scale, text_scale );
+#endif
 
     static const std::vector<gamepad::direction> directions = {
         gamepad::direction::N, gamepad::direction::NE, gamepad::direction::E,
@@ -4929,8 +5080,8 @@ static void draw_gamepad_radial_menu()
         gamepad::direction::W, gamepad::direction::NW
     };
 
-    for( size_t i = 0; i < directions.size(); ++i ) {
-        gamepad::direction dir = directions[i];
+    std::vector<std::string> labels;
+    for( gamepad::direction dir : directions ) {
         int joy_code = gamepad::direction_to_radial_joy( dir, stick_idx );
         input_event event( joy_code, input_event_t::gamepad );
         const std::string &action = ctxt->input_to_action( event );
@@ -4944,6 +5095,38 @@ static void draw_gamepad_radial_menu()
                 label = "None";
             }
         }
+        labels.push_back( label );
+    }
+
+#if defined(CDDA_GODOT)
+    // The VR host floats only UI windows, so the wheel gets one of its own,
+    // on top of the stack: an opaque panel around the labels instead of the
+    // full-screen scrim (which would dim the windows floating beneath it).
+    {
+        int widest = 0;
+        for( const std::string &label : labels ) {
+            widest = std::max( widest, utf8_width( label ) );
+        }
+        const int pad = static_cast<int>( font->height * text_scale );
+        const int half_w = static_cast<int>( radius + font->width * widest * text_scale / 2 ) + pad;
+        const int half_h = static_cast<int>( radius + font->height * text_scale / 2 ) + pad;
+        const SDL_Rect box{ std::max( 0, center.x - half_w ), std::max( 0, center.y - half_h ),
+                            std::min( w, 2 * half_w ), std::min( h, 2 * half_h ) };
+        geometry->rect( renderer, box, { 12, 14, 18, 255 } );
+        godot_host::set_radial_window( box.x, box.y, box.w, box.h );
+    }
+#else
+    // Draw a semi-transparent black background over the whole screen
+    SetRenderDrawBlendMode( renderer, SDL_BLENDMODE_BLEND );
+    geometry->rect( renderer, { 0, 0, w, h }, { 0, 0, 0, 150 } );
+    SetRenderDrawBlendMode( renderer, SDL_BLENDMODE_NONE );
+#endif
+
+    RenderSetScale( renderer, text_scale, text_scale );
+
+    for( size_t i = 0; i < directions.size(); ++i ) {
+        gamepad::direction dir = directions[i];
+        const std::string &label = labels[i];
 
         // Angle in radians (0 is North, clockwise)
         float angle = i * ( 2.0f * M_PI / 8.0f );
@@ -5147,7 +5330,13 @@ void android_vibrate()
 #endif
 
 #if !defined(__ANDROID__)
+#if defined(CDDA_GODOT)
+// Hosted: the offscreen window never gets focus events, and the host only
+// forwards input that is meant for the game. Text input needs focus.
+static bool window_focus = true;
+#else
 static bool window_focus = false;
+#endif
 static bool text_input_active_when_regaining_focus = false;
 #endif
 
@@ -5193,7 +5382,31 @@ static void CheckMessages()
     bool text_refresh = false;
     bool is_repeat = false;
 
+#if defined(CDDA_GODOT)
+    // The host's terminal size (a phone turned), as a window resize, taken
+    // before the drain so it applies now, then redrawn: a screen waiting
+    // for input would otherwise show the old frame until a key came.
+    int request_columns = 0;
+    int request_rows = 0;
+    // The redraw comes a pump after the resize: in the pump that rebuilt the
+    // buffer, nothing drawn reached the screen.
+    static bool redraw_after_resize = false;
+    const bool redraw_now = redraw_after_resize;
+    redraw_after_resize = false;
+    if( godot_host::take_terminal_request( request_columns, request_rows ) ) {
+        resize_term( request_columns, request_rows );
+        // Pump so the resize event reaches the coordinator's watch, and the
+        // drain below applies it.
+        SDL_PumpEvents();
+        redraw_after_resize = true;
+        godot_host::wake();
+    }
+#endif
     drain_renderer_recovery();
+#if defined(CDDA_GODOT)
+    // The host's mouse, and the state it reads (godot_pump.cpp).
+    godot_host::pump_engine_state();
+#endif
 
 #if defined(__ANDROID__)
     static uint32_t last_seen_visible_frame_seq = 0;
@@ -5593,6 +5806,9 @@ static void CheckMessages()
         } else {
             switch( ev.type ) {
                 case CATA_KEYDOWN: {
+                    // An Enter or Escape from here on is the keyboard's,
+                    // not the pad's A or B (query_popup's yes/no).
+                    gamepad::note_keyboard_input();
 #if defined(__ANDROID__)
                     // Toggle virtual keyboard with Android back button. For some reason I get double inputs, so ignore everything once it's already down.
                     if( GetKeysym( ev ).sym == SDLK_AC_BACK && ac_back_down_time == 0 ) {
@@ -5601,6 +5817,9 @@ static void CheckMessages()
                     }
 #endif
                     is_repeat = ev.key.repeat;
+#if defined(CDDA_GODOT)
+                    key_repeating = ev.key.repeat;
+#endif
                     //hide mouse cursor on keyboard input
                     if( get_option<std::string>( "HIDE_CURSOR" ) != "show" && IsCursorVisible() ) {
                         HideCursor();
@@ -5649,6 +5868,9 @@ static void CheckMessages()
                 }
                 break;
                 case CATA_KEYUP: {
+#if defined(CDDA_GODOT)
+                    key_repeating = false;
+#endif
 #if defined(__ANDROID__)
                     // Toggle virtual keyboard with Android back button
                     if( GetKeysym( ev ).sym == SDLK_AC_BACK ) {
@@ -5785,6 +6007,8 @@ static void CheckMessages()
                     if( ! mouse.enabled ) {
                         break;
                     }
+                    // A click is not the pad: its glyphs give way (query_popup).
+                    gamepad::note_keyboard_input();
                     if( cataimgui::client::want_capture_mouse() ) {
                         break;
                     }
@@ -6113,6 +6337,20 @@ static void CheckMessages()
             break;
         }
     }
+#if defined(CDDA_GODOT)
+    if( redraw_now ) {
+        // The resize left a new, blank buffer: redraw it all, the game's
+        // sidebar first, since a menu over the game (the inventory) stops the
+        // screens below it redrawing and the band would stay black, then
+        // every open screen on top of it.
+        if( godot_host::in_game() ) {
+            g->draw_panels( true );
+        }
+        ui_manager::invalidate_all_ui_adaptors();
+        ui_manager::redraw_invalidated();
+        needupdate = true;
+    }
+#endif
     if( needupdate ) {
         try_sdl_update();
     }

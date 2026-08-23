@@ -220,6 +220,8 @@ void avatar::power_mutations()
     input_context ctxt( "MUTATIONS", keyboard_mode::keychar );
     ctxt.register_updown();
     ctxt.register_action( "ANY_INPUT" );
+    // Mutation letters only: the pad's X can open the action list.
+    ctxt.allow_action_palette();
     ctxt.register_action( "TOGGLE_EXAMINE" );
     ctxt.register_action( "TOGGLE_SPRITE" );
     ctxt.register_action( "REASSIGN" );

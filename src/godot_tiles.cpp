@@ -1,0 +1,258 @@
+#if defined(CDDA_GODOT)
+
+// cata_tiles::draw's additions for Dark Forest (godot_tiles.h). Moved here
+// from cata_tiles.cpp unchanged (2026-11-09, ADR 0018), where upstream's
+// lighting rework kept conflicting with them.
+
+#include <algorithm>
+#include <array>
+#include <bitset>
+#include <chrono>
+#include <cstdint>
+#include <cstdlib>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "avatar.h"
+#include "calendar.h"
+#include "cata_tiles.h"
+#include "coordinates.h"
+#include "creature.h"
+#include "field_type.h"
+#include "game.h"
+#include "godot_host.h"
+#include "godot_tiles.h"
+#include "level_cache.h"
+#include "lightmap.h"
+#include "map.h"
+#include "map_memory.h"
+#include "map_scale_constants.h"
+#include "mapdata.h"
+#include "point.h"
+#include "string_id.h"
+#include "type_id.h"
+#include "units.h"
+#include "weather.h"
+#include "weather_type.h"
+
+static const std::string empty_string;
+
+void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
+{
+    // The sheets behind the snapshot's sprite indices, for the VR host.
+    if( godot_host::tileset_changed( ct.tileset_ptr.get() ) ) {
+        godot_host::tileset_info info;
+        info.tile_width = ct.tileset_ptr->get_tile_width();
+        info.tile_height = ct.tileset_ptr->get_tile_height();
+        for( const atlas_replay_descriptor &d : ct.tileset_ptr->get_atlas_descriptors() ) {
+            info.sheets.push_back( { d.image_path_u8, d.atlas_offset, d.expected_tilecount,
+                                     d.sprite_width, d.sprite_height, { d.color_key_r, d.color_key_g, d.color_key_b } } );
+        }
+        godot_host::publish_tileset( std::move( info ) );
+    }
+    // Terrain and furniture properties, for its modelling rules. The key
+    // changes when a world with different data is loaded.
+    if( godot_host::map_objects_changed( ( static_cast<uint64_t>( ter_t::count() ) << 32 ) ^
+                                         furn_t::count() ^ reinterpret_cast<uintptr_t>( &ter_id( 0 ).obj() ) ) ) {
+        // Terrain is impassable at movecost 0; furniture's movecost is a
+        // modifier (move_cost_mod), impassable when negative.
+        const auto props = []( const map_data_common_t &t, bool furniture ) {
+            uint32_t f = 0;
+            const auto set = [&]( ter_furn_flag flag, uint32_t bit ) {
+                if( t.has_flag( flag ) ) {
+                    f |= bit;
+                }
+            };
+            set( ter_furn_flag::TFLAG_WALL, godot_host::MOF_WALL );
+            set( ter_furn_flag::TFLAG_DOOR, godot_host::MOF_DOOR );
+            set( ter_furn_flag::TFLAG_WINDOW, godot_host::MOF_WINDOW );
+            set( ter_furn_flag::TFLAG_TRANSPARENT, godot_host::MOF_TRANSPARENT );
+            set( ter_furn_flag::TFLAG_TREE, godot_host::MOF_TREE );
+            set( ter_furn_flag::TFLAG_SHRUB, godot_host::MOF_SHRUB );
+            set( ter_furn_flag::TFLAG_YOUNG, godot_host::MOF_SHRUB );
+            set( ter_furn_flag::TFLAG_NO_FLOOR, godot_host::MOF_NO_FLOOR );
+            set( ter_furn_flag::TFLAG_THIN_OBSTACLE, godot_host::MOF_THIN_OBSTACLE );
+            set( ter_furn_flag::TFLAG_SHORT, godot_host::MOF_SHORT );
+            set( ter_furn_flag::TFLAG_FLAT, godot_host::MOF_FLAT );
+            set( ter_furn_flag::TFLAG_FLOWER, godot_host::MOF_FLOWER );
+            set( ter_furn_flag::TFLAG_FLAT_SURF, godot_host::MOF_FLAT_SURF );
+            set( ter_furn_flag::TFLAG_CONTAINER, godot_host::MOF_CONTAINER );
+            set( ter_furn_flag::TFLAG_LOCKED, godot_host::MOF_LOCKED );
+            set( ter_furn_flag::TFLAG_GOES_UP, godot_host::MOF_GOES_UP );
+            set( ter_furn_flag::TFLAG_GOES_DOWN, godot_host::MOF_GOES_DOWN );
+            if( furniture ? t.movecost < 0 : t.movecost == 0 ) {
+                f |= godot_host::MOF_IMPASSABLE;
+            }
+            return f;
+        };
+        godot_host::map_objects_info objects;
+        for( size_t i = 0; i < ter_t::count(); ++i ) {
+            const ter_t &t = ter_id( static_cast<int>( i ) ).obj();
+            objects.objects.push_back( { t.id.str(), false, props( t, false ), t.movecost, t.coverage } );
+        }
+        for( size_t i = 0; i < furn_t::count(); ++i ) {
+            const furn_t &f = furn_id( static_cast<int>( i ) ).obj();
+            objects.objects.push_back( { f.id.str(), true, props( f, true ), f.movecost, f.coverage } );
+        }
+        for( const field_type &ft : field_types::get_all() ) {
+            const bool flat = ft.phase == phase_id::LIQUID || ft.phase == phase_id::SOLID;
+            objects.objects.push_back( { ft.id.str(), false, flat ? godot_host::MOF_FLAT : 0u, 0, 0, true } );
+        }
+        godot_host::publish_map_objects( std::move( objects ) );
+    }
+}
+
+void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_ms &center,
+                                 const tripoint_bub_ms &you_pos )
+{
+    // The storeys below the avatar's, for the VR host's 3D view: what the
+    // avatar remembers of them (the 2D view never shows them), recorded by
+    // the same layer functions in their memory mode, without drawing.
+    if( godot_host::recording_map() ) {
+        const int r = godot_host::snapshot_radius();
+        // The square the snapshot covers: about the view's centre, as the
+        // board is (the avatar's storey, though: look-around's cursor can
+        // change storeys, the board doesn't).
+        const point mid = center.xy().raw();
+        {
+            const weather_manager &weather = get_weather();
+            const weather_type &type = weather.weather_id.obj();
+            godot_host::record_map_weather( weather.winddirection, weather.windspeed,
+                                            static_cast<int>( type.precip ), type.rains );
+            // The engine's azimuth runs from the south, positive to the
+            // west; the host wants compass bearings. The moon trails the sun
+            // by its phase (new with the sun, full opposite it): where the
+            // sun was that long ago is a fair stand-in for where it is.
+            const time_point now = calendar::turn;
+            const int phase = static_cast<int>( get_moon_phase( now ) );
+            const auto sun = sun_azimuth_altitude( now );
+            const auto moon = sun_azimuth_altitude( now - time_duration::from_seconds( phase * 24 * 3600 / 8 ) );
+            godot_host::record_map_sky( static_cast<float>( units::to_degrees( sun.first ) + 180.0 ),
+                                        static_cast<float>( units::to_degrees( sun.second ) ),
+                                        static_cast<float>( units::to_degrees( moon.first ) + 180.0 ),
+                                        static_cast<float>( units::to_degrees( moon.second ) ),
+                                        phase, type.light_modifier );
+        }
+        {
+            // Everyone the avatar sees within the snapshot, by attitude
+            // towards it, for the 3D view's bases.
+            avatar &you = get_avatar();
+            std::vector<godot_host::map_creature> &creatures = godot_host::record_map_creatures();
+            for( Creature &c : g->all_creatures() ) {
+                const tripoint_bub_ms p = c.pos_bub();
+                if( std::abs( p.x() - mid.x ) > r || std::abs( p.y() - mid.y ) > r ||
+                    ( !c.is_avatar() && !you.sees( here, c ) ) ) {
+                    continue;
+                }
+                int attitude = 0;
+                if( !c.is_avatar() ) {
+                    switch( c.attitude_to( you ) ) {
+                        case Creature::Attitude::HOSTILE:
+                            attitude = 1;
+                            break;
+                        case Creature::Attitude::FRIENDLY:
+                            attitude = 3;
+                            break;
+                        default:
+                            attitude = 2;
+                            break;
+                    }
+                }
+                creatures.push_back( { p.x(), p.y(), p.z(), attitude } );
+            }
+        }
+        {
+            // The light on the avatar's storey, for lighting the 3D view.
+            const level_cache &cache = here.access_cache( you_pos.z() );
+            const int size = 2 * r + 1;
+            std::vector<godot_host::map_light> &lights = godot_host::record_map_lights(
+                        cache.natural_light_level_cache, mid.x - r, mid.y - r, size );
+            for( int y = std::max( 0, mid.y - r ); y <= std::min( MAPSIZE_Y - 1, mid.y + r ); ++y ) {
+                for( int x = std::max( 0, mid.x - r ); x <= std::min( MAPSIZE_X - 1, mid.x + r ); ++x ) {
+                    const light_color_rgb &color = cache.light_color_cache[x][y];
+                    lights[( y - mid.y + r ) * size + x - mid.x + r] = {
+                        cache.lm[x][y].max(), color.r, color.g, color.b,
+                        cache.light_source_buffer[x][y].luminance,
+                        here.is_outside( tripoint_bub_ms( x, y, you_pos.z() ) )
+                    };
+                }
+            }
+        }
+        const auto storeys_start = std::chrono::steady_clock::now();
+        godot_host::record_only_scope record_only;
+        const std::array<bool, 5> unseen = { true, true, true, true, true };
+        // Every storey, the world's whole height (godot_host.h).
+        static_assert( godot_host::snapshot_levels_below >= OVERMAP_DEPTH + OVERMAP_HEIGHT &&
+                       godot_host::snapshot_levels_above >= OVERMAP_DEPTH + OVERMAP_HEIGHT );
+        // Below the avatar: what it remembers there.
+        for( int dz = 1; dz <= godot_host::snapshot_levels_below; ++dz ) {
+            const int z = you_pos.z() - dz;
+            if( z < -OVERMAP_DEPTH ) {
+                break;
+            }
+            for( int y = std::max( 0, mid.y - r ); y <= std::min( MAPSIZE_Y - 1, mid.y + r ); ++y ) {
+                for( int x = std::max( 0, mid.x - r ); x <= std::min( MAPSIZE_X - 1, mid.x + r ); ++x ) {
+                    const tripoint_bub_ms p( x, y, z );
+                    // Most of these storeys' tiles the avatar never saw: one
+                    // memory lookup, not four layer calls finding nothing
+                    // (each step paid them on every storey to the world's
+                    // bottom).
+                    const memorized_tile &mt = get_avatar().get_memorized_tile( here.get_abs( p ) );
+                    if( mt.get_ter_id().empty() && mt.get_dec_id().empty() ) {
+                        continue;
+                    }
+                    int height_3d = 0;
+                    ct.draw_terrain( p, lit_level::MEMORIZED, height_3d, unseen, false );
+                    ct.draw_furniture( p, lit_level::MEMORIZED, height_3d, unseen, false );
+                    ct.draw_trap( p, lit_level::MEMORIZED, height_3d, unseen, false );
+                    ct.draw_vpart_no_roof( p, lit_level::MEMORIZED, height_3d, unseen, false );
+                }
+            }
+        }
+        // Above it: the terrain itself (upper walls and floors, roofs), as
+        // a building's shell is seen from outside; nothing on it, and never
+        // memorized (draw_terrain's visible path would memorize). From the
+        // ground the avatar sees almost none of it, so memory would show
+        // nothing. The host keeps only what stands on something it shows,
+        // and cuts away what would hide the avatar.
+        {
+            const lit_level above_ll = here.access_cache( you_pos.z() ).natural_light_level_cache >=
+                                       LIGHT_AMBIENT_LIT ? lit_level::LIT : lit_level::LOW;
+            const std::array<bool, 5> seen = { false, false, false, false, false };
+            // None in the host's 2D view, which doesn't draw them.
+            const int levels_above = godot_host::flat_view() ? 0 : godot_host::snapshot_levels_above;
+            for( int dz = 1; dz <= levels_above; ++dz ) {
+                const int z = you_pos.z() + dz;
+                if( z > OVERMAP_HEIGHT ) {
+                    break;
+                }
+                for( int y = std::max( 0, mid.y - r ); y <= std::min( MAPSIZE_Y - 1, mid.y + r ); ++y ) {
+                    for( int x = std::max( 0, mid.x - r ); x <= std::min( MAPSIZE_X - 1, mid.x + r ); ++x ) {
+                        const tripoint_bub_ms p( x, y, z );
+                        const ter_id &t = here.ter( p );
+                        if( !t || t.obj().has_flag( ter_furn_flag::TFLAG_NO_FLOOR ) ) {
+                            continue;
+                        }
+                        int subtile = 0;
+                        int rotation = 0;
+                        const std::bitset<NUM_TERCONN> &connect_group = t.obj().connect_to_groups;
+                        const std::bitset<NUM_TERCONN> &rotate_group = t.obj().rotate_to_groups;
+                        if( connect_group.any() ) {
+                            ct.get_connect_values( p, subtile, rotation, connect_group, rotate_group, {} );
+                        } else {
+                            ct.get_terrain_orientation( p, rotation, subtile, {}, seen, rotate_group );
+                        }
+                        int height_3d = 0;
+                        ct.draw_from_id_string( t.id().str(), TILE_CATEGORY::TERRAIN, empty_string, p, subtile,
+                                             rotation, above_ll, false, height_3d );
+                    }
+                }
+            }
+        }
+        godot_host::note_storeys_usec( static_cast<int>( std::chrono::duration_cast<std::chrono::microseconds>
+                                       ( std::chrono::steady_clock::now() - storeys_start ).count() ) );
+    }
+}
+
+#endif // CDDA_GODOT
