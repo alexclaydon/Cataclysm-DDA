@@ -2436,49 +2436,58 @@ void options_manager::add_options_graphics()
              false, COPT_CURSES_HIDE
            );
 
+#if defined(CDDA_IOS)
+        // Double every font dimension: at native phone resolution the
+        // stock sizes render tiny and blurry-looking (non-hidpi).
+        constexpr int font_w = 16, font_h = 32, font_s = 32;
+        constexpr int grid_font = 32;
+#else
+        constexpr int font_w = 8, font_h = 16, font_s = 16;
+        constexpr int grid_font = 16;
+#endif
         add( "FONT_WIDTH", page_id, to_translation( "Font width" ),
              to_translation( "Set the font width.  Requires restart." ),
-             6, 100, 8, COPT_CURSES_HIDE
+             6, 100, font_w, COPT_CURSES_HIDE
            );
 
         add( "FONT_HEIGHT", page_id, to_translation( "Font height" ),
              to_translation( "Set the font height.  Requires restart." ),
-             8, 100, 16, COPT_CURSES_HIDE
+             8, 100, font_h, COPT_CURSES_HIDE
            );
 
         add( "FONT_SIZE", page_id, to_translation( "Font size" ),
              to_translation( "Set the font size.  Requires restart." ),
-             8, 100, 16, COPT_CURSES_HIDE
+             8, 100, font_s, COPT_CURSES_HIDE
            );
 
         add( "MAP_FONT_WIDTH", page_id, to_translation( "Map font width" ),
              to_translation( "Set the map font width.  Requires restart." ),
-             6, 100, 16, COPT_CURSES_HIDE
+             6, 100, grid_font, COPT_CURSES_HIDE
            );
 
         add( "MAP_FONT_HEIGHT", page_id, to_translation( "Map font height" ),
              to_translation( "Set the map font height.  Requires restart." ),
-             8, 100, 16, COPT_CURSES_HIDE
+             8, 100, grid_font, COPT_CURSES_HIDE
            );
 
         add( "MAP_FONT_SIZE", page_id, to_translation( "Map font size" ),
              to_translation( "Set the map font size.  Requires restart." ),
-             8, 100, 16, COPT_CURSES_HIDE
+             8, 100, grid_font, COPT_CURSES_HIDE
            );
 
         add( "OVERMAP_FONT_WIDTH", page_id, to_translation( "Overmap font width" ),
              to_translation( "Set the overmap font width.  Requires restart." ),
-             6, 100, 16, COPT_CURSES_HIDE
+             6, 100, grid_font, COPT_CURSES_HIDE
            );
 
         add( "OVERMAP_FONT_HEIGHT", page_id, to_translation( "Overmap font height" ),
              to_translation( "Set the overmap font height.  Requires restart." ),
-             8, 100, 16, COPT_CURSES_HIDE
+             8, 100, grid_font, COPT_CURSES_HIDE
            );
 
         add( "OVERMAP_FONT_SIZE", page_id, to_translation( "Overmap font size" ),
              to_translation( "Set the overmap font size.  Requires restart." ),
-             8, 100, 16, COPT_CURSES_HIDE
+             8, 100, grid_font, COPT_CURSES_HIDE
            );
 
         add( "USE_DRAW_ASCII_LINES_ROUTINE", page_id, to_translation( "SDL ASCII lines" ),
