@@ -38,6 +38,8 @@
 #include "string_input_popup.h"
 #include "translations.h"
 #include "ui_manager.h"
+#include "localized_comparator.h"
+#include "uilist.h"
 #include "sdl_gamepad.h"
 
 enum class kb_menu_status {
@@ -196,6 +198,7 @@ void input_context_stack_impl::push( std::shared_ptr<input_context_handle> const
 #if defined(__ANDROID__) || defined(TILES)
 input_context_stack_impl input_context::input_context_stack;
 #endif
+input_context *input_context::polling = nullptr;
 
 #if defined(__ANDROID__)
 void input_context::register_manual_key( manual_key mk )
@@ -310,9 +313,41 @@ bool input_context::allow_all_keys( const input_event & )
     return true;
 }
 
+std::vector<input_event> input_context::hint_events( const std::string &action_descriptor,
+        const input_context::input_event_filter &evt_filter, const bool by_device ) const
+{
+    std::vector<input_event> shown;
+    for( const input_event &evt : inp_mngr.get_input_for_action( action_descriptor, category ) ) {
+        if( is_event_type_enabled( evt.type ) && evt_filter( evt ) ) {
+            shown.push_back( evt );
+        }
+    }
+#if defined(TILES)
+    if( by_device ) {
+        const auto is_pad = []( const input_event & evt ) {
+            return evt.type == input_event_t::gamepad;
+        };
+        const bool pad_in_use = gamepad::is_active() && gamepad::last_input_was_pad();
+        const bool any_pad = std::any_of( shown.begin(), shown.end(), is_pad );
+        const bool any_other = !std::all_of( shown.begin(), shown.end(), is_pad );
+        if( pad_in_use && any_pad ) {
+            shown.erase( std::remove_if( shown.begin(), shown.end(), [&]( const input_event & evt ) {
+                return !is_pad( evt );
+            } ), shown.end() );
+        } else if( !pad_in_use && any_other ) {
+            shown.erase( std::remove_if( shown.begin(), shown.end(), is_pad ), shown.end() );
+        }
+    }
+#else
+    ( void )by_device;
+#endif
+    return shown;
+}
+
 std::string input_context::get_desc( const std::string &action_descriptor,
                                      const unsigned int max_limit,
-                                     const input_context::input_event_filter &evt_filter ) const
+                                     const input_context::input_event_filter &evt_filter,
+                                     const bool by_device ) const
 {
     if( action_descriptor == "ANY_INPUT" ) {
         return "(*)"; // * for wildcard
@@ -331,15 +366,9 @@ std::string input_context::get_desc( const std::string &action_descriptor,
         }
     }
 
-    std::vector<input_event> inputs_to_show;
-    for( const input_event &event : events ) {
-        if( is_event_type_enabled( event.type ) && evt_filter( event ) ) {
-            inputs_to_show.push_back( event );
-        }
-
-        if( max_limit > 0 && inputs_to_show.size() == max_limit ) {
-            break;
-        }
+    std::vector<input_event> inputs_to_show = hint_events( action_descriptor, evt_filter, by_device );
+    if( max_limit > 0 && inputs_to_show.size() > max_limit ) {
+        inputs_to_show.resize( max_limit );
     }
 
     if( inputs_to_show.empty() ) {
@@ -385,12 +414,8 @@ std::string input_context::get_button_text( const std::string &action_descriptor
         return action_text;
     }
 
-    std::vector<input_event> inputs_to_show;
-    for( const input_event &event : events ) {
-        if( is_event_type_enabled( event.type ) ) {
-            inputs_to_show.push_back( event );
-        }
-    }
+    const std::vector<input_event> inputs_to_show = hint_events( action_descriptor, allow_all_keys,
+            true );
 
     if( inputs_to_show.empty() ) {
         return action_text;
@@ -411,28 +436,24 @@ std::string input_context::get_desc(
         return string_format( separate_fmt.translated(), pgettext( "keybinding", "any" ), text );
     }
 
-    const auto &events = inp_mngr.get_input_for_action( action_descriptor, category );
+    const std::vector<input_event> events = hint_events( action_descriptor, evt_filter, true );
 
-    bool na = true;
     for( const input_event &evt : events ) {
-        if( is_event_type_enabled( evt.type ) && evt_filter( evt ) ) {
-            na = false;
-            if( ( evt.type == input_event_t::keyboard_char || evt.type == input_event_t::keyboard_code ) &&
-                evt.modifiers.empty() && evt.sequence.size() == 1 ) {
-                const int ch = evt.get_first_input();
-                if( ch > ' ' && ch <= '~' ) {
-                    const std::string key = utf32_to_utf8( ch );
-                    const int pos = ci_find_substr( text, key );
-                    if( pos >= 0 ) {
-                        return string_format( inline_fmt.translated(), text.substr( 0, pos ),
-                                              key, text.substr( pos + key.size() ) );
-                    }
+        if( ( evt.type == input_event_t::keyboard_char || evt.type == input_event_t::keyboard_code ) &&
+            evt.modifiers.empty() && evt.sequence.size() == 1 ) {
+            const int ch = evt.get_first_input();
+            if( ch > ' ' && ch <= '~' ) {
+                const std::string key = utf32_to_utf8( ch );
+                const int pos = ci_find_substr( text, key );
+                if( pos >= 0 ) {
+                    return string_format( inline_fmt.translated(), text.substr( 0, pos ),
+                                          key, text.substr( pos + key.size() ) );
                 }
             }
         }
     }
 
-    if( na ) {
+    if( events.empty() ) {
         //~ keybinding description for unbound or non-applicable keys
         return string_format( separate_fmt.translated(), pgettext( "keybinding", "n/a" ), text );
     } else {
@@ -485,13 +506,29 @@ const std::string &input_context::handle_input( const int timeout )
     const std::string *result = &CATA_ERROR;
     while( true ) {
 
+        input_context *const was_polling = polling;
+        polling = this;
         next_action = inp_mngr.get_input_event( preferred_keyboard_mode );
+        polling = was_polling;
         if( next_action.type == input_event_t::timeout ) {
             result = &TIMEOUT;
             break;
         }
 
         const std::string &action = input_to_action( next_action );
+
+#if defined(CDDA_GODOT)
+        // The touch pad's X is always the action list (ADR 0014: it is
+        // labelled Actions), the screen's own X action listed in it. A real
+        // pad's X keeps that action.
+        if( next_action.type == input_event_t::gamepad && !next_action.sequence.empty() &&
+            next_action.get_first_input() == JOY_X && gamepad::last_button_from_touch_pad() &&
+            ( !registered_any_input || action_palette_ok ) ) {
+            const std::string *picked = action_palette( action == CATA_ERROR ? std::string() : action );
+            result = picked != nullptr ? picked : &CATA_ERROR;
+            break;
+        }
+#endif
 
         //Special global key to toggle language to english and back
         if( action == "toggle_language_to_en" ) {
@@ -520,6 +557,18 @@ const std::string &input_context::handle_input( const int timeout )
             result = &action;
             break;
         }
+
+#if defined(TILES)
+        // The pad's X where nothing binds it: the action list (the fork's,
+        // ported behaviour from the BN backlog). A cancel returns ERROR,
+        // which screens ignore, so they redraw over the list.
+        if( next_action.type == input_event_t::gamepad && !next_action.sequence.empty() &&
+            next_action.get_first_input() == JOY_X && ( !registered_any_input || action_palette_ok ) ) {
+            const std::string *picked = action_palette();
+            result = picked != nullptr ? picked : &CATA_ERROR;
+            break;
+        }
+#endif
 
         // If we registered to receive any input, return ANY_INPUT
         // to signify that an unregistered key was pressed.
@@ -795,7 +844,8 @@ void keybindings_ui::draw_controls()
                                               nullptr, &is_hovered );
 
                 ImGui::TableSetColumnIndex( 3 );
-                ImGui::Text( "%s", ctxt->get_desc( action_id ).c_str() );
+                // Every binding, whichever device is in use.
+                ImGui::Text( "%s", ctxt->get_desc( action_id, 0, input_context::allow_all_keys, false ).c_str() );
 
                 // handle the first column last because
                 // ImGui::IsItemVisble() tells you the status of the most
@@ -1280,6 +1330,76 @@ std::optional<point> input_context::get_coordinates_text( const catacurses::wind
     return selected;
 #endif
 }
+
+#if defined(TILES)
+const std::string *input_context::action_palette( const std::string &also )
+{
+    // Navigation and plumbing the pad already has (menus synthesize the
+    // arrows, Enter and Escape) or that means nothing in a list.
+    static const std::set<std::string> skip = {
+        "ANY_INPUT", "COORDINATE", "MOUSE_MOVE", "SELECT", "SEC_SELECT", "TIMEOUT",
+        "UP", "DOWN", "LEFT", "RIGHT", "LEFTUP", "LEFTDOWN", "RIGHTUP", "RIGHTDOWN",
+        "PAGE_UP", "PAGE_DOWN", "SCROLL_UP", "SCROLL_DOWN", "HOME", "END",
+        "CONFIRM", "QUIT", "NEXT_TAB", "PREV_TAB", "toggle_language_to_en"
+    };
+    struct entry {
+        std::string name;
+        std::string action;
+        input_event key;
+    };
+    std::vector<entry> entries;
+    for( const std::string &a : registered_actions ) {
+        if( skip.count( a ) > 0 || a == also ) {
+            continue;
+        }
+        // Derived, never curated: a display name (nameless is plumbing), a
+        // keyboard key here (the list stands in for the hotkey legend), and
+        // no pad binding (what the pad reaches directly isn't listed).
+        const std::string name = get_action_name( a );
+        if( name.empty() || name == a ) {
+            continue;
+        }
+        const std::vector<input_event> keys = keys_bound_to( a, -1, false, true );
+        if( keys.empty() ) {
+            continue;
+        }
+        const std::vector<input_event> all = keys_bound_to( a, -1, false, false );
+        if( std::any_of( all.begin(), all.end(), []( const input_event & e ) {
+        return e.type == input_event_t::gamepad;
+    } ) ) {
+            continue;
+        }
+        entries.push_back( { name, a, keys.front() } );
+    }
+    std::sort( entries.begin(), entries.end(), []( const entry & l, const entry & r ) {
+        return localized_compare( l.name, r.name );
+    } );
+    if( !also.empty() ) {
+        // First, under its keyboard key if it has one, else the pad's own
+        // press (which the screen reads as that action).
+        const std::vector<input_event> keys = keys_bound_to( also, -1, false, true );
+        entries.insert( entries.begin(), { get_action_name( also ), also,
+                                           keys.empty() ? next_action : keys.front() } );
+    }
+    if( entries.empty() ) {
+        return nullptr;
+    }
+    uilist menu;
+    menu.title = _( "Actions" );
+    for( size_t i = 0; i < entries.size(); ++i ) {
+        menu.addentry_desc( static_cast<int>( i ), true, MENU_AUTOASSIGN, entries[i].name,
+                            entries[i].key.long_description() );
+    }
+    menu.query();
+    if( menu.ret < 0 || static_cast<size_t>( menu.ret ) >= entries.size() ) {
+        return nullptr;
+    }
+    palette_pick = entries[menu.ret].action;
+    // Screens that read the key rather than the action see its key.
+    next_action = entries[menu.ret].key;
+    return &palette_pick;
+}
+#endif
 
 std::string input_context::get_action_name( const std::string &action_id ) const
 {

@@ -3,8 +3,10 @@
 #define CATA_SRC_UI_MANAGER_H
 
 #include <stddef.h>
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include "cuboid_rectangle.h"
 #include "point.h"
@@ -79,6 +81,10 @@ class ui_adaptor
         bool is_imgui;
         bool is_shim = false;
         bool is_on_top;
+        // The redraw pass in which an ImGui window last actually drew itself
+        // (cataimgui::window::draw): a closed one stays on the stack while
+        // its owner lives, but isn't on screen. See ui_rects().
+        uint64_t imgui_drawn_pass = 0;
         using redraw_callback_t = std::function<void( ui_adaptor & )>;
         using screen_resize_callback_t = std::function<void( ui_adaptor & )>;
 
@@ -247,6 +253,19 @@ class ui_adaptor
         // mark all UI for resize and redraw without drawing, for callers inside a frame
         static void mark_all_for_resize();
         static size_t ui_stack_size();
+        // Counts redraw passes (redraw_invalidated), for imgui_drawn_pass.
+        static uint64_t redraw_pass();
+        /** One open UI's screen area and kind, for the VR host (which floats
+         *  each menu as its own window). */
+        struct ui_rect {
+            rectangle<point> dimensions;  // pixels in tiles builds
+            bool is_shim;
+            bool is_imgui;
+            bool disabling_uis_below;
+            bool visible;  // an ImGui one drew itself in the latest pass
+        };
+        /** The open UIs, bottom (the main game) first. */
+        static std::vector<ui_rect> ui_rects();
     private:
         static void invalidation_consistency_and_optimization();
 

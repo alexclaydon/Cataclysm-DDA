@@ -115,6 +115,10 @@
 #include "gamemode.h"
 #include "gates.h"
 #include "get_version.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#include "widget.h"
+#endif
 #include "harvest.h"
 #include "iexamine.h"
 #include "imgui/imgui_stdlib.h"
@@ -2468,9 +2472,18 @@ bool game::handle_mouseview( input_context &ctxt, std::string &action )
     do {
         action = ctxt.handle_input();
         if( action == "MOUSE_MOVE" ) {
-            const std::optional<tripoint_bub_ms> mouse_pos = ctxt.get_coordinates( w_terrain,
+            std::optional<tripoint_bub_ms> mouse_pos = ctxt.get_coordinates( w_terrain,
                     ter_view_p.raw().xy(),
                     true );
+#if defined(CDDA_GODOT)
+            if( godot_host::mouse_away() || godot_host::touch_pad() ) {
+                // The VR host stopped pointing at the 3D view; or the host's
+                // touch pad, with no mouse: a MOUSE_MOVE is only a nudge
+                // waking the loop (a request, the screen turning), and its
+                // stale mouse tile opened Mouse view.
+                mouse_pos.reset();
+            }
+#endif
             if( mouse_pos && ( !liveview_pos || *mouse_pos != *liveview_pos ) ) {
                 liveview_pos = mouse_pos;
                 liveview.show( liveview_pos->raw() );
@@ -2480,6 +2493,13 @@ bool game::handle_mouseview( input_context &ctxt, std::string &action )
             }
             ui_manager::redraw();
         }
+#if defined(CDDA_GODOT)
+        if( godot_host::look_pending() ) {
+            // Out to handle_action, which opens look-around.
+            liveview.hide();
+            return false;
+        }
+#endif
     } while( action == "MOUSE_MOVE" ); // Freeze animation when moving the mouse
 
     if( action != "TIMEOUT" ) {
@@ -2502,6 +2522,12 @@ std::pair<tripoint_rel_ms, tripoint_rel_ms> game::mouse_edge_scrolling( input_co
         // Fast return when the option is disabled.
         return ret;
     }
+#if defined(CDDA_GODOT)
+    // The VR host's mouse is a laser: it crosses the frame's edges as the
+    // ray leaves a window, and the map or look cursor would run off after
+    // it (and keep going on timeouts). Only the sticks scroll.
+    return ret;
+#endif
     // Ensure the parameters are used even if the #if below is false
     ( void ) ctxt;
     ( void ) speed;
@@ -3183,10 +3209,19 @@ shared_ptr_fast<ui_adaptor> game::create_or_get_main_ui_adaptor()
         ui->on_screen_resize( [this]( ui_adaptor & ui ) {
             // remove some space for the sidebar, this is the maximal space
             // (using standard font) that the terrain window can have
-            const int sidebar_left = panel_manager::get_manager().get_width_left();
-            const int sidebar_right = panel_manager::get_manager().get_width_right();
+            int sidebar_left = panel_manager::get_manager().get_width_left();
+            int sidebar_right = panel_manager::get_manager().get_width_right();
+            int sidebar_top = 0;
+#if defined(CDDA_GODOT)
+            // Dark Forest in portrait: the sidebar is a band across the top.
+            if( godot_host::sidebar_band() > 0 ) {
+                sidebar_left = 0;
+                sidebar_right = 0;
+                sidebar_top = std::min( godot_host::sidebar_band(), TERMY - 1 );
+            }
+#endif
 
-            TERRAIN_WINDOW_HEIGHT = TERMY;
+            TERRAIN_WINDOW_HEIGHT = TERMY - sidebar_top;
             TERRAIN_WINDOW_WIDTH = TERMX - ( sidebar_left + sidebar_right );
             TERRAIN_WINDOW_TERM_WIDTH = TERRAIN_WINDOW_WIDTH;
             TERRAIN_WINDOW_TERM_HEIGHT = TERRAIN_WINDOW_HEIGHT;
@@ -3220,7 +3255,7 @@ shared_ptr_fast<ui_adaptor> game::create_or_get_main_ui_adaptor()
             POSY = TERRAIN_WINDOW_HEIGHT / 2;
 
             w_terrain = w_terrain_ptr = catacurses::newwin( TERRAIN_WINDOW_HEIGHT, TERRAIN_WINDOW_WIDTH,
-                                        point( sidebar_left, 0 ) );
+                                        point( sidebar_left, sidebar_top ) );
 
             // minimap is always MINIMAP_WIDTH x MINIMAP_HEIGHT in size
             w_minimap = w_minimap_ptr = catacurses::newwin( MINIMAP_HEIGHT, MINIMAP_WIDTH, point::zero );
@@ -3423,10 +3458,33 @@ void game::draw_panels( bool force_draw )
 {
     static int previous_turn = -1;
     const int current_turn = to_turns<int>( calendar::turn - calendar::turn_zero );
+#if defined(CDDA_GODOT)
+    const bool draw_this_turn = current_turn > previous_turn || force_draw ||
+                                godot_host::take_sidebar_switched();
+#else
     const bool draw_this_turn = current_turn > previous_turn || force_draw;
+#endif
     panel_manager &mgr = panel_manager::get_manager();
     int y = 0;
     const bool sidebar_right = get_option<std::string>( "SIDEBAR_POSITION" ) == "right";
+#if defined(CDDA_GODOT)
+    const bool native = godot_host::native_sidebar();
+    if( native ) {
+        godot_host::sidebar_begin();
+    }
+    if( godot_host::sidebar_band() > 0 ) {
+        godot_host::set_sidebar( 0, 0, TERMX, TERMY );
+        draw_panels_band( draw_this_turn );
+        if( native ) {
+            godot_host::sidebar_end( TERMX, TERMY );
+        }
+        previous_turn = current_turn;
+        return;
+    }
+    // For the VR host's HUD window: where the sidebar (with the message
+    // log) lies in the frame.
+    godot_host::set_sidebar( mgr.get_width_left(), mgr.get_width_right(), TERMX, TERMY );
+#endif
     int spacer = get_option<bool>( "SIDEBAR_SPACERS" ) ? 1 : 0;
     // Total up height used by all panels, and see what is left over for log
     int log_height = 0;
@@ -3453,11 +3511,35 @@ void game::draw_panels( bool force_draw )
             }
             h += spacer;
             if( panel.toggle && panel.render() && h > 0 ) {
+#if defined(CDDA_GODOT)
+                const int px = sidebar_right ? TERMX - panel.get_width() : 0;
+                bool placed = false;
+#endif
                 if( panel.always_draw || draw_this_turn ) {
+#if defined(CDDA_GODOT)
+                    // The host's log box shows more than the column holds:
+                    // the log drawn the terminal's height (plan 0020).
+                    // (Narrowed by the host's log zoom, its font that much larger.)
+                    const bool tall_log = native && panel.get_id() == "Log";
+                    const int lw = tall_log ? std::max( 10, panel.get_width() * 100 / godot_host::log_zoom() ) :
+                                   panel.get_width();
+                    catacurses::window w = tall_log ?
+                                           catacurses::newwin( TERMY, lw, point( px, 0 ) ) :
+                                           catacurses::newwin( h, panel.get_width(), point( px, y ) );
+#else
                     catacurses::window w = catacurses::newwin( h, panel.get_width(),
                                            point( sidebar_right ? TERMX - panel.get_width() : 0, y ) );
+#endif
                     int tmp_h = panel.draw( { u, w, panel.get_widget() } );
                     h += tmp_h;
+#if defined(CDDA_GODOT)
+                    if( native ) {
+                        // The host draws it (plan 0020): captured, then blanked.
+                        godot_host::sidebar_place( panel.get_id(), panel.get_name(), px, y, lw, h );
+                        godot_host::sidebar_capture( panel.get_id(), w );
+                        placed = true;
+                    }
+#endif
                     // lines skipped for rendering -> reclaim space in the sidebar
                     if( tmp_h < 0 ) {
                         y += h;
@@ -3465,6 +3547,13 @@ void game::draw_panels( bool force_draw )
                         continue;
                     }
                 }
+#if defined(CDDA_GODOT)
+                if( native && !placed ) {
+                    godot_host::sidebar_place( panel.get_id(), panel.get_name(), px, y,
+                                               panel.get_id() == "Log" ? std::max( 10, panel.get_width() * 100 / godot_host::log_zoom() ) :
+                                               panel.get_width(), h );
+                }
+#endif
                 if( show_panel_adm ) {
                     const std::string panel_name = panel.get_name();
                     const int panel_name_width = utf8_width( panel_name );
@@ -3492,8 +3581,95 @@ void game::draw_panels( bool force_draw )
             }
         }
     }
+#if defined(CDDA_GODOT)
+    if( native ) {
+        godot_host::sidebar_end( TERMX, TERMY );
+    }
+#endif
     previous_turn = current_turn;
 }
+
+#if defined(CDDA_GODOT)
+// The sidebar as a band across the top (godot_host::sidebar_band, Dark
+// Forest in portrait): the narrow layout's panels flowed top to bottom
+// into columns side by side, the message log taking what its column has
+// left. Panels that don't fit across are left out.
+void game::draw_panels_band( bool draw_this_turn )
+{
+    panel_manager &mgr = panel_manager::get_manager();
+    panel_layout *narrow = mgr.find_layout( "legacy_labels_narrow_sidebar" );
+    panel_layout &layout = narrow != nullptr ? *narrow : mgr.get_current_layout();
+    if( narrow != nullptr ) {
+        static bool finalized = false;
+        if( !finalized ) {
+            widget *sidebar = mgr.get_sidebar( narrow->name() );
+            if( sidebar != nullptr ) {
+                widget::finalize_inherited_fields_recursive( sidebar->getId(), sidebar->_separator,
+                        sidebar->_padding );
+            }
+            finalized = true;
+        }
+    }
+    const int band = std::min( godot_host::sidebar_band(), TERMY );
+    const int spacer = get_option<bool>( "SIDEBAR_SPACERS" ) ? 1 : 0;
+    // The whole band first, so the gaps between columns are blank, not
+    // whatever the map window under it last drew.
+    catacurses::window blank = catacurses::newwin( band, TERMX, point::zero );
+    werase( blank );
+    wnoutrefresh( blank );
+    int x = 0;
+    int y = 0;
+    for( const window_panel &panel : layout.panels() ) {
+        if( !panel.toggle || !panel.render() ) {
+            continue;
+        }
+        const int width = panel.get_width();
+        int h = panel.get_height();
+        // The message log (-2) fills the rest of a column, in a fresh one
+        // when too little is left.
+        if( h == -2 ) {
+            if( band - y < 3 && y > 0 ) {
+                x += width + 1;
+                y = 0;
+            }
+            h = band - y;
+        }
+        if( h <= 0 ) {
+            continue;
+        }
+        h += spacer;
+        if( y + h > band && y > 0 ) {
+            x += width + 1;
+            y = 0;
+        }
+        if( x + width > TERMX ) {
+            break;
+        }
+        h = std::min( h, band - y );
+        if( panel.always_draw || draw_this_turn ) {
+            // The host's log box shows more than the band's column holds:
+            // the log drawn the terminal's height (plan 0020).
+            // (Narrowed by the host's log zoom, its font that much larger.)
+            const bool tall_log = godot_host::native_sidebar() && panel.get_id() == "Log";
+            const int lw = tall_log ? std::max( 10, width * 100 / godot_host::log_zoom() ) : width;
+            catacurses::window w = tall_log ? catacurses::newwin( TERMY, lw, point( x, 0 ) ) :
+                                   catacurses::newwin( h, width, point( x, y ) );
+            const int tmp_h = panel.draw( { u, w, panel.get_widget() } );
+            // Lines skipped for rendering: reclaim the space.
+            h += tmp_h;
+            if( godot_host::native_sidebar() ) {
+                // The host draws it (plan 0020): captured, then blanked.
+                godot_host::sidebar_place( panel.get_id(), panel.get_name(), x, y, lw, h );
+                godot_host::sidebar_capture( panel.get_id(), w );
+            }
+        } else if( godot_host::native_sidebar() ) {
+            godot_host::sidebar_place( panel.get_id(), panel.get_name(), x, y,
+                                       panel.get_id() == "Log" ? std::max( 10, width * 100 / godot_host::log_zoom() ) : width, h );
+        }
+        y += h;
+    }
+}
+#endif
 
 void game::draw_pixel_minimap( const catacurses::window &w )
 {
@@ -5816,6 +5992,14 @@ void game::peek( const tripoint_bub_ms &p )
     const bool is_same_pos = u.pos_bub() == prev;
     const bool is_standup_peek = is_same_pos && u.is_crouching();
     tripoint_bub_ms center = p;
+    // A view panned away and held (look-around confirmed, or Go here's)
+    // stays where it was, the cursor starting at its centre, so a peek sees
+    // what was being watched from the side; otherwise the peek tile.
+    if( u.view_offset.xy() != point_rel_ms::zero ) {
+        const tripoint_bub_ms watched = prev + u.view_offset;
+        center = tripoint_bub_ms( std::clamp( watched.x(), 0, MAPSIZE_X - 1 ),
+                                  std::clamp( watched.y(), 0, MAPSIZE_Y - 1 ), p.z() );
+    }
     here.build_map_cache( p.z() );
     here.update_visibility_cache( p.z() );
 
@@ -6169,6 +6353,50 @@ look_around_result game::look_around(
     mark_main_ui_adaptor_resize();
 #endif
     do {
+#if defined(CDDA_GODOT)
+        // The host's touch drag: the cursor to its tile, the view centre with
+        // it. Taken at the top of a pass, so a request made before the look
+        // opened (a slide that opens it) applies without waiting for input.
+        {
+            int cursor_dx = 0;
+            int cursor_dy = 0;
+            if( godot_host::take_look_cursor_request( cursor_dx, cursor_dy ) ) {
+                // Inside the map, as the cursor's own moves stay.
+                lx = std::clamp( u.pos_bub().x() + cursor_dx, 0, MAPSIZE_X - 1 );
+                ly = std::clamp( u.pos_bub().y() + cursor_dy, 0, MAPSIZE_Y - 1 );
+                center.x() = lx;
+                center.y() = ly;
+            }
+            // The touch pad's view radius slider, as the zoom actions here.
+            if( const int steps = godot_host::take_zoom_view_request() ) {
+                godot_host::zoom_view( steps );
+                mark_main_ui_adaptor_resize();
+            }
+        }
+        // The touch pad's Go here and Recenter: out of look-around, the
+        // view as it was (Go here: the route to the cursor's tile then waits
+        // for Confirm, as a tapped one does) or centred on the avatar.
+        if( !select_zone ) {
+            const godot_host::look_exit how = godot_host::take_look_exit_request();
+            if( how == godot_host::look_exit::go_here ) {
+                godot_host::request_click( lp.x() - u.pos_bub().x(), lp.y() - u.pos_bub().y() );
+                // The view stays where it was looking until the route is
+                // settled; the one before look-around is held for then.
+                godot_host::hold_view( prev_offset.x(), prev_offset.y(), prev_offset.z() );
+                u.view_offset = center - u.pos_bub();
+                prev_offset = u.view_offset;
+                action = "QUIT";
+                break;
+            }
+            if( how == godot_host::look_exit::recenter ) {
+                center = u.pos_bub();
+                lp = u.pos_bub();
+                prev_offset = tripoint_rel_ms::zero;
+                action = "QUIT";
+                break;
+            }
+        }
+#endif
         u.view_offset = center - u.pos_bub();
         if( select_zone ) {
             if( has_first_point ) {
@@ -6203,6 +6431,9 @@ look_around_result game::look_around(
             ctxt.set_timeout( get_option<int>( "BLINK_SPEED" ) );
         }
 
+#if defined(CDDA_GODOT)
+        godot_host::set_look_cursor( true, lx - u.pos_bub().x(), ly - u.pos_bub().y() );
+#endif
         //Wait for input
         // only specify a timeout here if "EDGE_SCROLL" is enabled
         // otherwise use the previously set timeout
@@ -6248,6 +6479,18 @@ look_around_result game::look_around(
             // Fix player character not visible from above
             here.build_map_cache( u.posz() );
             here.invalidate_visibility_cache();
+#if defined(CDDA_GODOT)
+        } else if( action == "TRAVEL_TO" && !select_zone ) {
+            // Go there as the touch pad's Go here does (the user's call, RT
+            // on the pad): the route to the cursor's tile waits for a second
+            // RT or A, B dropping it, and the view stays here until then.
+            godot_host::request_click( lp.x() - u.pos_bub().x(), lp.y() - u.pos_bub().y() );
+            godot_host::hold_view( prev_offset.x(), prev_offset.y(), prev_offset.z() );
+            u.view_offset = center - u.pos_bub();
+            prev_offset = u.view_offset;
+            action = "QUIT";
+            break;
+#endif
         } else if( action == "TRAVEL_TO" ) {
             const std::optional<std::vector<tripoint_bub_ms>> try_route = safe_route_to( u, lp,
             0,  []( const std::string & msg ) {
@@ -6290,7 +6533,15 @@ look_around_result game::look_around(
                 const std::optional<tripoint_bub_ms> mouse_pos = ctxt.get_coordinates( w_terrain,
                         ter_view_p.raw().xy(),
                         true );
+#if defined(CDDA_GODOT)
+                // On the host's touch pad there is no mouse: a MOUSE_MOVE is
+                // the nudge that wakes this pass for a request (Go here), and
+                // the stale mouse tile it carries would move the cursor the
+                // request acts on.
+                if( mouse_pos && !godot_host::touch_pad() ) {
+#else
                 if( mouse_pos ) {
+#endif
                     lx = mouse_pos->x();
                     ly = mouse_pos->y();
                 }
@@ -6312,16 +6563,29 @@ look_around_result game::look_around(
         } else if( action == "CONFIRM" && peeking ) {
             result.peek_action = PA_MOVE;
         } else if( action == "zoom_in" ) {
+#if defined(CDDA_GODOT)
+            godot_host::zoom_view( 1 );
+            mark_main_ui_adaptor_resize();
+#else
             center.xy() = lp.xy();
             zoom_in();
             mark_main_ui_adaptor_resize();
+#endif
         } else if( action == "zoom_out" ) {
+#if defined(CDDA_GODOT)
+            godot_host::zoom_view( -1 );
+            mark_main_ui_adaptor_resize();
+#else
             center.xy() = lp.xy();
             zoom_out();
             mark_main_ui_adaptor_resize();
+#endif
         }
     } while( action != "QUIT" && action != "CONFIRM" && action != "SELECT" && action != "TRAVEL_TO" &&
              action != "throw_blind" && action != "throw_blind_wielded" );
+#if defined(CDDA_GODOT)
+    godot_host::set_look_cursor( false, 0, 0 );
+#endif
 
     if( center.z() != old_levz ) {
         here.invalidate_map_cache( old_levz );
