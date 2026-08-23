@@ -931,6 +931,20 @@ static void handle_scheduler_event( SDL_Event &/*event*/ )
     for( size_t i = 0; i < all_tasks.size(); ++i ) {
         gamepad::task_t &task = all_tasks[i];
         if( task.counter && task.when <= now ) {
+            // Trigger repeats must check the trigger's CURRENT state, not the
+            // state when the repeat was scheduled: long turns queue scheduler
+            // events behind them, so a queued repeat can fire after the
+            // player released the trigger but before the release event has
+            // been processed — one tap then moves 2-3 times. Polling reads
+            // the value as of the last joystick update, which is already
+            // current when the stale scheduler event is handled.
+            if( i == triggers_task_index || i == triggers_task_index + 1 ) {
+                int trigger_idx = static_cast<int>( i - triggers_task_index );
+                if( get_controller_axis( triggers_axis[trigger_idx] ) < triggers_threshold ) {
+                    cancel_task( task );
+                    continue;
+                }
+            }
             // Check if this is the RT repeat task
             if( i == triggers_task_index + 1 && stick_dir( 0 ) != direction::NONE ) {
                 // RT continuous movement - send direction
