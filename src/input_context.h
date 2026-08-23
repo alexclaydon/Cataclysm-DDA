@@ -69,6 +69,10 @@ class input_context
         // Whatever's on top is our current input context.
         static input_context_stack_impl input_context_stack;
 #endif
+        // The context inside handle_input (waiting for input) right now, or
+        // null: what an input pushed now will reach, which the stack top
+        // isn't always. The gamepad wheel labels its slots from it.
+        static input_context *polling;
         input_context() : category( "default" ), registered_any_input( false ),
             coordinate_input_received( false ), handling_coordinate_input( false ) {
 #if defined(__ANDROID__) || defined(TILES)
@@ -161,9 +165,24 @@ class input_context
             timeout = std::forward<Rhs>( other ).timeout;
             preferred_keyboard_mode = std::forward<Rhs>( other ).preferred_keyboard_mode;
             action_name_overrides = std::forward<Rhs>( other ).action_name_overrides;
+            action_palette_ok = std::forward<Rhs>( other ).action_palette_ok;
             // NOLINTEND(bugprone-use-after-move)
         }
 
+        // The pad's X opens a list of this screen's keyboard-only actions
+        // wherever X isn't bound (the fork's action list, handle_input), but
+        // not, by default, on screens that take any input (text fields, key
+        // captures, "press any key"). A screen whose any-input only reads
+        // keyboard hotkeys (item letters) opts in with this.
+        void allow_action_palette() {
+            action_palette_ok = true;
+        }
+
+        // The input category, on every platform (get_category below is
+        // Android's): the gamepad layer asks it which screen is up.
+        const std::string &input_category() const {
+            return category;
+        }
 
 #if defined(__ANDROID__)
         // HACK: hack to allow creating manual keybindings for getch() instances, uilists etc. that don't use an input_context outside of the Android version
@@ -289,10 +308,14 @@ class input_context
          *
          * @param evt_filter Only keys satisfying this function will be
          *                   described.
+         *
+         * @param by_device Describe only the device in use (hint_events); false
+         *                  lists every binding (the keybindings screen).
          */
         std::string get_desc( const std::string &action_descriptor,
                               unsigned int max_limit = 0,
-                              const input_event_filter &evt_filter = allow_all_keys ) const;
+                              const input_event_filter &evt_filter = allow_all_keys,
+                              bool by_device = true ) const;
 
         /**
          * Get a description for the action parameter along with a printable hotkey
@@ -475,6 +498,11 @@ class input_context
         std::string get_edittext();
 
         void set_iso( bool mode = true );
+        // Whether its directions are map directions (set_iso): the pad turns
+        // them by the VR host's facing (sdl_gamepad.cpp, in_map_cursor).
+        bool is_iso() const {
+            return iso_mode;
+        }
 
         /**
          * Sets input polling timeout as appropriate for the current interface system.
@@ -489,6 +517,14 @@ class input_context
         input_event first_unassigned_hotkey( const hotkey_queue &queue ) const;
         input_event next_unassigned_hotkey( const hotkey_queue &queue, const input_event &prev ) const;
     private:
+        // The bindings a hint describes (the fork's): those enabled and
+        // passing evt_filter and, by_device, only the pad's while the pad is
+        // in use (gamepad::last_input_was_pad) and only the keyboard's and
+        // mouse's otherwise, each falling back to the other where the action
+        // has none. So a footer reads "[LT+LS SW] Filter" on the pad and
+        // "[/] Filter" on the keyboard, not "[/ or L_RADIAL_SW] Filter".
+        std::vector<input_event> hint_events( const std::string &action_descriptor,
+                                              const input_event_filter &evt_filter, bool by_device ) const;
 #if defined(__ANDROID__)
         std::vector<manual_key> registered_manual_keys;
 #endif
@@ -503,6 +539,14 @@ class input_context
         point coordinate;
 
         bool registered_any_input;
+        bool action_palette_ok = false;  // allow_action_palette
+        std::string palette_pick;  // the action list's pick, which handle_input returns
+        // The pad's action list: this context's actions the pad can't reach
+        // otherwise, as a menu, with `also` (an action the pad does reach,
+        // listed anyway: the touch pad's X, ADR 0014) first if given; the
+        // pick (with its key as the raw input), or null when there are none
+        // or it's cancelled.
+        const std::string *action_palette( const std::string &also = std::string() );
         bool coordinate_input_received;
         bool handling_coordinate_input;
         bool iso_mode = false; // should this context follow the game's isometric settings?

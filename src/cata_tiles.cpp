@@ -42,6 +42,10 @@
 #include "field_type.h"
 #include "flexbuffer_json.h"
 #include "game.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#include "godot_tiles.h"
+#endif
 #include "sdl_gamepad.h"
 #include "item.h"
 #include "item_factory.h"
@@ -573,6 +577,11 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
 
     has_animated_tiles_ = false;
 
+#if defined(CDDA_GODOT)
+    // The tileset's sheets and the map objects' properties (godot_tiles.cpp).
+    godot_tiles::publish_tileset_and_objects( *this );
+#endif
+
     {
         //set clipping to prevent drawing over stuff we shouldn't
         SDL_Rect clipRect = {dest.x, dest.y, width, height};
@@ -607,10 +616,25 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     cata_assert( top_any_tile_range.p_max.x == bottom_any_tile_range.p_max.x );
     cata_assert( top_any_tile_range.p_min.y >= bottom_any_tile_range.p_min.y );
     cata_assert( top_any_tile_range.p_max.y >= bottom_any_tile_range.p_max.y );
-    const int min_col = top_any_tile_range.p_min.x;
-    const int max_col = top_any_tile_range.p_max.x;
-    const int min_row = bottom_any_tile_range.p_min.y;
-    const int max_row = top_any_tile_range.p_max.y;
+    int min_col = top_any_tile_range.p_min.x;
+    int max_col = top_any_tile_range.p_max.x;
+    int min_row = bottom_any_tile_range.p_min.y;
+    int max_row = top_any_tile_range.p_max.y;
+#if defined(CDDA_GODOT)
+    // The VR host's 3D view: record the whole snapshot square around the
+    // view's centre (column POSX, row POSY), not only what the 2D zoom fits
+    // in the window, which made the game's zoom grow or shrink the table's
+    // patch of world (taller than wide). The 3D view is built about the
+    // view's centre too, so look-around's pan moves the board as it moves
+    // the flat game's view. Beyond the window, drawing is clipped away.
+    if( godot_host::recording_map() && !is_isometric() ) {
+        const int r = godot_host::snapshot_radius();
+        min_col = std::min( min_col, POSX - r );
+        max_col = std::max( max_col, POSX + r + 1 );
+        min_row = std::min( min_row, POSY - r );
+        max_row = std::max( max_row, POSY + r + 1 );
+    }
+#endif
 
     avatar &you = get_avatar();
     //limit the render area to maximum view range (121x121 square centered on player)
@@ -1023,7 +1047,13 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
         // in the layer loop. Revisit when SDL_gpu or a shader-based tint path
         // is available.
         const bool zlev_has_color = zlev_cache.has_colored_lights && !iso;
-        for( int row = cur_any_tile_range.p_min.y; row < cur_any_tile_range.p_max.y; row ++ ) {
+        // Flat tilesets draw min_row to max_row: the window's rows, or the VR
+        // host's whole snapshot square while recording. The window's own range
+        // left the 3D view a strip as tall as the 2D view (the columns, taken
+        // from draw_points_cache, were already the whole square).
+        const int first_row = iso ? cur_any_tile_range.p_min.y : min_row;
+        const int end_row = iso ? cur_any_tile_range.p_max.y : max_row;
+        for( int row = first_row; row < end_row; row ++ ) {
             if( renderer_should_abort_frame() ) {
                 // Abort emitting tiles mid-draw. Post-loop bookkeeping still runs
                 // so map memory and overrides stay consistent; invalidation kept
@@ -1512,12 +1542,18 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
         if( do_draw_async_anim ) {
             draw_async_anim();
         }
-    } else if( you.view_offset != tripoint_rel_ms::zero && !you.in_vehicle ) {
+    }
+#if !defined(CDDA_GODOT)
+    // (Hosted, the camera centres on the view and marks it; the marker,
+    // drawn only on frames without an animation, flashed there with each
+    // step, the step's mid-turn frame having none.)
+    else if( you.view_offset != tripoint_rel_ms::zero && !you.in_vehicle ) {
         // check to see if player is located at ter
         draw_from_id_string( "cursor", TILE_CATEGORY::NONE, empty_string,
                              tripoint_bub_ms( g->ter_view_p.xy(), center.z() ), 0, 0, lit_level::LIT,
                              false );
     }
+#endif
     if( you.controlling_vehicle ) {
         std::optional<tripoint_rel_ms> indicator_offset = g->get_veh_dir_indicator_location( true );
         if( indicator_offset ) {
@@ -1527,8 +1563,9 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
         }
     }
 
-    // Draw gamepad direction indicator
-    if( gamepad::is_active() ) {
+    // Draw gamepad direction indicator, in play only: in a menu the left
+    // stick is the menu's arrows, not an aim.
+    if( gamepad::is_active() && !gamepad::is_in_menu() ) {
         gamepad::direction dir = gamepad::get_left_stick_direction();
         if( dir != gamepad::direction::NONE ) {
             tripoint offset = gamepad::direction_to_offset( dir );
@@ -1538,6 +1575,11 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
                                  0, 0, lit_level::LIT, false );
         }
     }
+
+#if defined(CDDA_GODOT)
+    // The 3D view's extras and the other storeys (godot_tiles.cpp).
+    godot_tiles::record_extras( *this, here, center, you_pos );
+#endif
 
     RenderSetClipRect( renderer, nullptr );
     // Unbind any GPU render state held across sprite batches so ImGui or the
@@ -2161,6 +2203,13 @@ bool cata_tiles::draw_from_id_string_internal( const std::string &id, TILE_CATEG
         int intensity_level, const std::string &variant,
         const point &offset )
 {
+#if defined(CDDA_GODOT)
+    godot_host::sprite_lookup_scope godot_lookup;
+    if( godot_lookup.recording() ) {
+        godot_host::record_map_sprite( id, variant, static_cast<int>( category ),
+                                       static_cast<int>( ll ), pos.x(), pos.y(), pos.z(), subtile, rota, height_3d );
+    }
+#endif
     bool nv_color_active = apply_night_vision_goggles && get_option<bool>( "NV_GREEN_TOGGLE" );
     // If the ID string does not produce a drawable tile
     // it will revert to the "unknown" tile.
@@ -2588,6 +2637,9 @@ bool cata_tiles::draw_from_id_string_internal( const std::string &id, TILE_CATEG
             std::chrono::milliseconds value = now_ms.time_since_epoch();
             // aiming roughly at the standard 60 frames per second:
             int animation_frame = value.count() / 17;
+#if defined(CDDA_GODOT)
+            godot_anim_counter_ = value.count() / 17;
+#endif
             // offset by log_rand so that everything does not blink at the same time:
             animation_frame += loc_rand;
             int frames_in_loop = display_tile.fg.get_weight();
@@ -2608,6 +2660,9 @@ bool cata_tiles::draw_from_id_string_internal( const std::string &id, TILE_CATEG
     const tile_render_params rp{ ll, nv_color_active };
     draw_tile_at( display_tile, screen_pos, loc_rand, rota, rp,
                   retract, height_3d, offset );
+#if defined(CDDA_GODOT)
+    godot_anim_counter_ = -1;
+#endif
 
     return true;
 }
@@ -2651,6 +2706,10 @@ bool cata_tiles::draw_sprite_at(
     const texture *sprite_tex = tileset_ptr->get_tile( sprite_index );
 
     bool shader_bound = false;
+#if defined(CDDA_GODOT)
+    // Recording without drawing (the VR host's storeys below): no GPU state.
+    if( !godot_host::record_only() )
+#endif
     // Try the GPU shader variant first. On success the main atlas drives
     // the render and the variant transform happens per-pixel in the
     // fragment shader. On unsupported variant (NORMAL, custom MEMORY
@@ -2769,6 +2828,36 @@ bool cata_tiles::draw_sprite_at(
         }
     }
 
+#if defined(CDDA_GODOT)
+    {
+        const SDL_Rect opaque = sprite_tex->get_opaque_rect();
+        godot_host::record_map_blit( sprite_index, static_cast<int>( render_angle ),
+                                     ( render_flip & SDL_FLIP_HORIZONTAL ) != 0, ( render_flip & SDL_FLIP_VERTICAL ) != 0,
+                                     tile_offset.x + offset.x, tile_offset.y + offset.y, width, height, tile.pixelscale,
+                                     opaque.x, opaque.y, opaque.w, opaque.h );
+        // An animated tile's list cycles by the clock: every frame (its
+        // sprite, picked for this rotation as above, and how many 17 ms
+        // steps it shows), and where the cycle stood at this draw, so the
+        // host can run it on without a redraw.
+        const int total = svlist.get_weight();
+        if( godot_anim_counter_ >= 0 && total > 1 ) {
+            std::vector<godot_host::map_anim_frame> frames;
+            for( const std::pair<std::vector<int>, int> &f : svlist ) {
+                if( f.first.empty() || f.second <= 0 ) {
+                    continue;
+                }
+                const int n = f.first.size() == 1 ? 0 : rota % static_cast<int>( f.first.size() );
+                frames.push_back( { f.first[n], f.second } );
+            }
+            const int at = static_cast<int>( loc_rand % total );
+            const int base = static_cast<int>( ( ( at - godot_anim_counter_ ) % total + total ) % total );
+            godot_host::record_map_blit_animation( frames, base, total );
+        }
+    }
+    if( godot_host::record_only() ) {
+        return true;
+    }
+#endif
     // Record this sprite for silhouette mask replay. Must happen before the
     // actual render because the render path may modify destination (d3d offset
     // workaround). Only active for ortho tiles that need tinting.

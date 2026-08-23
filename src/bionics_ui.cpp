@@ -678,6 +678,8 @@ void avatar::power_bionics()
     input_context ctxt( "BIONICS", keyboard_mode::keychar );
     ctxt.register_updown();
     ctxt.register_action( "ANY_INPUT" );
+    // Bionic letters only: the pad's X can open the action list.
+    ctxt.allow_action_palette();
     ctxt.register_action( "TOGGLE_EXAMINE" );
     ctxt.register_action( "REASSIGN" );
     ctxt.register_action( "NEXT_TAB" );

@@ -2,6 +2,8 @@
 #ifndef CATA_SRC_SDL_GAMEPAD_H
 #define CATA_SRC_SDL_GAMEPAD_H
 #if defined(TILES)
+#include <vector>
+
 #include "input_enums.h"
 #include "sdl_wrappers.h"
 
@@ -44,6 +46,30 @@ direction get_radial_right_direction();
 bool is_radial_left_open();
 bool is_radial_right_open();
 bool is_alt_held();
+// A held move's next step already due (Dark Forest's snapshot skip): RT
+// walking, or the left stick's repeat.
+bool move_due();
+
+// In a menu the pad's A arrives as Enter and B as Escape. Which pad button
+// sent the latest of those, or none once a key on the keyboard is pressed
+// (note_keyboard_input): so a yes/no prompt can answer A with Yes while the
+// keyboard's Enter keeps the prompt's default (query_popup).
+enum class menu_press { none, a, b };
+menu_press last_menu_press();
+void note_keyboard_input();
+
+// Whether the latest input came from the pad: set by every event it sends
+// (in a menu, its synthesized keys too), cleared by the keyboard and mouse
+// clicks (note_keyboard_input).
+bool last_input_was_pad();
+// Whether the latest button came from the host's touch pad (ADR 0014;
+// godot_host::touch_pad), not a real pad: its X is always the action list.
+bool last_button_from_touch_pad();
+// The step a number prompt takes for `ev` (the d-pad spinner): the pad's
+// up or down +1 or -1 (in a menu they arrive as arrow keys, so only while
+// last_input_was_pad), with LT held +10 or -10 (JOY_ALT_UP/DOWN); 0 for
+// anything else, the keyboard's own arrows included.
+int number_step( const input_event &ev );
 
 // A seam for the unit tests (tests/sdl_gamepad_test.cpp): with no device,
 // test_begin resets all state and makes axis reads come from test_axis,
@@ -57,8 +83,34 @@ void test_begin();
 void test_end();
 void test_axis( pad_axis which, int value );
 void test_button( pad_button which, bool down );
+// The host's shoulder wheels (ADR 0009): test_enable_wheels turns them on
+// as a host drawing wheels would; test_advance moves the clock on and runs
+// the scheduler; test_take_wheel_events returns the kinds of the wheel
+// events sent since (godot_host::wheel_event::kind_t).
+void test_enable_wheels();
+void test_advance( int ms );
+std::vector<int> test_take_wheel_events();
+bool wheel_is_open();
 bool is_in_menu();
 bool is_active();
+
+// Button glyphs for hints (the fork's, from the BN backlog): the
+// GAMEPAD_GLYPHS option, where auto follows the pad in use (PlayStation's
+// shapes for a Sony pad, Xbox letters for the rest, the Deck's included).
+enum class glyph_style { xbox, playstation, text };
+glyph_style current_glyph_style();
+#if defined(CDDA_GODOT)
+// For the host's own glyphs (godot_host::glyph_style): 0 Xbox, 1
+// PlayStation, 2 text, 3 the option on auto with no real pad connected (the
+// touch pad's virtual one, or none). Engine thread.
+int host_glyph_style();
+#endif
+// The width draw_glyph takes for it, in pixels.
+float glyph_width( pad_button button );
+// Draws a button's glyph at the ImGui cursor as one item, a framed widget's
+// height (it lines up with a button beside it). The face buttons in the
+// makers' colours; any other button as its short name.
+void draw_glyph( pad_button button );
 
 // Convert direction enum to movement offset
 tripoint direction_to_offset( direction dir );

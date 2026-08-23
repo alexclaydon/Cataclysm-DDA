@@ -2276,6 +2276,18 @@ void options_manager::add_options_interface()
              true, COPT_CURSES_HIDE
            );
 
+        add( "GAMEPAD_GLYPHS", page_id, to_translation( "Gamepad button glyphs" ),
+             to_translation( "How hints show the gamepad's buttons.  Auto: as the gamepad in use, PlayStation shapes for a Sony gamepad and Xbox letters for the rest.  Text: the buttons' names." ),
+             //~ gamepad button glyphs follow the gamepad in use
+        {   { "auto", to_translation( "Auto" ) },
+            { "xbox", to_translation( "Xbox" ) },
+            { "playstation", to_translation( "PlayStation" ) },
+            //~ gamepad buttons shown as their names
+            { "text", to_translation( "Text" ) }
+        },
+        "auto", COPT_CURSES_HIDE );
+        get_option( "GAMEPAD_GLYPHS" ).setPrerequisite( "ENABLE_JOYSTICK" );
+
         add( "HIDE_CURSOR", page_id, to_translation( "Hide mouse cursor" ),
              to_translation( "Show: cursor is always shown.  Hide: cursor is hidden.  HideKB: cursor is hidden on keyboard input and unhidden on mouse movement." ),
              //~ show mouse cursor
