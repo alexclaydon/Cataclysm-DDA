@@ -135,7 +135,13 @@ static std::array<task_t, max_tasks> all_tasks;
 static std::array<int, max_sticks> stick_sent = { -1, -1 };
 
 static int repeat_delay = 400;
-static int repeat_interval = 50;
+// Held buttons, the d-pad and sticks in menus (50 scrolled a long list too
+// wildly).
+static int repeat_interval = 80;
+// RT-held walking: a step every 100 ms (150 felt slow). At 33 the repeats
+// outran the game (each pushes a step whether or not the last has been
+// drawn), most of all on the phone, and the steps piled up.
+static int movement_repeat_interval = 100;
 
 // SDL related stuff
 static SDL_TimerID timer_id;
@@ -1516,10 +1522,26 @@ static void handle_scheduler_event( SDL_Event &/*event*/ )
     for( size_t i = 0; i < all_tasks.size(); ++i ) {
         gamepad::task_t &task = all_tasks[i];
         if( task.counter && task.when <= now ) {
+            // Trigger repeats must check the trigger's CURRENT state, not the
+            // state when the repeat was scheduled: long turns queue scheduler
+            // events behind them, so a queued repeat can fire after the
+            // player released the trigger but before the release event has
+            // been processed — one tap then moves 2-3 times. Polling reads
+            // the value as of the last joystick update, which is already
+            // current when the stale scheduler event is handled.
+            if( i == triggers_task_index || i == triggers_task_index + 1 ) {
+                int trigger_idx = static_cast<int>( i - triggers_task_index );
+                if( get_controller_axis( triggers_axis[trigger_idx] ) < triggers_threshold ) {
+                    cancel_task( task );
+                    continue;
+                }
+            }
             // Check if this is the RT repeat task
+            int interval = repeat_interval;
             if( i == triggers_task_index + 1 && stick_dir( 0 ) != direction::NONE ) {
                 // RT continuous movement - send direction
                 send_direction_movement();
+                interval = movement_repeat_interval;
             } else if( i >= sticks_task_index && i < triggers_task_index ) {
                 // Stick repeat (sticks_task_index + i where i is stick index)
                 if( task.button != -1 ) {
@@ -1530,7 +1552,7 @@ static void handle_scheduler_event( SDL_Event &/*event*/ )
                 send_input( task.button, task.type );
             }
             task.counter += 1;
-            task.when = now + repeat_interval;
+            task.when = now + interval;
         }
     }
 }
