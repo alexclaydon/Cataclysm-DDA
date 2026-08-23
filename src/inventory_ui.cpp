@@ -1107,20 +1107,23 @@ void inventory_column::set_width( const size_t new_width )
     // Now adjust the width if we must
     while( width_gap != 0 ) {
         const int step = width_gap > 0 ? -1 : 1;
-        // Should return true when lhs < rhs
-        const auto cmp_for_expansion = []( cell_t &lhs, cell_t &rhs ) {
-            return lhs.visible() && lhs.gap() < rhs.gap();
+        // Should return true when lhs < rhs. Both comparators must be strict
+        // weak orders: hardened libc++ (e.g. Xcode debug builds) asserts on
+        // violations inside min/max_element.
+        const auto cmp_for_expansion = []( const cell_t &lhs, const cell_t &rhs ) {
+            // Visible cells first, smallest gap among them.
+            return std::make_tuple( !lhs.visible(), lhs.gap() )
+                   < std::make_tuple( !rhs.visible(), rhs.gap() );
         };
-        // Should return true when lhs < rhs
-        const auto cmp_for_shrinking = []( cell_t &lhs, cell_t &rhs ) {
-            if( !lhs.visible() ) {
-                return false;
-            }
-            if( rhs.gap() <= min_cell_gap ) {
-                return lhs.current_width < rhs.current_width;
-            } else {
-                return lhs.gap() < rhs.gap();
-            }
+        const auto cmp_for_shrinking = []( const cell_t &lhs, const cell_t &rhs ) {
+            // Gaps at or below the minimum are equally unshrinkable, so clamp
+            // before comparing and break ties on width. (The old form picked
+            // the criterion from one side only, which both directions of the
+            // comparison could satisfy at once.)
+            return std::make_tuple( lhs.visible(), std::max( lhs.gap(), min_cell_gap ),
+                                    lhs.current_width )
+                   < std::make_tuple( rhs.visible(), std::max( rhs.gap(), min_cell_gap ),
+                                      rhs.current_width );
         };
         const auto &cell = step > 0
                            ? std::min_element( cells.begin(), cells.end(), cmp_for_expansion )
