@@ -42,6 +42,14 @@ ui_adaptor::ui_adaptor() : is_imgui( false ), disabling_uis_below( false ),
     ui_stack.emplace_back( *this );
 }
 
+ui_adaptor::ui_adaptor( ui_adaptor::shim ) : is_imgui( false ), disabling_uis_below( false ),
+    is_debug_message_ui( false ),
+    invalidated( false ), deferred_resize( false )
+{
+    is_shim = true;
+    ui_stack.emplace_back( *this );
+}
+
 ui_adaptor::ui_adaptor( ui_adaptor::disable_uis_below ) : is_imgui( false ),
     disabling_uis_below( true ),
     is_debug_message_ui( false ), invalidated( false ), deferred_resize( false )
@@ -249,7 +257,13 @@ static bool overlap( const rectangle<point> &lhs, const rectangle<point> &rhs )
 
 size_t ui_adaptor::ui_stack_size()
 {
-    return ui_stack.size();
+    size_t n = 0;
+    for( const ui_adaptor &ui : ui_stack ) {
+        if( !ui.is_shim ) {
+            ++n;
+        }
+    }
+    return n;
 }
 
 // This function does two things:
