@@ -2405,14 +2405,23 @@ void options_manager::add_options_graphics()
     add_option_group( "graphics", Group( "term_opts", to_translation( "Terminal display options" ),
                                          to_translation( "Options regarding terminal display." ) ),
     [&]( const std::string & page_id ) {
+#if defined(CDDA_IOS)
+        // Tuned for phone screens; nothing resizes the window on iOS, so
+        // the default is what a fresh install actually plays at.
+        constexpr int default_terminal_x = 152;
+        constexpr int default_terminal_y = 39;
+#else
+        constexpr int default_terminal_x = 80;
+        constexpr int default_terminal_y = 24;
+#endif
         add( "TERMINAL_X", page_id, to_translation( "Terminal width" ),
              to_translation( "Set the size of the terminal along the X axis." ),
-             80, 960, 80, COPT_POSIX_CURSES_HIDE
+             80, 960, default_terminal_x, COPT_POSIX_CURSES_HIDE
            );
 
         add( "TERMINAL_Y", page_id, to_translation( "Terminal height" ),
              to_translation( "Set the size of the terminal along the Y axis." ),
-             24, 270, 24, COPT_POSIX_CURSES_HIDE
+             24, 270, default_terminal_y, COPT_POSIX_CURSES_HIDE
            );
     } );
 
