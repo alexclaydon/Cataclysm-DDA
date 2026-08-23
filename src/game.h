@@ -1175,6 +1175,12 @@ class game
         map &m; // NOLINT(cata-serialize)
         // 'current_map' will be identical to 'm' as you can save only at the top of the main loop.
         ::current_map &current_map; // NOLINT(cata-serialize)
+    public:
+        // Public so the iOS app shell (CDDA_IOS builds) can reach it;
+        // declared in place so the ctor member-init order stays valid
+        // (-Wreorder-ctor is an error on the Deck build).
+        avatar &u;
+    private:
         scent_map &scent;
         // scenario is saved in avatar::store
         const scenario *scen = nullptr; // NOLINT(cata-serialize)
@@ -1185,9 +1191,8 @@ class game
         global_variables global_variables_instance;
         std::unordered_map<std::string, point_abs_om> unique_npcs;
     public:
-        // Public so the iOS app shell (CDDA_IOS builds) can reach them.
+        // Public so the iOS app shell (CDDA_IOS builds) can reach it.
         event_bus &events();
-        avatar &u;
         void update_unique_npc_location( const std::string &id, point_abs_om loc );
         point_abs_om get_unique_npc_location( const std::string &id );
         bool unique_npc_exists( const std::string &id );
