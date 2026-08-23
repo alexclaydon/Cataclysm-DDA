@@ -1,16 +1,26 @@
 #if defined(TILES)
 #include "sdl_gamepad.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <map>
 #include <ostream>
+#include <string>
+#include <vector>
 
 #include "debug.h"
 #include "input.h"
+#include "input_context.h"
 #include "input_enums.h"
 #include "point.h"
 #include "ui_manager.h"
 #include "game.h"
+#include "imgui/imgui.h"
+#include "options.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -25,6 +35,8 @@ static constexpr Uint32 CATA_CONTROLLERBUTTONDOWN    = SDL_EVENT_GAMEPAD_BUTTON_
 static constexpr Uint32 CATA_CONTROLLERBUTTONUP      = SDL_EVENT_GAMEPAD_BUTTON_UP;
 static constexpr Uint32 CATA_CONTROLLERAXISMOTION    = SDL_EVENT_GAMEPAD_AXIS_MOTION;
 static constexpr Uint32 CATA_CONTROLLERDEVICEADDED   = SDL_EVENT_GAMEPAD_ADDED;
+static constexpr Uint32 CATA_JOYDEVICEADDED         = SDL_EVENT_JOYSTICK_ADDED;
+static constexpr Uint32 CATA_JOYDEVICEREMOVED       = SDL_EVENT_JOYSTICK_REMOVED;
 static constexpr Uint32 CATA_CONTROLLERDEVICEREMOVED = SDL_EVENT_GAMEPAD_REMOVED;
 static constexpr int CATA_AXIS_TRIGGERLEFT  = SDL_GAMEPAD_AXIS_LEFT_TRIGGER;
 static constexpr int CATA_AXIS_TRIGGERRIGHT = SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
@@ -51,6 +63,8 @@ static constexpr Uint32 CATA_CONTROLLERBUTTONDOWN    = SDL_CONTROLLERBUTTONDOWN;
 static constexpr Uint32 CATA_CONTROLLERBUTTONUP      = SDL_CONTROLLERBUTTONUP;
 static constexpr Uint32 CATA_CONTROLLERAXISMOTION    = SDL_CONTROLLERAXISMOTION;
 static constexpr Uint32 CATA_CONTROLLERDEVICEADDED   = SDL_CONTROLLERDEVICEADDED;
+static constexpr Uint32 CATA_JOYDEVICEADDED         = SDL_JOYDEVICEADDED;
+static constexpr Uint32 CATA_JOYDEVICEREMOVED       = SDL_JOYDEVICEREMOVED;
 static constexpr Uint32 CATA_CONTROLLERDEVICEREMOVED = SDL_CONTROLLERDEVICEREMOVED;
 static constexpr int CATA_AXIS_TRIGGERLEFT  = SDL_CONTROLLER_AXIS_TRIGGERLEFT;
 static constexpr int CATA_AXIS_TRIGGERRIGHT = SDL_CONTROLLER_AXIS_TRIGGERRIGHT;
@@ -92,6 +106,9 @@ static std::array<int, max_triggers> triggers_state = {0, 0};
 
 static int triggers_threshold = 16000;
 static int sticks_threshold = 16000;
+// A deflected stick stays deflected until it falls this far below the
+// threshold: a thumb resting near it otherwise re-presses.
+static int sticks_release_margin = 4000;
 static int error_margin = 2000;
 
 namespace
@@ -113,6 +130,9 @@ static constexpr int sticks_task_index   = max_buttons;
 static constexpr int triggers_task_index = max_buttons + max_sticks;
 
 static std::array<task_t, max_tasks> all_tasks;
+// The key each stick last sent (and repeats), or -1: a new direction that
+// sends the same key (N to NE in a list, both "up") is not a new press.
+static std::array<int, max_sticks> stick_sent = { -1, -1 };
 
 static int repeat_delay = 400;
 static int repeat_interval = 50;
@@ -120,18 +140,43 @@ static int repeat_interval = 50;
 // SDL related stuff
 static SDL_TimerID timer_id;
 #if SDL_MAJOR_VERSION >= 3
-static SDL_Gamepad *controller = nullptr;
+using cata_controller_t = SDL_Gamepad;
+static cata_controller_t *controller = nullptr;
 static SDL_JoystickID controller_id = 0; // SDL3 uses 0 as invalid
 #else
-static SDL_GameController *controller = nullptr;
+using cata_controller_t = SDL_GameController;
+static cata_controller_t *controller = nullptr;
 static SDL_JoystickID controller_id = -1;
 #endif
+// Every connected controller stays open so all of them generate events
+// (e.g. a physical pad alongside the iOS on-screen virtual pad).
+// `controller` is only the POLLING target — see set_active_controller().
+static std::map<SDL_JoystickID, cata_controller_t *> open_controllers;
+
+// Polling (get_controller_axis) must read the device the player is
+// actually using: whichever controller last sent SIGNIFICANT input is
+// active. Significance matters because idle physical sticks stream tiny
+// noise deltas; if noise could claim the active slot, a connected pad
+// would clobber the on-screen virtual pad's stick state dozens of times
+// a second.
+static void set_active_controller( SDL_JoystickID which )
+{
+    if( which == controller_id ) {
+        return;
+    }
+    auto it = open_controllers.find( which );
+    if( it != open_controllers.end() ) {
+        controller = it->second;
+        controller_id = which;
+    }
+}
 
 static direction left_stick_dir = direction::NONE;
 static direction right_stick_dir = direction::NONE;
 static direction radial_left_last_dir = direction::NONE;
 static direction radial_right_last_dir = direction::NONE;
 static bool radial_left_open = false;
+static bool button_from_touch_pad = false;  // last_button_from_touch_pad
 static bool radial_right_open = false;
 static bool alt_modifier_held = false;
 // Layer 2: LT held, then RT pulled. RT can only mean this while LT is down —
@@ -212,9 +257,19 @@ void init()
         printErrorIf( true, "Init gamepad+timer failed" );
         return;
     }
+#if defined(CDDA_GODOT)
+    // The VR host's Touch controllers, if it asked for them.
+    godot_host::attach_virtual_pad();
+#endif
 
     int num_joysticks = 0;
     SDL_JoystickID *joysticks = SDL_GetJoysticks( &num_joysticks );
+    DebugLog( D_INFO, DC_ALL ) << "Gamepad init: " << num_joysticks << " joystick(s)";
+    for( int i = 0; i < num_joysticks; i++ ) {
+        const char *jname = SDL_GetJoystickNameForID( joysticks[i] );
+        DebugLog( D_INFO, DC_ALL ) << "Gamepad init: " << ( jname ? jname : "?" ) << " (id " << joysticks[i] <<
+                                   ( SDL_IsGamepad( joysticks[i] ) ? ", a gamepad)" : ", not a gamepad)" );
+    }
     if( joysticks && num_joysticks > 0 ) {
         controller = SDL_OpenGamepad( joysticks[0] );
         if( controller ) {
@@ -261,6 +316,8 @@ void quit()
 // The unit tests (tests/sdl_gamepad_test.cpp) drive the module without a
 // device: in test mode axis reads come from here instead.
 static bool test_mode = false;
+static menu_press menu_press_seen = menu_press::none;  // last_menu_press
+static bool pad_input_last = false;  // last_input_was_pad
 static std::array<Sint16, 8> test_axes = {};
 
 static Sint16 get_controller_axis( int axis )
@@ -304,6 +361,7 @@ static void cancel_task( task_t &task )
 static void send_input( int ibtn, input_event_t itype = input_event_t::gamepad )
 {
     last_input = input_event( ibtn, itype );
+    pad_input_last = true;
 }
 
 
@@ -457,15 +515,44 @@ static int highlighted_radial_slot()
     return -1;
 }
 
-// Calculate 8-way direction from raw axis values using angle
-static direction angle_to_direction( const point &p )
+// A screen whose directions are map directions, though a menu by the UI
+// stack: every "which way?" prompt (choose_direction: peek, close, pry...),
+// looking around, aiming, the map editor. They all mark their context with
+// set_iso (upstream's own flag for map directions, which isometric tilesets
+// turn), so the pad treats them as play: sticks turned (map_turn), eight
+// ways, and the d-pad too (dpad_map_key). Screens whose directions are on
+// screen (the overmap, vehicle interaction, lists) don't set it.
+static bool in_map_cursor()
+{
+    input_context *top = input_context::input_context_stack.back();
+    return top != nullptr && top->is_iso();
+}
+
+// How far to turn a stick before reading it as a direction: in VR, by the
+// way the player faces (godot_host::view_yaw), so forward is "my forward"
+// however the table is turned. Only where the stick means a map direction,
+// in play and on map cursors: menus and the wheels (LT held) stay as on
+// screen.
+static double map_turn()
+{
+#if defined(CDDA_GODOT)
+    if( ( !is_in_menu() || in_map_cursor() ) && !alt_modifier_held ) {
+        return godot_host::view_yaw();
+    }
+#endif
+    return 0.0;
+}
+
+// Calculate 8-way direction from raw axis values using angle, turned
+// clockwise by `turn` degrees first (see map_turn).
+static direction angle_to_direction( const point &p, double turn = 0.0 )
 {
     // atan2 returns angle in radians, with 0 pointing right (East)
     // We want 0 to be North, so we use atan2(x, -y)
     double angle = std::atan2( static_cast<double>( p.x ), static_cast<double>( -p.y ) );
 
     // Convert to degrees (0-360, with 0 = North, clockwise)
-    double degrees = angle * 180.0 / M_PI;
+    double degrees = std::fmod( angle * 180.0 / M_PI + turn, 360.0 );
     if( degrees < 0 ) {
         degrees += 360.0;
     }
@@ -489,6 +576,14 @@ static direction angle_to_direction( const point &p )
     } else {
         return direction::NW;
     }
+}
+
+// The d-pad on a map screen in a menu (in_map_cursor): the num key for its
+// direction turned like the sticks (map_turn), so up is forward there as on
+// the left stick.
+static int dpad_map_key( const point &step )
+{
+    return direction_to_num_key( angle_to_direction( step, map_turn() ) );
 }
 
 // Helper to send directional movement input
@@ -530,6 +625,234 @@ static void send_direction_movement()
     }
 }
 
+// The host's shoulder wheels (ADR 0009). In play, where the host draws
+// wheels, a bare shoulder is a tap or a hold: let go before the wheel opens
+// and it sends its binding, as a press does without wheels; hold it
+// (wheel_hold_ms, or push a stick) and its wheel opens. While open the pad
+// is the wheel's: the sticks, A and B go to the host as wheel events, the
+// rest is swallowed, until the shoulder's release or the host's answer.
+// The engine knows nothing of slots or rings; the host picks and answers
+// with an action (godot_host::wheel_done).
+namespace
+{
+enum class wheel_phase { none, pending, open, done };
+} // namespace
+static wheel_phase wheel_state = wheel_phase::none;
+static int wheel_button = -1;  // the shoulder (CATA_BUTTON_*) while not none
+static uint32_t wheel_pressed_at = 0;
+static int wheel_serial = 0;
+// Whether the left stick was pushed (aiming) when the shoulder went down:
+// then it neither opens the wheel nor picks until it re-centres.
+static std::array<bool, max_sticks> wheel_stick_was_pushed = {{false, false}};
+static constexpr uint32_t wheel_hold_ms = 250;
+// Start in play is a tap or a hold too: a tap the game's menu (sent on
+// release), a hold Dark Forest's settings panel (the user's call).
+static constexpr uint32_t start_hold_ms = 500;
+static bool start_pending = false;
+static bool start_held = false;  // the hold went to the host: its release is spent
+static uint32_t start_pressed_at = 0;
+// Whether the host had the pad at the last event: letting go spends the
+// sticks, as a wheel closing does.
+static bool pad_was_captured = false;
+// The host has the pad now: the triggers still keep their state (as under
+// a wheel), so a release while it had it can't leave LT's layer on.
+static bool host_has_pad = false;
+// R3 in play with the stick camera: a quick tap with the stick left alone
+// is its binding (look-around), sent on release; anything else is the
+// host's (held: the camera's zoom and reset).
+static constexpr uint32_t r3_tap_ms = 300;
+static bool r3_pending = false;
+static bool r3_stick_moved = false;
+static uint32_t r3_pressed_at = 0;
+
+static bool wheels_on();
+
+// The host draws the wheels (ADR 0017): the game's radials are LB's, not
+// LT's.
+static bool host_wheels()
+{
+#if defined(CDDA_GODOT)
+    return godot_host::wheels_enabled();
+#else
+    return false;
+#endif
+}
+
+// The right stick is the host's camera: in play, no menu, no layer, no
+// radial, no shoulder held (godot_host::set_stick_camera).
+static bool stick_camera_now()
+{
+#if defined(CDDA_GODOT)
+    return godot_host::stick_camera() && wheels_on() && !is_in_menu() && !alt_modifier_held &&
+           !any_radial_open() && wheel_state == wheel_phase::none;
+#else
+    return false;
+#endif
+}
+static bool test_wheels = false;  // test_enable_wheels
+static uint32_t test_ticks = 0;   // test_advance: added to GetTicks
+static std::vector<int> test_wheel_kinds;  // test_take_wheel_events
+
+static uint32_t now_ms()
+{
+    return GetTicks() + test_ticks;
+}
+
+static bool wheels_on()
+{
+    if( test_wheels ) {
+        return true;
+    }
+#if defined(CDDA_GODOT)
+    return godot_host::wheels_enabled() && godot_host::in_game();
+#else
+    return false;
+#endif
+}
+
+static bool wheel_capturing()
+{
+    return wheel_state == wheel_phase::open;
+}
+
+static void send_wheel_event( int kind, float x = 0.0f, float y = 0.0f, int stick_index = -1 )
+{
+    // Recorded as the host's queue keeps them: a stick replaces a stick.
+    if( test_mode && !( kind == 1 && !test_wheel_kinds.empty() && test_wheel_kinds.back() == 1 ) ) {
+        test_wheel_kinds.push_back( kind );
+    }
+#if defined(CDDA_GODOT)
+    godot_host::wheel_event event;
+    event.kind = static_cast<godot_host::wheel_event::kind_t>( kind );
+    event.serial = wheel_serial;
+    event.wheel = wheel_button == CATA_BUTTON_LEFTSHOULDER ? 0 : 1;
+    event.x = x;
+    event.y = y;
+    event.stick_index = stick_index;
+    godot_host::push_wheel_event( std::move( event ) );
+#else
+    ( void )x;
+    ( void )y;
+    ( void )stick_index;
+#endif
+}
+
+// Sticks still pushed as a wheel closes are spent (as after the LT wheels),
+// so nothing walks or aims with them by accident.
+static void end_wheel( wheel_phase next )
+{
+    wheel_state = next;
+    if( next == wheel_phase::none ) {
+        wheel_button = -1;
+    }
+    stick_consumed[0] = left_stick_dir != direction::NONE;
+    stick_consumed[1] = right_stick_dir != direction::NONE;
+    if( g ) {
+        g->invalidate_main_ui_adaptor();
+    }
+}
+
+static void send_wheel_stick();
+
+static void open_wheel()
+{
+    wheel_state = wheel_phase::open;
+    ++wheel_serial;
+    // The aim is where the left stick pointed as the shoulder went down; a
+    // stick pushed now is spent, so it picks nothing until it re-centres.
+    const tripoint aim = direction_to_offset( stick_dir( 0 ) );
+    stick_consumed[0] = wheel_stick_was_pushed[0];
+    stick_consumed[1] = wheel_stick_was_pushed[1];
+    for( task_t &task : all_tasks ) {
+        cancel_task( task );
+    }
+    stick_sent = { -1, -1 };
+    if( test_mode ) {
+        test_wheel_kinds.push_back( 0 );
+    }
+#if defined(CDDA_GODOT)
+    godot_host::wheel_event event;
+    event.kind = godot_host::wheel_event::opened;
+    event.serial = wheel_serial;
+    event.wheel = wheel_button == CATA_BUTTON_LEFTSHOULDER ? 0 : 1;
+    event.aim_dx = aim.x;
+    event.aim_dy = aim.y;
+    if( !test_mode ) {
+        // LB: the game's own radial sets (ADR 0017); RB: the catalogue.
+        event.actions = wheel_button == CATA_BUTTON_LEFTSHOULDER ? godot_host::radial_catalogue() :
+                        godot_host::wheel_catalogue( aim.x, aim.y );
+    }
+    godot_host::set_wheel_aim( wheel_serial, aim.x, aim.y );
+    godot_host::push_wheel_event( std::move( event ) );
+#else
+    ( void )aim;
+#endif
+    // Where the picking stick is already (SDL reports a stick only as it moves).
+    send_wheel_stick();
+    if( g ) {
+        g->invalidate_main_ui_adaptor();
+    }
+}
+
+// The picking stick: of the sticks not spent, the one pushed further, as
+// -1..1 with y up.
+static void send_wheel_stick()
+{
+    float best = -1.0f;
+    float x = 0.0f;
+    float y = 0.0f;
+    int which = -1;
+    for( int i = 0; i < max_sticks; ++i ) {
+        if( stick_consumed[i] ) {
+            continue;
+        }
+        const float sx = get_controller_axis( sticks_axis[i][0] ) / 32767.0f;
+        const float sy = -get_controller_axis( sticks_axis[i][1] ) / 32767.0f;
+        const float m = sx * sx + sy * sy;
+        if( m > best ) {
+            best = m;
+            x = sx;
+            y = sy;
+            which = i;
+        }
+    }
+    // (Which stick, for the game's wheel: the left its inner ring, the
+    // right its outer, ADR 0017.)
+    send_wheel_event( 1, std::clamp( x, -1.0f, 1.0f ), std::clamp( y, -1.0f, 1.0f ), which );
+}
+
+// Each pad event first: the host's answer closes the wheel, and so does
+// leaving play (a menu the game opened itself, the game ending).
+static void check_wheel()
+{
+#if defined(CDDA_GODOT)
+    // The game's wheel answered with a slot: its radial key, as LT's
+    // release fired it (ADR 0017). Taken whatever the wheel's state: its
+    // shoulder's release closes the wheel here before the host answers.
+    {
+        int side = 0;
+        int index = 0;
+        if( godot_host::take_wheel_radial( side, index ) ) {
+            send_input( ( side == 0 ? JOY_L_RADIAL_N : JOY_R_RADIAL_N ) + index );
+        }
+    }
+#endif
+    if( wheel_state != wheel_phase::open ) {
+        return;
+    }
+#if defined(CDDA_GODOT)
+    if( godot_host::take_wheel_done( wheel_serial ) ) {
+        end_wheel( wheel_phase::done );
+        return;
+    }
+#endif
+    // (The game's wheel, LB, works in screens too.)
+    if( !wheels_on() || ( is_in_menu() && !test_mode && wheel_button != CATA_BUTTON_LEFTSHOULDER ) ) {
+        send_wheel_event( 5 );
+        end_wheel( wheel_phase::done );
+    }
+}
+
 static bool handle_axis_event( SDL_Event &event )
 {
     if( event.type != CATA_CONTROLLERAXISMOTION ) {
@@ -540,10 +863,21 @@ static bool handle_axis_event( SDL_Event &event )
 #if SDL_MAJOR_VERSION >= 3
     int axis = event.gaxis.axis;
     int value = event.gaxis.value;
+    const SDL_JoystickID event_source = event.gaxis.which;
 #else
     int axis = event.caxis.axis;
     int value = event.caxis.value;
+    const SDL_JoystickID event_source = event.caxis.which;
 #endif
+    // Only deliberate input claims the active-device slot (see
+    // set_active_controller): a stick past the movement threshold or a
+    // trigger past its press threshold. Sub-threshold events still run
+    // below, interpreted against the active device's polled state.
+    const bool is_trigger_axis = one_of_two( triggers_axis, axis ) >= 0;
+    if( ( is_trigger_axis && value > triggers_threshold ) ||
+        ( !is_trigger_axis && std::abs( value ) > sticks_threshold ) ) {
+        set_active_controller( event_source );
+    }
     // Use GetTicks() instead of event timestamps for consistent millisecond
     // timebase. SDL3 event timestamps are nanoseconds, not milliseconds.
     uint32_t now = GetTicks();
@@ -556,6 +890,37 @@ static bool handle_axis_event( SDL_Event &event )
         task_t &task = all_tasks[triggers_task_index + idx];
         bool trigger_pressed = value > triggers_threshold + error_margin;
         bool trigger_released = value < triggers_threshold - error_margin;
+
+        if( wheel_capturing() ) {
+            // The wheel has the pad: a trigger only keeps its state.
+            if( !state && trigger_pressed ) {
+                triggers_state[idx] = 1;
+            }
+            if( state && trigger_released ) {
+                triggers_state[idx] = 0;
+            }
+            return false;
+        }
+        if( host_has_pad ) {
+            // The host has the pad: a trigger keeps its state and its layer,
+            // and does nothing else. LT let go meanwhile ends both layers
+            // (it stuck on: the stick opened LT's radial, the d-pad zoomed).
+            if( !state && trigger_pressed ) {
+                triggers_state[idx] = 1;
+                if( idx == 0 ) {
+                    alt_modifier_held = true;
+                }
+            }
+            if( state && trigger_released ) {
+                triggers_state[idx] = 0;
+                alt2_modifier_held = false;
+                if( idx == 0 ) {
+                    alt_modifier_held = false;
+                    close_radials();
+                }
+            }
+            return false;
+        }
 
         if( idx == 1 ) {
             // Right trigger (RT)
@@ -630,10 +995,13 @@ static bool handle_axis_event( SDL_Event &event )
             double magnitude = std::sqrt( static_cast<double>( val.x ) * val.x +
                                           static_cast<double>( val.y ) * val.y );
 
-            direction dir = ( magnitude > sticks_threshold ) ? angle_to_direction( val ) : direction::NONE;
-
             task_t &stick_task = all_tasks[sticks_task_index + i];
             direction old_dir = ( i == 0 ) ? left_stick_dir : right_stick_dir;
+
+            const int threshold = old_dir == direction::NONE ? sticks_threshold :
+                                  sticks_threshold - sticks_release_margin;
+            direction dir = ( magnitude > threshold ) ? angle_to_direction( val,
+                            map_turn() ) : direction::NONE;
 
             if( dir != old_dir ) {
                 direction_changed = true;
@@ -651,9 +1019,25 @@ static bool handle_axis_event( SDL_Event &event )
             // Physically back at centre, so the stick is live again.
             if( dir == direction::NONE ) {
                 stick_consumed[i] = false;
+                wheel_stick_was_pushed[i] = false;
             }
 
-            if( alt_modifier_held && !alt2_modifier_held && !stick_consumed[i] ) {
+            // A stick pushed while a shoulder is held opens its wheel at once
+            // (not the one already aiming when it went down).
+            if( wheel_state == wheel_phase::pending && dir != direction::NONE &&
+                !wheel_stick_was_pushed[i] ) {
+                open_wheel();
+            }
+            if( wheel_capturing() ) {
+                cancel_task( stick_task );
+                stick_sent[i] = -1;
+                send_wheel_stick();
+                continue;
+            }
+
+            // (Not while the host draws wheels: the game's radials are LB's
+            // there, ADR 0017; LT keeps its layer.)
+            if( alt_modifier_held && !alt2_modifier_held && !stick_consumed[i] && !host_wheels() ) {
                 // When LT is held, sticks control radial menu state
                 direction &radial_last = ( i == 0 ) ? radial_left_last_dir : radial_right_last_dir;
                 bool &radial_open = ( i == 0 ) ? radial_left_open : radial_right_open;
@@ -678,16 +1062,57 @@ static bool handle_axis_event( SDL_Event &event )
 
                 // Cancel any existing repeat tasks when entering radial mode
                 cancel_task( stick_task );
+                stick_sent[i] = -1;
+            } else if( i == 1 && stick_camera_now() ) {
+                // The host's camera: no look-around from a tilt (R3 opens it).
+                if( dir != direction::NONE && r3_pending ) {
+                    r3_stick_moved = true;
+                }
+                cancel_task( stick_task );
+                stick_sent[i] = -1;
             } else if( stick_consumed[i] ) {
                 // Spent on a wheel slot and not yet re-centred. Emitting octants
                 // here would walk the player (or reopen look on the right stick)
                 // just for sliding a thumb that never left the stick.
                 cancel_task( stick_task );
+                stick_sent[i] = -1;
             } else {
                 int joy_code = -1;
                 input_event_t itype = input_event_t::gamepad;
 
-                if( i == 1 ) {
+                if( is_in_menu() && in_map_cursor() && !radial_right_open ) {
+                    // Either stick moves a map cursor, eight ways, turned
+                    // like play (map_turn): the left stick's arrows below
+                    // would lose the diagonals.
+                    joy_code = direction_to_num_key( dir );
+                    itype = input_event_t::keyboard_char;
+                } else if( i == 0 && is_in_menu() && !alt_modifier_held ) {
+                    // Left stick in menus: the d-pad's arrow keys, repeating
+                    // the same way, for controllers without a d-pad (the VR
+                    // host's Touch). In play the stick only aims. Diagonals
+                    // count as their vertical part: menus are mostly lists.
+                    switch( dir ) {
+                        case direction::N:
+                        case direction::NE:
+                        case direction::NW:
+                            joy_code = KEY_UP;
+                            break;
+                        case direction::S:
+                        case direction::SE:
+                        case direction::SW:
+                            joy_code = KEY_DOWN;
+                            break;
+                        case direction::E:
+                            joy_code = KEY_RIGHT;
+                            break;
+                        case direction::W:
+                            joy_code = KEY_LEFT;
+                            break;
+                        default:
+                            break;
+                    }
+                    itype = input_event_t::keyboard_char;
+                } else if( i == 1 ) {
                     // Right stick (i=1): Map to num keys in menu if the radial menu is not open, or JOY_R_* in gameplay
                     if( is_in_menu() ) {
                         if( !radial_right_open ) {
@@ -728,10 +1153,12 @@ static bool handle_axis_event( SDL_Event &event )
 
                 if( dir == direction::NONE || joy_code == -1 ) {
                     cancel_task( stick_task );
-                } else if( dir != old_dir ) {
-                    // Only send input and schedule repeat if direction changed.
+                    stick_sent[i] = -1;
+                } else if( joy_code != stick_sent[i] ) {
+                    // Only send input and schedule repeat if the key changed.
                     send_input( joy_code, itype );
                     schedule_task( stick_task, now + repeat_delay, joy_code, 1, itype );
+                    stick_sent[i] = joy_code;
                 }
             }
         }
@@ -747,8 +1174,13 @@ static bool handle_button_event( SDL_Event &event )
     // SDL3: event.cbutton becomes event.gbutton
 #if SDL_MAJOR_VERSION >= 3
     int button = event.gbutton.button;
+    set_active_controller( event.gbutton.which );
+#if defined(CDDA_GODOT)
+    button_from_touch_pad = godot_host::touch_pad() && godot_host::is_virtual_pad( event.gbutton.which );
+#endif
 #else
     int button = event.cbutton.button;
+    set_active_controller( event.cbutton.which );
 #endif
     uint32_t now = GetTicks();
 
@@ -757,6 +1189,79 @@ static bool handle_button_event( SDL_Event &event )
         if( button < max_buttons ) {
             cancel_task( all_tasks[button] );
         }
+        if( button == CATA_BUTTON_RIGHTSTICK && r3_pending ) {
+            r3_pending = false;
+            if( !r3_stick_moved && now_ms() - r3_pressed_at < r3_tap_ms ) {
+                send_input( JOY_RS );
+            }
+            return false;
+        }
+        if( button == CATA_BUTTON_START && ( start_pending || start_held ) ) {
+            const bool tap = start_pending;
+            start_pending = false;
+            start_held = false;
+            if( tap ) {
+                // A tap: Start's own binding, on release.
+                send_input( JOY_START );
+            }
+            return false;
+        }
+        if( wheel_state != wheel_phase::none && button == wheel_button ) {
+            const wheel_phase was = wheel_state;
+            if( was == wheel_phase::pending ) {
+                // A tap: the shoulder's own binding, on release.
+                wheel_state = wheel_phase::none;
+                wheel_button = -1;
+                send_input( button == CATA_BUTTON_LEFTSHOULDER ? JOY_LB : JOY_RB );
+                return false;
+            }
+            if( was == wheel_phase::open ) {
+                send_wheel_event( 4 );
+            }
+            end_wheel( wheel_phase::none );
+            return true;
+        }
+        return false;
+    }
+
+    if( wheel_capturing() ) {
+        // A and B are the wheel's (confirm, back); the rest are swallowed.
+        if( button == CATA_BUTTON_A ) {
+            send_wheel_event( 2 );
+        } else if( button == CATA_BUTTON_B ) {
+            send_wheel_event( 3 );
+        }
+        return false;
+    }
+    if( wheel_state == wheel_phase::pending ) {
+        // Another button before the wheel opened: swallowed, as it would be
+        // a moment later. (Sending the shoulder's tap and this button both
+        // would lose one: a poll keeps only the last input.)
+        return false;
+    }
+    if( button == CATA_BUTTON_RIGHTSTICK && stick_camera_now() ) {
+        r3_pending = true;
+        r3_stick_moved = right_stick_dir != direction::NONE;
+        r3_pressed_at = now_ms();
+        return false;
+    }
+    if( button == CATA_BUTTON_START && wheels_on() && !is_in_menu() && !alt_modifier_held &&
+        !any_radial_open() ) {
+        start_pending = true;
+        start_held = false;
+        start_pressed_at = now_ms();
+        return false;
+    }
+    // (LB, the game's wheel, in screens too: ADR 0017.)
+    if( ( button == CATA_BUTTON_LEFTSHOULDER || button == CATA_BUTTON_RIGHTSHOULDER ) &&
+        wheel_state == wheel_phase::none && wheels_on() &&
+        ( !is_in_menu() || button == CATA_BUTTON_LEFTSHOULDER ) && !alt_modifier_held &&
+        !any_radial_open() ) {
+        wheel_state = wheel_phase::pending;
+        wheel_button = button;
+        wheel_pressed_at = now_ms();
+        // Only the left stick aims: a right stick already pushed picks.
+        wheel_stick_was_pushed = { { left_stick_dir != direction::NONE, false } };
         return false;
     }
 
@@ -789,6 +1294,7 @@ static bool handle_button_event( SDL_Event &event )
             if( is_in_menu() ) {
                 joy_code = '\n';
                 input_type = input_event_t::keyboard_char;
+                menu_press_seen = menu_press::a;
             } else {
                 joy_code = JOY_A;
             }
@@ -797,6 +1303,7 @@ static bool handle_button_event( SDL_Event &event )
             if( is_in_menu() ) {
                 joy_code = KEY_ESCAPE;
                 input_type = input_event_t::keyboard_code;
+                menu_press_seen = menu_press::b;
             } else {
                 joy_code = JOY_B;
             }
@@ -844,7 +1351,7 @@ static bool handle_button_event( SDL_Event &event )
         // If in gameplay, send JOY_* codes for mapped actions
         case CATA_BUTTON_DPAD_UP:
             if( is_in_menu() && !alt_modifier_held ) {
-                joy_code = KEY_UP;
+                joy_code = in_map_cursor() ? dpad_map_key( point::north ) : KEY_UP;
                 input_type = input_event_t::keyboard_char;
             } else {
                 joy_code = JOY_UP;
@@ -852,7 +1359,7 @@ static bool handle_button_event( SDL_Event &event )
             break;
         case CATA_BUTTON_DPAD_DOWN:
             if( is_in_menu() && !alt_modifier_held ) {
-                joy_code = KEY_DOWN;
+                joy_code = in_map_cursor() ? dpad_map_key( point::south ) : KEY_DOWN;
                 input_type = input_event_t::keyboard_char;
             } else {
                 joy_code = JOY_DOWN;
@@ -860,7 +1367,7 @@ static bool handle_button_event( SDL_Event &event )
             break;
         case CATA_BUTTON_DPAD_LEFT:
             if( is_in_menu() && !alt_modifier_held ) {
-                joy_code = KEY_LEFT;
+                joy_code = in_map_cursor() ? dpad_map_key( point::west ) : KEY_LEFT;
                 input_type = input_event_t::keyboard_char;
             } else {
                 joy_code = JOY_LEFT;
@@ -868,7 +1375,7 @@ static bool handle_button_event( SDL_Event &event )
             break;
         case CATA_BUTTON_DPAD_RIGHT:
             if( is_in_menu() && !alt_modifier_held ) {
-                joy_code = KEY_RIGHT;
+                joy_code = in_map_cursor() ? dpad_map_key( point::east ) : KEY_RIGHT;
                 input_type = input_event_t::keyboard_char;
             } else {
                 joy_code = JOY_RIGHT;
@@ -899,42 +1406,112 @@ static bool handle_button_event( SDL_Event &event )
     return false;
 }
 
+// Opens a pad SDL lists and keeps it with the others (the first becomes the
+// one polled). SDL3 takes the instance id, SDL2 the device index.
+static void add_controller( int which )
+{
+#if SDL_MAJOR_VERSION >= 3
+    if( open_controllers.count( static_cast<SDL_JoystickID>( which ) ) ) {
+        return;
+    }
+    cata_controller_t *opened = SDL_OpenGamepad( static_cast<SDL_JoystickID>( which ) );
+    if( !opened ) {
+        DebugLog( D_WARNING, DC_ALL ) << "Gamepad " << which << " couldn't be opened: " << SDL_GetError();
+        return;
+    }
+    const SDL_JoystickID id = SDL_GetGamepadID( opened );
+    const char *name = SDL_GetGamepadName( opened );
+#else
+    const SDL_JoystickID device_id = SDL_JoystickGetDeviceInstanceID( which );
+    if( open_controllers.count( device_id ) ) {
+        return;
+    }
+    cata_controller_t *opened = SDL_GameControllerOpen( which );
+    if( !opened ) {
+        DebugLog( D_WARNING, DC_ALL ) << "Gamepad " << which << " couldn't be opened: " << SDL_GetError();
+        return;
+    }
+    const SDL_JoystickID id = SDL_JoystickInstanceID( SDL_GameControllerGetJoystick( opened ) );
+    const char *name = SDL_GameControllerName( opened );
+#endif
+    DebugLog( D_INFO, DC_ALL ) << "Gamepad added: " << ( name ? name : "?" ) << " (id " << id << ")";
+    open_controllers[id] = opened;
+    if( controller == nullptr ) {
+        controller = opened;
+        controller_id = id;
+    }
+}
+
+static void remove_controller( SDL_JoystickID gone )
+{
+    auto it = open_controllers.find( gone );
+    if( it != open_controllers.end() ) {
+        DebugLog( D_INFO, DC_ALL ) << "Gamepad removed: id " << gone;
+#if SDL_MAJOR_VERSION >= 3
+        SDL_CloseGamepad( it->second );
+#else
+        SDL_GameControllerClose( it->second );
+#endif
+        open_controllers.erase( it );
+    }
+    if( controller_id == gone ) {
+        if( open_controllers.empty() ) {
+            controller = nullptr;
+#if SDL_MAJOR_VERSION >= 3
+            controller_id = 0;
+#else
+            controller_id = -1;
+#endif
+        } else {
+            controller = open_controllers.begin()->second;
+            controller_id = open_controllers.begin()->first;
+        }
+    }
+}
+
 static void handle_device_event( SDL_Event &event )
 {
+    // Every hotplug event SDL sends is logged, the joystick-level ones too
+    // (a pad SDL saw but couldn't take as a gamepad shows only those). In
+    // the rootless distrobox SDL must not use udev, whose hotplug events
+    // never arrive there: the launchers set SDL_JOYSTICK_DISABLE_UDEV.
+    if( event.type == CATA_JOYDEVICEADDED || event.type == CATA_JOYDEVICEREMOVED ) {
+#if SDL_MAJOR_VERSION >= 3
+        const int which = static_cast<int>( event.jdevice.which );
+#else
+        const int which = event.jdevice.which;
+#endif
+        DebugLog( D_INFO, DC_ALL ) << "Joystick " << ( event.type == CATA_JOYDEVICEADDED ? "added" :
+                                   "removed" ) << " event: " << which;
+        return;
+    }
+#if SDL_MAJOR_VERSION >= 3
+    const int which = static_cast<int>( event.gdevice.which );
+#else
+    const int which = event.cdevice.which;
+#endif
+    DebugLog( D_INFO, DC_ALL ) << "Gamepad " << ( event.type == CATA_CONTROLLERDEVICEADDED ? "added" :
+                               "removed" ) << " event: " << which;
     if( event.type == CATA_CONTROLLERDEVICEADDED ) {
-        if( controller == nullptr ) {
-#if SDL_MAJOR_VERSION >= 3
-            // SDL3: event provides instance ID directly; SDL_OpenGamepad takes it.
-            controller = SDL_OpenGamepad( event.gdevice.which );
-            if( controller ) {
-                controller_id = SDL_GetGamepadID( controller );
-            }
-#else
-            controller = SDL_GameControllerOpen( event.cdevice.which );
-            if( controller ) {
-                controller_id = SDL_JoystickInstanceID( SDL_GameControllerGetJoystick( controller ) );
-            }
-#endif
-        }
+        // SDL3: the event gives the instance id, which SDL_OpenGamepad takes.
+        add_controller( which );
     } else if( event.type == CATA_CONTROLLERDEVICEREMOVED ) {
-#if SDL_MAJOR_VERSION >= 3
-        if( controller != nullptr && event.gdevice.which == controller_id ) {
-            SDL_CloseGamepad( controller );
-            controller = nullptr;
-            controller_id = 0;
-        }
-#else
-        if( controller != nullptr && event.cdevice.which == controller_id ) {
-            SDL_GameControllerClose( controller );
-            controller = nullptr;
-            controller_id = -1;
-        }
-#endif
+        remove_controller( static_cast<SDL_JoystickID>( which ) );
     }
 }
 
 static void handle_scheduler_event( SDL_Event &/*event*/ )
 {
+    if( wheel_state == wheel_phase::pending && now_ms() - wheel_pressed_at >= wheel_hold_ms ) {
+        open_wheel();
+    }
+    if( start_pending && now_ms() - start_pressed_at >= start_hold_ms ) {
+        start_pending = false;
+        start_held = true;
+#if defined(CDDA_GODOT)
+        godot_host::request_df_panel();
+#endif
+    }
     uint32_t now = GetTicks();
     for( size_t i = 0; i < all_tasks.size(); ++i ) {
         gamepad::task_t &task = all_tasks[i];
@@ -993,6 +1570,18 @@ bool is_alt_held()
     return alt_modifier_held;
 }
 
+bool move_due()
+{
+    // A held move's next step already due, the game behind it: RT walking
+    // (its repeat task sends no button, -1; the touch pad's move pad
+    // included) or the left stick's repeat, past its time.
+    const uint32_t now = GetTicks();
+    const task_t &rt = all_tasks[triggers_task_index + 1];
+    const task_t &stick = all_tasks[sticks_task_index];
+    return ( rt.counter > 0 && rt.button == -1 && stick_dir( 0 ) != direction::NONE && rt.when <= now ) ||
+           ( stick.counter > 0 && stick.when <= now );
+}
+
 bool is_in_menu()
 {
     // If the UI stack has more than 1 element, it usually means a menu is open
@@ -1041,6 +1630,8 @@ bool is_gamepad_event( const SDL_Event &event )
         case CATA_CONTROLLERAXISMOTION:
         case CATA_CONTROLLERDEVICEADDED:
         case CATA_CONTROLLERDEVICEREMOVED:
+        case CATA_JOYDEVICEADDED:
+        case CATA_JOYDEVICEREMOVED:
         case SDL_GAMEPAD_SCHEDULER:
             return true;
         default:
@@ -1048,9 +1639,48 @@ bool is_gamepad_event( const SDL_Event &event )
     }
 }
 
+menu_press last_menu_press()
+{
+    return menu_press_seen;
+}
+
+void note_keyboard_input()
+{
+    menu_press_seen = menu_press::none;
+    pad_input_last = false;
+}
+
+bool last_input_was_pad()
+{
+    return pad_input_last;
+}
+
+bool last_button_from_touch_pad()
+{
+    return button_from_touch_pad;
+}
+
+int number_step( const input_event &ev )
+{
+    if( ev.sequence.empty() ) {
+        return 0;
+    }
+    const int code = ev.get_first_input();
+    if( ev.type == input_event_t::gamepad ) {
+        return code == JOY_ALT_UP ? 10 : code == JOY_ALT_DOWN ? -10 : 0;
+    }
+    if( !pad_input_last || ( ev.type != input_event_t::keyboard_char &&
+                             ev.type != input_event_t::keyboard_code ) ) {
+        return 0;
+    }
+    return code == KEY_UP ? 1 : code == KEY_DOWN ? -1 : 0;
+}
+
 void test_begin()
 {
     test_mode = true;
+    menu_press_seen = menu_press::none;
+    pad_input_last = false;
     test_axes.fill( 0 );
     triggers_state = { 0, 0 };
     left_stick_dir = direction::NONE;
@@ -1066,6 +1696,37 @@ void test_begin()
     for( task_t &task : all_tasks ) {
         task.counter = 0;
     }
+    wheel_state = wheel_phase::none;
+    wheel_button = -1;
+    wheel_stick_was_pushed = { { false, false } };
+    test_wheels = false;
+    test_ticks = 0;
+    test_wheel_kinds.clear();
+}
+
+void test_enable_wheels()
+{
+    test_wheels = true;
+}
+
+void test_advance( int ms )
+{
+    test_ticks += ms;
+    SDL_Event event{};
+    event.type = SDL_GAMEPAD_SCHEDULER;
+    handle_event( event );
+}
+
+std::vector<int> test_take_wheel_events()
+{
+    std::vector<int> out;
+    out.swap( test_wheel_kinds );
+    return out;
+}
+
+bool wheel_is_open()
+{
+    return wheel_state == wheel_phase::open;
 }
 
 void test_end()
@@ -1114,6 +1775,41 @@ void test_button( pad_button which, bool down )
 
 bool handle_event( SDL_Event &event )
 {
+    check_wheel();
+#if defined(CDDA_GODOT)
+    // The host has the pad (godot_host::set_pad_captured): it reads the pad
+    // itself, and nothing reaches the game until it lets go.
+    {
+        const bool captured = godot_host::pad_captured();
+        const bool pad_input = event.type == CATA_CONTROLLERBUTTONDOWN ||
+                               event.type == CATA_CONTROLLERBUTTONUP || event.type == CATA_CONTROLLERAXISMOTION;
+        if( captured && !pad_was_captured ) {
+            for( task_t &task : all_tasks ) {
+                cancel_task( task );
+            }
+            start_pending = false;
+        }
+        if( !captured && pad_was_captured ) {
+            // Sticks still pushed as the host lets go are spent.
+            stick_consumed[0] = left_stick_dir != direction::NONE;
+            stick_consumed[1] = right_stick_dir != direction::NONE;
+        }
+        pad_was_captured = captured;
+        host_has_pad = captured;
+        if( captured && pad_input ) {
+            // The triggers through, to keep their state (handle_axis_event).
+            const bool trigger = event.type == CATA_CONTROLLERAXISMOTION &&
+#if SDL_MAJOR_VERSION >= 3
+                                 one_of_two( triggers_axis, event.gaxis.axis ) >= 0;
+#else
+                                 one_of_two( triggers_axis, event.caxis.axis ) >= 0;
+#endif
+            if( !trigger ) {
+                return false;
+            }
+        }
+    }
+#endif
     switch( event.type ) {
         case CATA_CONTROLLERBUTTONDOWN:
         case CATA_CONTROLLERBUTTONUP:
@@ -1122,6 +1818,8 @@ bool handle_event( SDL_Event &event )
             return handle_axis_event( event );
         case CATA_CONTROLLERDEVICEADDED:
         case CATA_CONTROLLERDEVICEREMOVED:
+        case CATA_JOYDEVICEADDED:
+        case CATA_JOYDEVICEREMOVED:
             handle_device_event( event );
             return false;
         case SDL_GAMEPAD_SCHEDULER:
@@ -1129,6 +1827,164 @@ bool handle_event( SDL_Event &event )
             return false;
         default:
             return false;
+    }
+}
+
+glyph_style current_glyph_style()
+{
+    const std::string style = get_option<std::string>( "GAMEPAD_GLYPHS" );
+    if( style == "xbox" ) {
+        return glyph_style::xbox;
+    } else if( style == "playstation" ) {
+        return glyph_style::playstation;
+    } else if( style == "text" ) {
+        return glyph_style::text;
+    }
+    if( controller != nullptr ) {
+#if SDL_MAJOR_VERSION >= 3
+        switch( SDL_GetGamepadType( controller ) ) {
+            case SDL_GAMEPAD_TYPE_PS3:
+            case SDL_GAMEPAD_TYPE_PS4:
+            case SDL_GAMEPAD_TYPE_PS5:
+                return glyph_style::playstation;
+            default:
+                break;
+        }
+#elif SDL_VERSION_ATLEAST( 2, 0, 14 )
+        switch( SDL_GameControllerGetType( controller ) ) {
+            case SDL_CONTROLLER_TYPE_PS3:
+            case SDL_CONTROLLER_TYPE_PS4:
+            case SDL_CONTROLLER_TYPE_PS5:
+                return glyph_style::playstation;
+            default:
+                break;
+        }
+#endif
+    }
+    return glyph_style::xbox;
+}
+
+#if defined(CDDA_GODOT)
+int host_glyph_style()
+{
+    const std::string style = get_option<std::string>( "GAMEPAD_GLYPHS" );
+    if( style != "auto" ) {
+        return style == "playstation" ? 1 : style == "text" ? 2 : 0;
+    }
+#if SDL_MAJOR_VERSION >= 3
+    // The real pads connected, not the one last used (the user's call,
+    // 2026-11-08: on the phone that is mostly the touch pad's virtual one,
+    // which would hide a DualSense's glyphs): the active pad if it's real,
+    // else the first real one; none (only the virtual pad) is 3.
+    const auto is_ps = []( SDL_GamepadType t ) {
+        return t == SDL_GAMEPAD_TYPE_PS3 || t == SDL_GAMEPAD_TYPE_PS4 || t == SDL_GAMEPAD_TYPE_PS5;
+    };
+    if( controller != nullptr && !godot_host::is_virtual_pad( SDL_GetGamepadID( controller ) ) ) {
+        return is_ps( SDL_GetGamepadType( controller ) ) ? 1 : 0;
+    }
+    int count = 0;
+    SDL_JoystickID *ids = SDL_GetGamepads( &count );
+    int found = 3;
+    for( int i = 0; ids != nullptr && i < count; ++i ) {
+        if( !godot_host::is_virtual_pad( ids[i] ) ) {
+            found = is_ps( SDL_GetGamepadTypeForID( ids[i] ) ) ? 1 : 0;
+            break;
+        }
+    }
+    SDL_free( ids );
+    return found;
+#else
+    return current_glyph_style() == glyph_style::playstation ? 1 : 0;
+#endif
+}
+#endif
+
+static const char *glyph_name( pad_button button )
+{
+    static const std::array<const char *, 14> names = {
+        "A", "B", "X", "Y", "LB", "RB", "LS", "RS", "Start", "Back", "Up", "Down", "Left", "Right"
+    };
+    return names[static_cast<int>( button )];
+}
+
+static bool is_face( pad_button button )
+{
+    return button == pad_button::A || button == pad_button::B || button == pad_button::X ||
+           button == pad_button::Y;
+}
+
+float glyph_width( pad_button button )
+{
+    if( !is_face( button ) || current_glyph_style() == glyph_style::text ) {
+        return ImGui::CalcTextSize( glyph_name( button ) ).x;
+    }
+    return ImGui::GetTextLineHeight() + ImGui::GetStyle().FramePadding.y * 2.0f;
+}
+
+void draw_glyph( pad_button button )
+{
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const float line = ImGui::GetTextLineHeight();
+    const glyph_style glyphs = current_glyph_style();
+    if( !is_face( button ) || glyphs == glyph_style::text ) {
+        // The name, in the face button's colour where it has one.
+        static const std::array<ImU32, 4> colours = {
+            IM_COL32( 110, 200, 70, 255 ), IM_COL32( 235, 80, 70, 255 ),
+            IM_COL32( 80, 140, 240, 255 ), IM_COL32( 240, 200, 60, 255 )
+        };
+        ImGui::AlignTextToFramePadding();
+        ImGui::PushStyleColor( ImGuiCol_Text, is_face( button ) ? colours[static_cast<int>( button )] :
+                               ImGui::GetColorU32( ImGuiCol_Text ) );
+        ImGui::TextUnformatted( glyph_name( button ) );
+        ImGui::PopStyleColor();
+        return;
+    }
+    const float size = glyph_width( button );
+    const ImVec2 at = ImGui::GetCursorScreenPos();
+    ImGui::Dummy( ImVec2( size, line + style.FramePadding.y * 2.0f ) );
+    ImDrawList *draw = ImGui::GetWindowDrawList();
+    const ImVec2 c( at.x + size / 2.0f, at.y + style.FramePadding.y + line / 2.0f );
+    const float r = size * 0.47f;
+    const int face = static_cast<int>( button );
+    if( glyphs == glyph_style::xbox ) {
+        // A disc in the button's colour, its letter dark on it.
+        static const std::array<ImU32, 4> discs = {
+            IM_COL32( 96, 184, 56, 255 ), IM_COL32( 220, 60, 50, 255 ),
+            IM_COL32( 50, 120, 220, 255 ), IM_COL32( 235, 185, 40, 255 )
+        };
+        draw->AddCircleFilled( c, r, discs[face] );
+        const char *letter = glyph_name( button );
+        const ImVec2 text = ImGui::CalcTextSize( letter );
+        draw->AddText( ImVec2( c.x - text.x / 2.0f, c.y - text.y / 2.0f ), IM_COL32( 20, 20, 20, 255 ),
+                       letter );
+        return;
+    }
+    // PlayStation: a dark disc with the shape on it, cross, circle, square
+    // and triangle (south, east, west, north: SDL's A, B, X, Y).
+    static const std::array<ImU32, 4> shapes = {
+        IM_COL32( 125, 170, 235, 255 ), IM_COL32( 235, 95, 110, 255 ),
+        IM_COL32( 225, 130, 200, 255 ), IM_COL32( 70, 200, 165, 255 )
+    };
+    draw->AddCircleFilled( c, r, IM_COL32( 30, 30, 34, 255 ) );
+    const ImU32 col = shapes[face];
+    const float s = r * 0.5f;
+    const float thick = std::max( 1.5f, r * 0.16f );
+    switch( button ) {
+        case pad_button::A:
+            draw->AddLine( ImVec2( c.x - s, c.y - s ), ImVec2( c.x + s, c.y + s ), col, thick );
+            draw->AddLine( ImVec2( c.x - s, c.y + s ), ImVec2( c.x + s, c.y - s ), col, thick );
+            break;
+        case pad_button::B:
+            draw->AddCircle( c, s * 1.05f, col, 0, thick );
+            break;
+        case pad_button::X:
+            draw->AddRect( ImVec2( c.x - s * 0.9f, c.y - s * 0.9f ), ImVec2( c.x + s * 0.9f, c.y + s * 0.9f ),
+                           col, 0.0f, 0, thick );
+            break;
+        default:
+            draw->AddTriangle( ImVec2( c.x, c.y - s * 1.05f ), ImVec2( c.x + s * 1.05f, c.y + s * 0.75f ),
+                               ImVec2( c.x - s * 1.05f, c.y + s * 0.75f ), col, thick );
+            break;
     }
 }
 

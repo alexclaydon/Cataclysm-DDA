@@ -1,4 +1,7 @@
 #include "ranged.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 
 #include <algorithm>
 #include <cmath>
@@ -2845,6 +2848,18 @@ double Character::gun_value( const item &weap, int ammo ) const
 
 target_handler::trajectory target_ui::run()
 {
+#if defined(CDDA_GODOT)
+    // Aiming is a map screen for the host (godot_host::aiming), until run
+    // returns.
+    struct aiming_scope {
+        aiming_scope() {
+            godot_host::set_aiming( true );
+        }
+        ~aiming_scope() {
+            godot_host::set_aiming( false );
+        }
+    } aiming_now;
+#endif
     if( mode == TargetMode::Spell && !no_mana && !casting->can_cast( *you ) ) {
         you->add_msg_if_player( m_bad, _( "You don't have enough %s to cast this spell" ),
                                 casting->energy_string() );

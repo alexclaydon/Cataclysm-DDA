@@ -47,6 +47,9 @@
 #include "game_constants.h"
 #include "game_ui.h"
 #include "get_version.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 #include "help.h"
 #include "input.h"
 #include "main_menu.h"
@@ -624,6 +627,10 @@ int APIENTRY WinMain( _In_ HINSTANCE /* hInstance */, _In_opt_ HINSTANCE /* hPre
     char **argv = __argv;
 #elif defined(__ANDROID__)
 extern "C" int SDL_main( int argc, char **argv ) {
+#elif defined(CDDA_GODOT)
+// Hosted: the host calls this on its own thread instead of main().
+int godot_host::run( int argc, const char *argv[] )
+{
 #else
 int main( int argc, const char *argv[] )
 {
@@ -798,7 +805,15 @@ int main( int argc, const char *argv[] )
         if( cli.check_mods ) {
             init_colors();
             const std::vector<mod_id> mods( cli.opts.begin(), cli.opts.end() );
-            exit( g->check_mod_data( mods ) && !debug_has_error_been_observed() ? 0 : 1 );
+            const int verdict = g->check_mod_data( mods ) && !debug_has_error_been_observed() ? 0 : 1;
+#if defined(CDDA_GODOT)
+            // Hosted, run() returns the verdict to the host, which ends the
+            // process: exit() from the engine's thread tore it down under
+            // the host's feet (an abort, the verdict lost).
+            return verdict;
+#else
+            exit( verdict );
+#endif
         }
     } catch( const std::exception &err ) {
         debugmsg( "%s", err.what() );
@@ -874,9 +889,25 @@ int main( int argc, const char *argv[] )
 
         shared_ptr_fast<ui_adaptor> ui = g->create_or_get_main_ui_adaptor();
         get_event_bus().send<event_type::game_begin>( getVersionString() );
+#if defined(CDDA_GODOT)
+        godot_host::set_in_game( true );
+#endif
         while( !g->do_turn() ) {}
+#if defined(CDDA_GODOT)
+        godot_host::set_in_game( false );
+#endif
     }
 
+#if defined(CDDA_GODOT)
+    // Hosted: hand back to the host, which quits, rather than exit() from
+    // its thread under a running Godot. The same teardown otherwise.
+    deinitDebug();
+    g.reset();
+    catacurses::endwin();
+    imclient.reset();
+    return 0;
+#else
     exit_handler( -999 );
     return 0;
+#endif
 }

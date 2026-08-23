@@ -537,6 +537,14 @@ class uilist // NOLINT(cata-xy)
         size_t current_category = 0;
         size_t switch_to_category = 0;
 
+#if defined(CDDA_GODOT)
+        // Native menus (plan 0017): this list is the host's to draw.
+        bool host_drawn = false;
+        bool host_menu();
+        void publish_host_menu();
+        bool take_host_requests();
+#endif
+
     public:
         // Results
         // TODO change to getters

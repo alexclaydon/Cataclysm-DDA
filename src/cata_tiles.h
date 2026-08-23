@@ -1040,6 +1040,12 @@ class cata_tiles
         bool nv_goggles_activated = false;
         // Set during draw() when any tile with animated=true is rendered.
         bool has_animated_tiles_ = false;
+#if defined(CDDA_GODOT)
+        // While an animated tile is drawn: the 17 ms frame count its frame
+        // was picked at (draw_from_id_string), for draw_sprite_at to record
+        // the whole animation for the VR host; -1 otherwise.
+        int64_t godot_anim_counter_ = -1;
+#endif
 
         pimpl<pixel_minimap> minimap;
 
