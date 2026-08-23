@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cmath>
+#include <map>
 #include <ostream>
 
 #include "debug.h"
@@ -120,12 +121,36 @@ static int repeat_interval = 50;
 // SDL related stuff
 static SDL_TimerID timer_id;
 #if SDL_MAJOR_VERSION >= 3
-static SDL_Gamepad *controller = nullptr;
+using cata_controller_t = SDL_Gamepad;
+static cata_controller_t *controller = nullptr;
 static SDL_JoystickID controller_id = 0; // SDL3 uses 0 as invalid
 #else
-static SDL_GameController *controller = nullptr;
+using cata_controller_t = SDL_GameController;
+static cata_controller_t *controller = nullptr;
 static SDL_JoystickID controller_id = -1;
 #endif
+// Every connected controller stays open so all of them generate events
+// (e.g. a physical pad alongside the iOS on-screen virtual pad).
+// `controller` is only the POLLING target — see set_active_controller().
+static std::map<SDL_JoystickID, cata_controller_t *> open_controllers;
+
+// Polling (get_controller_axis) must read the device the player is
+// actually using: whichever controller last sent SIGNIFICANT input is
+// active. Significance matters because idle physical sticks stream tiny
+// noise deltas; if noise could claim the active slot, a connected pad
+// would clobber the on-screen virtual pad's stick state dozens of times
+// a second.
+static void set_active_controller( SDL_JoystickID which )
+{
+    if( which == controller_id ) {
+        return;
+    }
+    auto it = open_controllers.find( which );
+    if( it != open_controllers.end() ) {
+        controller = it->second;
+        controller_id = which;
+    }
+}
 
 static direction left_stick_dir = direction::NONE;
 static direction right_stick_dir = direction::NONE;
@@ -532,10 +557,21 @@ static bool handle_axis_event( SDL_Event &event )
 #if SDL_MAJOR_VERSION >= 3
     int axis = event.gaxis.axis;
     int value = event.gaxis.value;
+    const SDL_JoystickID event_source = event.gaxis.which;
 #else
     int axis = event.caxis.axis;
     int value = event.caxis.value;
+    const SDL_JoystickID event_source = event.caxis.which;
 #endif
+    // Only deliberate input claims the active-device slot (see
+    // set_active_controller): a stick past the movement threshold or a
+    // trigger past its press threshold. Sub-threshold events still run
+    // below, interpreted against the active device's polled state.
+    const bool is_trigger_axis = one_of_two( triggers_axis, axis ) >= 0;
+    if( ( is_trigger_axis && value > triggers_threshold ) ||
+        ( !is_trigger_axis && std::abs( value ) > sticks_threshold ) ) {
+        set_active_controller( event_source );
+    }
     // Use GetTicks() instead of event timestamps for consistent millisecond
     // timebase. SDL3 event timestamps are nanoseconds, not milliseconds.
     uint32_t now = GetTicks();
@@ -739,8 +775,10 @@ static bool handle_button_event( SDL_Event &event )
     // SDL3: event.cbutton becomes event.gbutton
 #if SDL_MAJOR_VERSION >= 3
     int button = event.gbutton.button;
+    set_active_controller( event.gbutton.which );
 #else
     int button = event.cbutton.button;
+    set_active_controller( event.cbutton.which );
 #endif
     uint32_t now = GetTicks();
 
@@ -894,34 +932,50 @@ static bool handle_button_event( SDL_Event &event )
 static void handle_device_event( SDL_Event &event )
 {
     if( event.type == CATA_CONTROLLERDEVICEADDED ) {
-        if( controller == nullptr ) {
 #if SDL_MAJOR_VERSION >= 3
-            // SDL3: event provides instance ID directly; SDL_OpenGamepad takes it.
-            controller = SDL_OpenGamepad( event.gdevice.which );
-            if( controller ) {
-                controller_id = SDL_GetGamepadID( controller );
-            }
+        // SDL3: event provides instance ID directly; SDL_OpenGamepad takes it.
+        cata_controller_t *opened = SDL_OpenGamepad( event.gdevice.which );
+        if( opened ) {
+            SDL_JoystickID id = SDL_GetGamepadID( opened );
 #else
-            controller = SDL_GameControllerOpen( event.cdevice.which );
-            if( controller ) {
-                controller_id = SDL_JoystickInstanceID( SDL_GameControllerGetJoystick( controller ) );
-            }
+        cata_controller_t *opened = SDL_GameControllerOpen( event.cdevice.which );
+        if( opened ) {
+            SDL_JoystickID id = SDL_JoystickInstanceID( SDL_GameControllerGetJoystick( opened ) );
 #endif
+            open_controllers[id] = opened;
+            if( controller == nullptr ) {
+                controller = opened;
+                controller_id = id;
+            }
         }
     } else if( event.type == CATA_CONTROLLERDEVICEREMOVED ) {
 #if SDL_MAJOR_VERSION >= 3
-        if( controller != nullptr && event.gdevice.which == controller_id ) {
-            SDL_CloseGamepad( controller );
-            controller = nullptr;
-            controller_id = 0;
-        }
+        const SDL_JoystickID gone = event.gdevice.which;
 #else
-        if( controller != nullptr && event.cdevice.which == controller_id ) {
-            SDL_GameControllerClose( controller );
-            controller = nullptr;
-            controller_id = -1;
-        }
+        const SDL_JoystickID gone = event.cdevice.which;
 #endif
+        auto it = open_controllers.find( gone );
+        if( it != open_controllers.end() ) {
+#if SDL_MAJOR_VERSION >= 3
+            SDL_CloseGamepad( it->second );
+#else
+            SDL_GameControllerClose( it->second );
+#endif
+            open_controllers.erase( it );
+        }
+        if( controller_id == gone ) {
+            if( open_controllers.empty() ) {
+                controller = nullptr;
+#if SDL_MAJOR_VERSION >= 3
+                controller_id = 0;
+#else
+                controller_id = -1;
+#endif
+            } else {
+                controller = open_controllers.begin()->second;
+                controller_id = open_controllers.begin()->first;
+            }
+        }
     }
 }
 
