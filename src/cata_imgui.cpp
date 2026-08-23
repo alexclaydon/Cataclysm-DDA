@@ -898,6 +898,9 @@ class cataimgui::window_impl
         cataimgui::window *win_base;
         bool is_resized;
         std::unique_ptr<ui_adaptor> window_adaptor;
+        // The rectangle last given to window_adaptor (position_absolute).
+        point placed_pos = point( -1, -1 );
+        point placed_size;
     public:
         explicit window_impl( cataimgui::window *win ) {
             win_base = win;
@@ -1064,16 +1067,28 @@ void cataimgui::window::draw()
     }
     if( ImGui::Begin( id.c_str(), &is_open, window_flags ) ) {
         draw_controls();
+        // On screen only if it drew something and isn't hidden: an owner
+        // kept alive below a newer window hides its own (hide_ui) but still
+        // begins it each frame.
+        if( !hide_ui && ImGui::GetWindowDrawList()->VtxBuffer.Size > 0 ) {
+            p_impl->window_adaptor->imgui_drawn_pass = ui_adaptor::redraw_pass();
+        }
         if( p_impl->window_adaptor->is_on_top && !force_to_back ) {
             ImGui::BringWindowToDisplayFront( ImGui::GetCurrentWindow() );
         }
-        if( handled_resize ) {
-            point catapos;
-            point catasize;
-            ImVec2 impos = ImGui::GetWindowPos();
-            ImVec2 imsize = ImGui::GetWindowSize();
-            imvec2_to_point( &impos, &catapos );
-            imvec2_to_point( &imsize, &catasize );
+        // Keep the adaptor's rectangle on the window, also after the bounds
+        // were set: an auto-sized window (a query popup) only has its real
+        // size from its second frame, and its rectangle stayed at the first
+        // frame's (16x16 at the corner) for whatever reads the UI stack.
+        point catapos;
+        point catasize;
+        ImVec2 impos = ImGui::GetWindowPos();
+        ImVec2 imsize = ImGui::GetWindowSize();
+        imvec2_to_point( &impos, &catapos );
+        imvec2_to_point( &imsize, &catasize );
+        if( handled_resize || catapos != p_impl->placed_pos || catasize != p_impl->placed_size ) {
+            p_impl->placed_pos = catapos;
+            p_impl->placed_size = catasize;
             p_impl->window_adaptor->position_absolute( catapos, catasize );
         }
     }

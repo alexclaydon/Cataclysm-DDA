@@ -38,6 +38,9 @@
 #include "display.h"
 #include "enum_conversions.h"
 #include "game.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 #include "game_constants.h"
 #include "game_ui.h"
 #include "generic_factory.h"
@@ -2118,6 +2121,8 @@ static tripoint_abs_omt display()
     }
     // Configure input context for navigating the map.
     ictxt.register_action( "ANY_INPUT" );
+    // The pad's X can open the action list (its any-input is keys only).
+    ictxt.allow_action_palette();
     ictxt.register_directions();
     ictxt.register_action( "CONFIRM" );
     ictxt.register_action( "LEVEL_UP" );
@@ -2197,6 +2202,13 @@ static tripoint_abs_omt display()
 #else
         action = ictxt.handle_input( get_option<int>( "BLINK_SPEED" ) );
 #endif
+#if defined(CDDA_GODOT)
+        // The touch pad's map buttons: this screen's own action, in place of
+        // the input (the loop wakes on its own timeout to take it).
+        if( std::string asked = godot_host::take_screen_action(); !asked.empty() ) {
+            action = asked;
+        }
+#endif
         if( !display_path.empty() ) {
             std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
             // We go faster per-tile the more we have to go
@@ -2220,6 +2232,12 @@ static tripoint_abs_omt display()
                     scroll_d; // TODO: Make += etc. available with corresponding relative coordinates.
         } else if( action == "MOUSE_MOVE" || action == "TIMEOUT" ) {
             tripoint_rel_omt edge_scroll = g->mouse_edge_scrolling_overmap( ictxt );
+#if defined(CDDA_GODOT)
+            if( godot_host::touch_pad() ) {
+                // No mouse on the touch pad: its stale position scrolled.
+                edge_scroll = tripoint_rel_omt::zero;
+            }
+#endif
             if( edge_scroll != tripoint_rel_omt::zero ) {
                 if( action == "MOUSE_MOVE" ) {
                     edge_scroll.raw() *= 2; // TODO: Make *= etc. available to relative coordinates
@@ -2318,6 +2336,10 @@ static tripoint_abs_omt display()
                 player_character.omt_path.swap( path );
             }
             if( same_path_selected && !player_character.omt_path.empty() ) {
+#if defined(CDDA_GODOT)
+                // The game asks first: no map buttons over its question.
+                godot_host::set_overmap_state( 0 );
+#endif
                 if( try_travel_to_destination( player_character, curs, curs, driving ) ) {
                     action = "QUIT";
                     if( uistate.overmap_only_auto_travel ) {
@@ -2398,7 +2420,17 @@ static tripoint_abs_omt display()
             }
             last_blink = now;
         }
+#if defined(CDDA_GODOT)
+        {
+            // For the touch pad's Route/Travel: a route plotted to here.
+            const std::vector<tripoint_abs_omt> &route = get_avatar().omt_path;
+            godot_host::set_overmap_state( !route.empty() && route.front().xy() == curs.xy() ? 2 : 1 );
+        }
+#endif
     } while( action != "QUIT" && action != "CONFIRM" );
+#if defined(CDDA_GODOT)
+    godot_host::set_overmap_state( 0 );
+#endif
     if( !keep_overmap_ui ) {
         ui::omap::force_quit();
     } else {

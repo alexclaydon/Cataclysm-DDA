@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <memory>
 
 #include "cached_options.h"
@@ -9,18 +10,33 @@
 #include "catacharset.h"
 #include "color.h"
 #include "imgui/imgui.h"
+#include "input.h"
 #include "input_context.h"
 #include "output.h"
 #include "string_formatter.h"
 #include "ui_manager.h"
+#if defined(TILES)
+#include "sdl_gamepad.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
+#endif
 
 class query_popup_impl : public cataimgui::window
 {
         short mouse_selected_option;
+        short clicked_option = -1;
         size_t msg_width;
         nc_color default_text_color;
         query_popup *parent;
         short last_keyboard_selected_option;
+#if defined(TILES)
+        // The pad's glyphs on each button while the pad is in use (bit 1 A,
+        // bit 2 B: what each answers), and the layout made room for them.
+        std::vector<int> glyphs;
+        std::vector<int> pad_glyphs() const;
+        float glyphs_width( size_t ind ) const;
+#endif
 
         std::vector<std::vector<std::string>> fold_query(
                                                const std::string &category,
@@ -45,6 +61,18 @@ class query_popup_impl : public cataimgui::window
         int get_mouse_selected_option() const {
             return mouse_selected_option;
         }
+#if defined(CDDA_GODOT)
+        // Native dialogs (plan 0018): hidden while the host draws it.
+        void set_host_drawn( bool host ) {
+            hide_ui = host;
+        }
+#endif
+        // The button clicked since the last call, or -1.
+        int take_clicked_option() {
+            const int clicked = clicked_option;
+            clicked_option = -1;
+            return clicked;
+        }
     protected:
         void draw_controls() override;
         cataimgui::bounds get_bounds() override {
@@ -52,9 +80,67 @@ class query_popup_impl : public cataimgui::window
         }
 };
 
+#if defined(TILES)
+std::vector<int> query_popup_impl::pad_glyphs() const
+{
+    std::vector<int> want( parent->options.size(), 0 );
+    if( !gamepad::is_active() || !gamepad::last_input_was_pad() ) {
+        return want;
+    }
+    // A answers Yes where there is one, else the highlighted button
+    // (query_once).
+    int a = keyboard_selected_option;
+    for( size_t i = 0; i < parent->options.size(); ++i ) {
+        if( parent->options[i].action == "YES" ) {
+            a = int( i );
+        }
+    }
+    if( a >= 0 && a < int( want.size() ) ) {
+        want[a] |= 1;
+    }
+    if( parent->pad_b_option >= 0 && parent->pad_b_option < int( want.size() ) ) {
+        want[parent->pad_b_option] |= 2;
+    }
+    return want;
+}
+
+float query_popup_impl::glyphs_width( size_t ind ) const
+{
+    if( ind >= glyphs.size() ) {
+        return 0.0f;
+    }
+    const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
+    float width = 0.0f;
+    if( glyphs[ind] & 1 ) {
+        width += gamepad::glyph_width( gamepad::pad_button::A ) + gap;
+    }
+    if( glyphs[ind] & 2 ) {
+        width += gamepad::glyph_width( gamepad::pad_button::B ) + gap;
+    }
+    return width;
+}
+#endif
+
 void query_popup_impl::draw_controls()
 {
+#if defined(CDDA_GODOT)
+    hide_if_hidden();
+#endif
+#if defined(TILES)
+    // While the pad is in use its glyphs mark what A and B answer, and the
+    // focus frame goes (the keyboard and the mouse bring it back).
+    const std::vector<int> want = pad_glyphs();
+    if( want != glyphs ) {
+        glyphs = want;
+        on_resized();
+    }
+    const bool pad_hints = std::any_of( glyphs.begin(), glyphs.end(), []( int g ) {
+        return g != 0;
+    } );
+    ImGui::SetNavCursorVisible( !pad_hints );
+#else
     ImGui::SetNavCursorVisible( true );
+#endif
     mouse_selected_option = -1;
 
     for( const std::string &line : parent->folded_msg ) {
@@ -68,7 +154,23 @@ void query_popup_impl::draw_controls()
                 ImGui::SameLine();
             }
             ImGui::SetCursorPosX( float( parent->buttons[ind].pos.x ) );
-            ImGui::Button( remove_color_tags( parent->buttons[ind].text ).c_str() );
+#if defined(TILES)
+            const int glyph = ind < glyphs.size() ? glyphs[ind] : 0;
+            if( glyph & 1 ) {
+                gamepad::draw_glyph( gamepad::pad_button::A );
+                ImGui::SameLine( 0.0f, ImGui::GetStyle().ItemInnerSpacing.x );
+            }
+            if( glyph & 2 ) {
+                gamepad::draw_glyph( gamepad::pad_button::B );
+                ImGui::SameLine( 0.0f, ImGui::GetStyle().ItemInnerSpacing.x );
+            }
+#endif
+            // A click on a button is ImGui's (it captures the mouse over its
+            // windows, so no SELECT reaches the input context): take it
+            // from the button, as uilist does from its rows.
+            if( ImGui::Button( remove_color_tags( parent->buttons[ind].text ).c_str() ) ) {
+                clicked_option = short( ind );
+            }
             if( ImGui::IsItemHovered() ) {
                 mouse_selected_option = ind;
             }
@@ -105,12 +207,23 @@ void query_popup_impl::on_resized()
     auto btn_padding = [&frame_padding, &item_padding]( size_t num_buttons ) {
         return ( frame_padding * ( num_buttons - 1 ) ) + ( item_padding * ( num_buttons - 1 ) );
     };
+    // A button's width, its pad glyphs included (the options in order).
+    auto opt_width = [this]( size_t ind, const std::string & opt ) {
+        int width = get_text_width( remove_color_tags( opt ) );
+#if defined(TILES)
+        width += int( std::ceil( glyphs_width( ind ) ) );
+#else
+        ( void )ind;
+#endif
+        return width;
+    };
     // Calculate width with query buttons
+    size_t opt_idx = 0;
     for( const auto &line : folded_query ) {
         if( !line.empty() ) {
             int button_width = 0;
             for( const auto &opt : line ) {
-                button_width += get_text_width( remove_color_tags( opt ) );
+                button_width += opt_width( opt_idx++, opt );
             }
             // extra item padding needed here to account for space left at the beginning of the window by ImGui
             msg_width = std::max( msg_width, button_width + btn_padding( line.size() ) + item_padding );
@@ -121,13 +234,16 @@ void query_popup_impl::on_resized()
     // Calculate height with query buttons & button positions
     parent->buttons.clear();
     size_t line_idx = 0;
+    opt_idx = 0;
     if( !folded_query.empty() ) {
         for( const auto &line : folded_query ) {
             if( !line.empty() ) {
                 int button_width = 0;
+                const size_t line_first = opt_idx;
                 for( const auto &opt : line ) {
-                    button_width += get_text_width( remove_color_tags( opt ) );
+                    button_width += opt_width( opt_idx++, opt );
                 }
+                opt_idx = line_first;
                 button_width += btn_padding( line.size() );
                 // Right align.
                 // TODO: multi-line buttons
@@ -135,7 +251,7 @@ void query_popup_impl::on_resized()
                                   size_t( msg_width - button_width );
                 for( const auto &opt : line ) {
                     parent->buttons.emplace_back( opt, point( button_x, line_idx ) );
-                    button_x += get_text_width( remove_color_tags( opt ) ) + frame_padding + item_padding;
+                    button_x += opt_width( opt_idx++, opt ) + frame_padding + item_padding;
                 }
             }
             line_idx++;
@@ -147,6 +263,13 @@ query_popup::query_popup()
     : cur( 0 ), default_text_color( c_white ), anykey( false ), cancel( false ),
       ontop( false ), fullscr( false ), pref_kbd_mode( keyboard_mode::keycode )
 {
+}
+
+query_popup::~query_popup()
+{
+#if defined(CDDA_GODOT)
+    godot_host::clear_dialog( this );
+#endif
 }
 
 query_popup &query_popup::context( const std::string &cat )
@@ -318,19 +441,76 @@ query_popup::result query_popup::query_once()
         ctxt.register_action( "QUIT" );
     }
 
+#if defined(TILES)
+    // What the pad's B answers (below): the option taking Escape, else No
+    // where nothing can cancel. Its glyph goes on that button.
+    pad_b_option = -1;
+    const std::string &escape_action = ctxt.input_to_action( input_event( KEY_ESCAPE,
+                                       input_event_t::keyboard_code ) );
+    for( size_t i = 0; i < options.size(); ++i ) {
+        if( options[i].action == escape_action ) {
+            pad_b_option = int( i );
+        }
+    }
+    for( size_t i = 0; i < options.size() && pad_b_option < 0 && !cancel; ++i ) {
+        if( options[i].action == "NO" ) {
+            pad_b_option = int( i );
+        }
+    }
+#endif
+
     result res;
     // Assign outside construction of `res` to ensure execution order
     res.wait_input = !anykey;
+    bool by_mouse = false;
+#if defined(CDDA_GODOT)
+    // The host draws it (plan 0018): published, hidden, and its answers
+    // taken each pass (the wait polls every 50 ms).
+    host_drawn = godot_host::native_menus();
+    impl->set_host_drawn( host_drawn );
+    if( host_drawn ) {
+        godot_host::dialog_state s;
+        s.kind = 0;
+        s.message = godot_host::bbcode( text );
+        // Each option by its name (no key in it: the host shows the pad
+        // button answering it as a glyph): A answers Yes, B the option
+        // pad_b_option says.
+        for( size_t i = 0; i < options.size(); ++i ) {
+            s.options.push_back( ctxt.get_action_name( options[i].action ) );
+            s.option_glyphs.emplace_back( options[i].action == "YES" ? "A" :
+                                          static_cast<int>( i ) == pad_b_option ? "B" : "" );
+        }
+        s.cancel = cancel;
+        s.anykey = anykey;
+        godot_host::publish_dialog( this, std::move( s ) );
+    }
+#endif
     do {
         ui_manager::redraw();
         res.action = ctxt.handle_input( 50 );
         res.evt = ctxt.get_raw_input();
+#if defined(CDDA_GODOT)
+        if( host_drawn && take_host_dialog( res ) ) {
+            if( res.action == "CONFIRM" ) {
+                by_mouse = true;
+            }
+            break;
+        }
+#endif
 
+        const int clicked = impl->take_clicked_option();
+        if( !options.empty() && clicked != -1 ) {
+            res.action = "CONFIRM";
+            cur = size_t( clicked );
+            by_mouse = true;
+            break;
+        }
         // If we're tracking mouse movement
         if( !options.empty() && res.action == "SELECT" && impl->get_mouse_selected_option() != -1 ) {
             // Left-click to confirm selection
             res.action = "CONFIRM";
             cur = size_t( impl->get_mouse_selected_option() );
+            by_mouse = true;
         } else if( res.action == "CONFIRM" && impl->keyboard_selected_option != -1 ) {
             cur = size_t( impl->keyboard_selected_option );
         }
@@ -343,7 +523,40 @@ query_popup::result query_popup::query_once()
         res.evt.type == input_event_t::timeout
     );
 
-    if( cancel && res.action == "QUIT" ) {
+    const auto has_option = [&]( const std::string & action ) {
+        return std::any_of( options.begin(), options.end(), [&]( const query_option & o ) {
+            return o.action == action;
+        } );
+    };
+#if defined(TILES)
+    // The pad (the fork's controller scheme): A answers Yes on any prompt
+    // with a Yes, whatever is highlighted; B answers No where nothing on the
+    // prompt takes Escape. The keyboard's Enter and Escape keep the
+    // prompt's own default.
+    const gamepad::menu_press pad = by_mouse ? gamepad::menu_press::none : gamepad::last_menu_press();
+    if( pad == gamepad::menu_press::a && res.action == "CONFIRM" && has_option( "YES" ) ) {
+        res.action = "YES";
+        res.wait_input = false;
+        return res;
+    }
+    if( pad == gamepad::menu_press::b && !cancel && res.evt.type == input_event_t::keyboard_code &&
+        res.evt.get_first_input() == KEY_ESCAPE && !has_option( res.action ) && has_option( "NO" ) ) {
+        res.action = "NO";
+        res.wait_input = false;
+        return res;
+    }
+#endif
+#if defined(TILES)
+    // On a prompt with a Yes the pad answers with A and B alone, so its
+    // d-pad (arrow keys in a menu) moves nothing: the glyphs stay put.
+    const bool pad_arrow = ( res.action == "LEFT" || res.action == "RIGHT" ) &&
+                           gamepad::last_input_was_pad() && has_option( "YES" );
+#else
+    const bool pad_arrow = false;
+#endif
+    if( pad_arrow ) {
+        // Nothing to do.
+    } else if( cancel && res.action == "QUIT" ) {
         res.wait_input = false;
     } else if( res.action == "CONFIRM" ) {
         if( cur < options.size() ) {
@@ -381,8 +594,64 @@ query_popup::result query_popup::query_once()
         }
     }
 
+#if defined(CDDA_GODOT)
+    if( !res.wait_input ) {
+        godot_host::clear_dialog( this );
+    }
+#endif
     return res;
 }
+
+#if defined(CDDA_GODOT)
+// The host's answer, as the matching input: an option chosen (a click on
+// its button), a cancel (Escape, or the option the pad's B answers where
+// nothing cancels), any key. True if one came.
+bool query_popup::take_host_dialog( result &res )
+{
+    godot_host::dialog_request r;
+    if( !godot_host::take_dialog_request( r ) ) {
+        return false;
+    }
+    switch( r.kind ) {
+        case godot_host::dialog_request_kind::choose:
+            if( r.value >= 0 && r.value < static_cast<int>( options.size() ) ) {
+                cur = static_cast<size_t>( r.value );
+                res.action = "CONFIRM";
+                res.evt = input_event();
+                return true;
+            }
+            break;
+        case godot_host::dialog_request_kind::cancel:
+            if( cancel ) {
+                res.action = "QUIT";
+                res.evt = input_event( KEY_ESCAPE, input_event_t::keyboard_code );
+                return true;
+            }
+            if( pad_b_option >= 0 ) {
+                cur = static_cast<size_t>( pad_b_option );
+                res.action = "CONFIRM";
+                res.evt = input_event();
+                return true;
+            }
+            if( anykey ) {
+                // A message any key dismisses: so does a cancel.
+                res.action = "ANY_INPUT";
+                res.evt = input_event( KEY_ESCAPE, input_event_t::keyboard_code );
+                return true;
+            }
+            break;
+        case godot_host::dialog_request_kind::dismiss:
+        case godot_host::dialog_request_kind::submit:
+            if( anykey ) {
+                res.action = "ANY_INPUT";
+                res.evt = input_event( ' ', input_event_t::keyboard_char );
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+#endif
 
 std::shared_ptr<query_popup_impl> query_popup::create_or_get_impl()
 {

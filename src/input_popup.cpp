@@ -1,9 +1,11 @@
 #include "input_popup.h"
 
+#include <algorithm>
 #include <cstddef>
 
 #include "coordinates.h"
 #include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
 #include "imgui/imgui_stdlib.h"
 #include "input_enums.h"
 #include "ret_val.h"
@@ -13,6 +15,16 @@
 #include "uilist.h"
 #include "ui_manager.h"
 #include "uistate.h"
+#if defined(TILES)
+#include "sdl_gamepad.h"
+#if defined(CDDA_GODOT)
+#include <cstdlib>
+
+#include "catacharset.h"
+#include "godot_host.h"
+#include "string_formatter.h"
+#endif
+#endif
 
 input_popup::input_popup( int width, const std::string &title, const point &pos,
                           ImGuiWindowFlags flags ) :
@@ -27,7 +39,38 @@ input_popup::input_popup( int width, const std::string &title, const point &pos,
     ctxt.register_action( "TEXT.CLEAR" );
     ctxt.register_action( "HELP_KEYBINDINGS" );
     ctxt.set_timeout( 10 );
+#if defined(CDDA_GODOT)
+    host_title = title;
+#endif
 }
+
+input_popup::~input_popup()
+{
+#if defined(CDDA_GODOT)
+    godot_host::clear_dialog( this );
+#endif
+}
+
+#if defined(CDDA_GODOT)
+void input_popup::publish_host( int kind, const std::string &value )
+{
+    host_drawn = godot_host::native_menus();
+    hide_ui = host_drawn;
+    if( !host_drawn ) {
+        godot_host::clear_dialog( this );
+        return;
+    }
+    godot_host::dialog_state s;
+    s.kind = kind;
+    s.title = host_title;
+    s.message = godot_host::bbcode( description );
+    s.label = godot_host::bbcode( label );
+    s.value = value;
+    s.cancel = true;
+    s.max_length = max_input_length;
+    godot_host::publish_dialog( this, std::move( s ) );
+}
+#endif
 
 void input_popup::set_description( const std::string &desc, const nc_color &default_color,
                                    bool monofont )
@@ -88,6 +131,9 @@ cataimgui::bounds input_popup::get_bounds()
 
 void input_popup::draw_controls()
 {
+#if defined(CDDA_GODOT)
+    hide_if_hidden();
+#endif
     if( !description.empty() ) {
         if( description_monofont ) {
             cataimgui::PushMonoFont();
@@ -337,14 +383,38 @@ std::string string_input_popup_imgui::query()
     is_cancelled = false;
 
     while( true ) {
+#if defined(CDDA_GODOT)
+        publish_host( 1, text );
+#endif
         ui_manager::redraw_invalidated();
 
         std::string action = ctxt.handle_input();
+#if defined(CDDA_GODOT)
+        // The host's answer (plan 0018): the text submitted, or a cancel.
+        godot_host::dialog_request r;
+        if( host_drawn && godot_host::take_dialog_request( r ) ) {
+            if( r.kind == godot_host::dialog_request_kind::submit ) {
+                text = r.text;
+                if( max_input_length > 0 && static_cast<int>( text.size() ) > max_input_length ) {
+                    text = utf8_truncate( text, max_input_length );
+                }
+                add_to_history( text );
+                godot_host::clear_dialog( this );
+                return text;
+            }
+            if( r.kind == godot_host::dialog_request_kind::cancel ) {
+                break;
+            }
+        }
+#endif
         if( handle_custom_callbacks( action ) ) {
             continue;
         }
 
         if( action == "TEXT.CONFIRM" ) {
+#if defined(CDDA_GODOT)
+            godot_host::clear_dialog( this );
+#endif
             add_to_history( text );
             return text;
         } else if( action == "TEXT.QUIT" ) {
@@ -362,6 +432,9 @@ std::string string_input_popup_imgui::query()
         }
     }
 
+#if defined(CDDA_GODOT)
+    godot_host::clear_dialog( this );
+#endif
     is_cancelled = true;
     return old_input;
 }
@@ -394,7 +467,19 @@ number_input_popup<T>::number_input_popup( int width, T old_value, const std::st
     value( old_value ),
     old_value( old_value )
 {
-    // potentially register context keys
+#if defined(TILES)
+    // The d-pad spinner reads the raw pad events, which no action carries.
+    ctxt.register_action( "ANY_INPUT" );
+    pad_hint = gamepad::last_input_was_pad();
+#endif
+}
+
+// The hint under a number field opened from the pad.
+static void draw_spinner_hint( bool show )
+{
+    if( show ) {
+        cataimgui::draw_colored_text( _( "D-pad up/down: +1/-1.  LT and d-pad: +10/-10." ), c_light_gray );
+    }
 }
 
 template<>
@@ -402,8 +487,15 @@ void number_input_popup<int>::draw_input_control()
 {
     // todo: maybe set width of input field, default is fairly long
     // step size default values are imgui defaults
+    if( spun ) {
+        // An active field keeps its own text: let go of it, and the focus
+        // request (set_focus) takes it back with the new value.
+        ImGui::ClearActiveID();
+        spun = false;
+    }
     ImGui::InputInt( "##number_input", &value, step_size.value_or( 1 ),
                      fast_step_size.value_or( 100 ) );
+    draw_spinner_hint( pad_hint );
 }
 
 template<>
@@ -411,8 +503,13 @@ void number_input_popup<float>::draw_input_control()
 {
     // todo: maybe set width of input field, default is fairly long
     // step size default values are imgui defaults
+    if( spun ) {
+        ImGui::ClearActiveID();
+        spun = false;
+    }
     cataimgui::InputFloat( "##number_input", &value, step_size.value_or( 0.f ),
                            fast_step_size.value_or( 0.f ) );
+    draw_spinner_hint( pad_hint );
 }
 
 template<typename T>
@@ -420,14 +517,47 @@ T number_input_popup<T>::query()
 {
 
     while( true ) {
+#if defined(CDDA_GODOT)
+        publish_host( 2, string_format( "%g", static_cast<double>( value ) ) );
+#endif
         ui_manager::redraw_invalidated();
         std::string action = ctxt.handle_input();
+#if defined(CDDA_GODOT)
+        // The host's answer (plan 0018): a number submitted, or a cancel.
+        godot_host::dialog_request r;
+        if( host_drawn && godot_host::take_dialog_request( r ) ) {
+            if( r.kind == godot_host::dialog_request_kind::submit ) {
+                char *end = nullptr;
+                const double v = std::strtod( r.text.c_str(), &end );
+                if( end != r.text.c_str() ) {
+                    godot_host::clear_dialog( this );
+                    return static_cast<T>( v );
+                }
+            } else if( r.kind == godot_host::dialog_request_kind::cancel ) {
+                break;
+            }
+        }
+#endif
 
         if( handle_custom_callbacks( action ) ) {
             continue;
         }
 
+#if defined(TILES)
+        // The d-pad spinner: the pad's up and down step the number, LT with
+        // them by ten, never below zero; the keyboard's arrows are not it.
+        if( const int step = gamepad::number_step( ctxt.get_raw_input() ) ) {
+            value = std::max<T>( 0, value + static_cast<T>( step ) );
+            spun = true;
+            set_focus = true;
+            continue;
+        }
+#endif
+
         if( action == "TEXT.CONFIRM" ) {
+#if defined(CDDA_GODOT)
+            godot_host::clear_dialog( this );
+#endif
             return value;
         } else if( action == "TEXT.QUIT" ) {
             break;
@@ -439,6 +569,9 @@ T number_input_popup<T>::query()
         }
     }
 
+#if defined(CDDA_GODOT)
+    godot_host::clear_dialog( this );
+#endif
     return old_value;
 }
 
