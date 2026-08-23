@@ -77,6 +77,7 @@ class ui_adaptor
 {
     public:
         bool is_imgui;
+        bool is_shim = false;
         bool is_on_top;
         using redraw_callback_t = std::function<void( ui_adaptor & )>;
         using screen_resize_callback_t = std::function<void( ui_adaptor & )>;
@@ -85,6 +86,16 @@ class ui_adaptor
         };
 
         struct debug_message_ui {
+        };
+
+        /**
+         * App-shell adaptors (the iOS wrapper keeps one alive for the whole
+         * run to catch screen resizes) are not user-facing UIs: they stay on
+         * the stack for callbacks but are excluded from ui_stack_size(), so
+         * menu-depth heuristics (gamepad is_in_menu()) aren't permanently
+         * fooled into menu mode.
+         **/
+        struct shim {
         };
 
         /**
@@ -106,6 +117,7 @@ class ui_adaptor
          * graphics caused by overwritten screen area and resizing.
          **/
         explicit ui_adaptor( debug_message_ui );
+        explicit ui_adaptor( shim );
         ui_adaptor( const ui_adaptor &rhs ) = delete;
         ui_adaptor( ui_adaptor &&rhs ) = delete;
         ~ui_adaptor();
