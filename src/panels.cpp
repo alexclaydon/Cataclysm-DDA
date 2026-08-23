@@ -414,6 +414,9 @@ panel_manager::panel_manager()
 {
 #if defined(__ANDROID__)
     current_layout_id = "sidebar-mobile";
+#elif defined(CDDA_IOS)
+    // Phone screens want the narrow layout out of the box.
+    current_layout_id = "legacy_labels_narrow_sidebar";
 #else
     current_layout_id = "legacy_labels_sidebar";
 #endif
