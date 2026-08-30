@@ -3387,7 +3387,21 @@ bool game::handle_action()
             return false;
         }
 
-        if( act == ACTION_SELECT || act == ACTION_SEC_SELECT ) {
+        if( act == ACTION_PAUSE && !destination_preview.empty() && !veh_ctrl &&
+            !player_character.is_dead_state() &&
+            ctxt.get_raw_input().type == input_event_t::gamepad ) {
+            // Gamepad RT (bound to pause) with a click-to-move route preview
+            // pending commits the route, as the second click would. Handled in
+            // this chain so the any-other-action branch below cannot clear the
+            // fresh destination, and so the first step executes this iteration.
+            player_character.set_destination( destination_preview );
+            destination_preview.clear();
+            act = player_character.get_next_auto_move_direction();
+            if( act == ACTION_NULL ) {
+                player_character.clear_destination();
+                return false;
+            }
+        } else if( act == ACTION_SELECT || act == ACTION_SEC_SELECT ) {
             // Mouse button click
             if( veh_ctrl ) {
                 // No mouse use in vehicle

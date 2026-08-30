@@ -1342,12 +1342,6 @@ class game
         // called on map shifting
         void shift_destination_preview( const point_rel_ms &delta );
 
-        /** Commit a pending auto-move route preview (from click-to-move's
-         *  first click), as the second click would. Returns false if no
-         *  preview is pending. The automove machinery picks the route up
-         *  at the next handle_action entry. */
-        bool commit_destination_preview();
-
         /** Passed to climbing-related functions (slip_down) to
         *   indicate the climbing action being attempted.
         */

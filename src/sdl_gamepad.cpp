@@ -604,11 +604,6 @@ static bool handle_axis_event( SDL_Event &event )
                     send_direction_movement();
                     // Schedule repeat for continuous movement
                     schedule_task( task, now + repeat_delay, -1, 1 );
-                } else if( !is_in_menu() && g && g->commit_destination_preview() ) {
-                    // A click-to-move route preview is pending: RT commits it,
-                    // mirroring the second click. No input event is sent — the
-                    // automove machinery starts walking on the next input tick,
-                    // and any event here would cancel the fresh destination.
                 } else {
                     // No direction selected - send JOY_RT event and schedule repeat
                     send_input( JOY_RT );

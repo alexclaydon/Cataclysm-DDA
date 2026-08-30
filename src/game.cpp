@@ -2796,16 +2796,6 @@ bool game::try_get_left_click_action( action_id &act, const tripoint_bub_ms &mou
     return true;
 }
 
-bool game::commit_destination_preview()
-{
-    if( destination_preview.empty() ) {
-        return false;
-    }
-    u.set_destination( destination_preview );
-    destination_preview.clear();
-    return true;
-}
-
 bool game::try_get_right_click_action( action_id &act, const tripoint_bub_ms &mouse_target )
 {
     map &here = get_map();
