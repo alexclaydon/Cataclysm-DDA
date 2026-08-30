@@ -117,6 +117,9 @@ static std::array<task_t, max_tasks> all_tasks;
 
 static int repeat_delay = 400;
 static int repeat_interval = 50;
+// RT-held continuous movement repeats faster than the generic repeat —
+// walking cadence wants to be snappier than menu-scroll cadence.
+static int movement_repeat_interval = 33;
 
 // SDL related stuff
 static SDL_TimerID timer_id;
@@ -1000,9 +1003,11 @@ static void handle_scheduler_event( SDL_Event &/*event*/ )
                 }
             }
             // Check if this is the RT repeat task
+            int interval = repeat_interval;
             if( i == triggers_task_index + 1 && stick_dir( 0 ) != direction::NONE ) {
                 // RT continuous movement - send direction
                 send_direction_movement();
+                interval = movement_repeat_interval;
             } else if( i >= sticks_task_index && i < triggers_task_index ) {
                 // Stick repeat (sticks_task_index + i where i is stick index)
                 if( task.button != -1 ) {
@@ -1013,7 +1018,7 @@ static void handle_scheduler_event( SDL_Event &/*event*/ )
                 send_input( task.button, task.type );
             }
             task.counter += 1;
-            task.when = now + repeat_interval;
+            task.when = now + interval;
         }
     }
 }
