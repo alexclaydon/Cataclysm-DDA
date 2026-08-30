@@ -5568,6 +5568,23 @@ static void CheckMessages()
                 case CATA_WINDOWEVENT_MINIMIZED:
                     break;
                 case CATA_WINDOWEVENT_EXPOSED:
+#if defined(CDDA_IOS)
+                    // The iOS wrapper heartbeats EXPOSED at 1Hz because the
+                    // main menu's initial draw can land while the Metal layer
+                    // isn't ready, leaving the display buffer itself black —
+                    // a bare re-present shows black until the first input
+                    // forces a redraw. Answer the first minute's worth of
+                    // heartbeats with a full UI redraw; after that the plain
+                    // re-present below suffices (and stays cheap in-game).
+                    {
+                        static int ios_exposed_redraw_budget = 60;
+                        if( ios_exposed_redraw_budget > 0 ) {
+                            ios_exposed_redraw_budget--;
+                            ui_manager::invalidate_all_ui_adaptors();
+                            ui_manager::redraw_invalidated();
+                        }
+                    }
+#endif
                     needupdate = true;
                     break;
 #if SDL_MAJOR_VERSION >= 3
