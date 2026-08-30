@@ -49,6 +49,7 @@
 #include "gamemode.h"
 #include "gun_mode.h"
 #include "help.h"
+#include "input.h"
 #include "input_context.h"
 #include "input_enums.h"
 #include "input_popup.h"
@@ -3295,7 +3296,32 @@ bool game::handle_action()
             return false;
         }
 
-        if( act == ACTION_SELECT || act == ACTION_SEC_SELECT ) {
+        // With a click-to-move route preview pending (a click by mouse,
+        // trackpad or the VR host's laser), the pad's A walks it and B drops
+        // it: B is bound to pause, and walking a route on the button that
+        // means "back out" nearly killed the player on the Deck. RT (pause)
+        // walks it too, as before.
+        const input_event &pad_evt = ctxt.get_raw_input();
+        const int pad_key = pad_evt.type == input_event_t::gamepad && !pad_evt.sequence.empty() ?
+                            pad_evt.get_first_input() : -1;
+        if( pad_key == JOY_B && !destination_preview.empty() ) {
+            player_character.clear_destination();
+            destination_preview.clear();
+            return false;
+        }
+        if( ( pad_key == JOY_A || ( act == ACTION_PAUSE && pad_key != -1 ) ) &&
+            !destination_preview.empty() && !veh_ctrl && !player_character.is_dead_state() ) {
+            // Commits the route, as the second click would. Handled in this
+            // chain so the any-other-action branch below cannot clear the
+            // fresh destination, and so the first step executes this iteration.
+            player_character.set_destination( destination_preview );
+            destination_preview.clear();
+            act = player_character.get_next_auto_move_direction();
+            if( act == ACTION_NULL ) {
+                player_character.clear_destination();
+                return false;
+            }
+        } else if( act == ACTION_SELECT || act == ACTION_SEC_SELECT ) {
             // Mouse button click
             if( veh_ctrl ) {
                 // No mouse use in vehicle
