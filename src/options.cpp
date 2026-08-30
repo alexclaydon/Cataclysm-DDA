@@ -2758,6 +2758,16 @@ void options_manager::add_options_graphics()
                 break;
             }
         }
+#   elif defined(CDDA_IOS)
+        // Measured 2026-08-30 on an iPhone 15 Pro Max: the software
+        // renderer spends 5-13ms of CPU per present at 2796x1290 where
+        // metal spends ~0.1ms, with no visual differences.
+        for( const id_and_option &renderer : renderer_list ) {
+            if( renderer.first == "metal" ) {
+                default_renderer = renderer.first;
+                break;
+            }
+        }
 #   endif
         // SDL3 drives renderer selection through SDL_HINT_RENDER_DRIVER; the
         // saved RENDERER value is ignored at startup but the option ID is
