@@ -1,0 +1,116 @@
+# Fork release build: the Linux tiles+sounds artifact for our aec-dev,
+# trimmed from upstream's release.yml (Experimental Release). Produces the
+# same tarball the Deck and iOS assets are taken from (composed tilesets,
+# CC-Sounds, bundled SDL3 stack) — from-source builds ship neither.
+#
+# Manual only (workflow_dispatch). Output is a workflow artifact, not a
+# GitHub release, so nothing is published; fetch it with
+#   gh run download <run-id> -R alexclaydon/Cataclysm-DDA
+# Dropped from upstream: translations (needs the Transifex token), Windows,
+# macOS (builds SDL3 from source; Nova builds locally), Android, WASM.
+name: "Fork Release"
+concurrency: fork-release
+on:
+  workflow_dispatch:
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  compose-tilesets:
+    uses: ./.github/workflows/compose-tilesets.yml
+
+  compile-shaders:
+    name: Compile shaders
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: build SDL3 shader artifacts
+        uses: ./.github/actions/build-sdl3-shaders
+
+  build:
+    name: Linux Tiles Sounds x64
+    needs:
+      - compose-tilesets
+      - compile-shaders
+    runs-on: ubuntu-24.04
+    env:
+      ZSTD_CLEVEL: 17
+      ARTIFACT: linux-with-graphics-and-sounds-x64
+    steps:
+      - name: Get build timestamp
+        id: ts
+        run: echo "time=$(/bin/date -u "+%Y-%m-%d-%H%M")" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-tags: true
+          persist-credentials: false
+      - name: Get soundpack
+        run: |
+          git clone --depth=1 --shallow-submodules --recurse-submodules https://github.com/Fris0uman/CDDA-Soundpacks '${{ github.workspace }}/CDDA-Soundpacks'
+          mv '${{ github.workspace }}/CDDA-Soundpacks/sound/CC-Sounds' '${{ github.workspace }}/data/sound'
+      - name: Fetch tileset artifact into build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: tileset-*
+          path: gfx
+          merge-multiple: true
+      - name: Fetch shader artifacts into build (SDL3)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cdda-shaders
+          path: data/shaders
+      - name: Mark shader artifacts fresh (SDL3)
+        shell: bash
+        run: |
+          # Bump artifact mtimes so the Make shader rule sees them as
+          # up-to-date and skips invoking build_shaders.py.
+          touch data/shaders/build-*.stamp data/shaders/*.spv data/shaders/*.dxil data/shaders/*.msl
+      - name: Install dependencies (Linux, SDL3)
+        run: |
+          sudo apt-get update
+          wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 18
+          sudo apt-get install -y libncursesw5-dev ccache gettext parallel patchelf
+      - name: Setup SDL3 stack (Linux, SDL3)
+        uses: ./.github/actions/setup-sdl3-stack
+        with:
+          cache-key: sdl3-stack-strict-sdl-3.4.10-image-3.4.4-ttf-3.2.2-mixer-3.2.4-ubuntu-24.04-v2
+          prefix: ${{ runner.workspace }}/sdl3_prefix
+          stage-licenses: "true"
+      - name: Create VERSION.TXT
+        shell: bash
+        run: |
+          cat >VERSION.txt <<EOL
+          build type: ${{ env.ARTIFACT }}
+          build number: ${{ steps.ts.outputs.time }}
+          commit sha: ${{ github.sha }}
+          commit url: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+          EOL
+      - name: Build libbacktrace
+        run: |
+          git clone https://github.com/ianlancetaylor/libbacktrace.git
+          cd libbacktrace
+          git checkout 14818b7783eeb9a56c3f0fca78cefd3143f8c5f6
+          ./configure
+          make -j$((`nproc`+0))
+          cp LICENSE ${{ github.workspace }}/LICENSE-libbacktrace.txt
+          sudo make install
+      - name: Build CDDA (linux)
+        run: |
+          export PKG_CONFIG_PATH="$RUNNER_WORKSPACE/sdl3_prefix/lib/pkgconfig:$RUNNER_WORKSPACE/sdl3_prefix/lib/x86_64-linux-gnu/pkgconfig"
+          export LD_LIBRARY_PATH="$RUNNER_WORKSPACE/sdl3_prefix/lib:$RUNNER_WORKSPACE/sdl3_prefix/lib/x86_64-linux-gnu"
+          # LANGUAGES left unset: the .po files come from the Transifex job we
+          # don't run, and any LANGUAGES value is taken as a language id.
+          make COMPILER=clang++-18 -j$((`nproc`+0)) TILES=1 SOUND=1 SDL3=1 RELEASE=1 LOCALIZE=1 BACKTRACE=1 LIBBACKTRACE=1 WARN_STALE_DATA=1 PCH=0 bindist
+          mv cataclysmdda-*.tar.gz cdda-${{ env.ARTIFACT }}-${{ steps.ts.outputs.time }}.tar.gz
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cdda-${{ env.ARTIFACT }}-${{ steps.ts.outputs.time }}
+          path: cdda-${{ env.ARTIFACT }}-${{ steps.ts.outputs.time }}.tar.gz
+          retention-days: 90
+          compression-level: 0
