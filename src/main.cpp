@@ -47,6 +47,9 @@
 #include "game_constants.h"
 #include "game_ui.h"
 #include "get_version.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 #include "help.h"
 #include "input.h"
 #include "main_menu.h"
@@ -624,6 +627,10 @@ int APIENTRY WinMain( _In_ HINSTANCE /* hInstance */, _In_opt_ HINSTANCE /* hPre
     char **argv = __argv;
 #elif defined(__ANDROID__)
 extern "C" int SDL_main( int argc, char **argv ) {
+#elif defined(CDDA_GODOT)
+// Hosted: the host calls this on its own thread instead of main().
+int godot_host::run( int argc, const char *argv[] )
+{
 #else
 int main( int argc, const char *argv[] )
 {

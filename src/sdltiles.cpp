@@ -56,6 +56,9 @@
 #include "game.h"
 #include "game_constants.h"
 #include "game_ui.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 #include "hash_utils.h"
 #include "horde_entity.h"
 #include "input.h"
@@ -235,6 +238,14 @@ static void InitSDL()
     // identifying itself when asking to inhibit screensaver via dbus under
     // Linux.
     SDL_SetHint( SDL_HINT_APP_NAME, _( "Cataclysm: Dark Days Ahead" ) );
+#endif
+
+#if defined(CDDA_GODOT)
+    // Hosted (godot_host.h): no window of our own. Render offscreen for the
+    // host to show, and keep gamepad events flowing even though the
+    // offscreen window never receives focus.
+    SDL_SetHint( SDL_HINT_VIDEO_DRIVER, "offscreen" );
+    SDL_SetHint( SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1" );
 #endif
 
 #if defined(__linux__) && SDL_MAJOR_VERSION < 3
@@ -656,6 +667,9 @@ static void WinCreate()
 
     ::window = CreateGameWindow( "", display, WindowWidth, WindowHeight, window_flags );
     throwErrorIf( !::window, "CreateWindow failed" );
+#if defined(CDDA_GODOT)
+    godot_host::set_window_id( SDL_GetWindowID( ::window.get() ) );
+#endif
 
     // Apply fullscreen after creation to preserve exclusive vs desktop distinction
     if( desired_fullscreen != FullscreenMode::windowed ) {
@@ -687,6 +701,11 @@ static void WinCreate()
     // layer via SDL_RENDER_DRIVER environment variable (env > SDL_SetHint).
     bool software_renderer = false;
     std::string renderer_name;
+#if defined(CDDA_GODOT)
+    // The offscreen driver has no GPU swapchain; frames are read back from
+    // the software renderer's target (godot_host::publish_frame).
+    software_renderer = true;
+#endif
 #else
     bool software_renderer = get_option<std::string>( "RENDERER" ).empty();
     std::string renderer_name;
@@ -1061,6 +1080,9 @@ void refresh_display()
     draw_virtual_joystick();
 #endif
     draw_gamepad_radial_menu();
+#if defined(CDDA_GODOT)
+    godot_host::publish_frame( renderer.get() );
+#endif
     RenderPresent( renderer );
 }
 
@@ -5147,7 +5169,13 @@ void android_vibrate()
 #endif
 
 #if !defined(__ANDROID__)
+#if defined(CDDA_GODOT)
+// Hosted: the offscreen window never gets focus events, and the host only
+// forwards input that is meant for the game. Text input needs focus.
+static bool window_focus = true;
+#else
 static bool window_focus = false;
+#endif
 static bool text_input_active_when_regaining_focus = false;
 #endif
 
