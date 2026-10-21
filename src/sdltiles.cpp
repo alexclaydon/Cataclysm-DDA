@@ -3686,6 +3686,13 @@ void cata_cursesport::curses_drawwindow( const catacurses::window &w )
         // Strings with colors do be drawn with map_font on top of tiles.
         std::multimap<point, formatted_text> overlay_strings;
 
+#if defined(CDDA_GODOT)
+        {
+            const tripoint_bub_ms you = get_avatar().pos_bub();
+            godot_host::begin_map_snapshot( g->ter_view_p.x(), g->ter_view_p.y(), g->ter_view_p.z(),
+                                            you.x(), you.y(), you.z() );
+        }
+#endif
         // game::w_terrain can be drawn by the tilecontext.
         // skip the normal drawing code for it.
         tilecontext->draw(
@@ -3695,6 +3702,9 @@ void cata_cursesport::curses_drawwindow( const catacurses::window &w )
             TERRAIN_WINDOW_TERM_HEIGHT * font->height,
             overlay_strings,
             color_blocks );
+#if defined(CDDA_GODOT)
+        godot_host::end_map_snapshot();
+#endif
 
         // color blocks overlay
         if( !color_blocks.second.empty() ) {

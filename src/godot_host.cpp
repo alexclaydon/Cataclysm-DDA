@@ -23,6 +23,16 @@ uint64_t frame_sequence = 0;
 
 std::atomic<uint32_t> engine_window_id{ 0 };
 
+// Recording happens on the engine thread only; the mutex guards the
+// published snapshot the host takes.
+bool map_recording = false;
+int lookup_depth = 0;
+godot_host::map_snapshot map_building;
+
+std::mutex map_mutex;
+godot_host::map_snapshot map_published;
+uint64_t map_sequence = 0;
+
 } // namespace
 
 void godot_host::publish_frame( SDL_Renderer *renderer )
@@ -76,6 +86,65 @@ uint32_t godot_host::window_id()
 void godot_host::set_window_id( uint32_t id )
 {
     engine_window_id.store( id );
+}
+
+void godot_host::begin_map_snapshot( int center_x, int center_y, int center_z, int player_x,
+                                     int player_y, int player_z )
+{
+    map_building.center[0] = center_x;
+    map_building.center[1] = center_y;
+    map_building.center[2] = center_z;
+    map_building.player[0] = player_x;
+    map_building.player[1] = player_y;
+    map_building.player[2] = player_z;
+    map_building.sprites.clear();
+    map_recording = true;
+}
+
+void godot_host::end_map_snapshot()
+{
+    map_recording = false;
+    if( map_building.sprites.empty() ) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock( map_mutex );
+    // The previous snapshot's storage comes back for the next draw.
+    std::swap( map_published, map_building );
+    ++map_sequence;
+}
+
+godot_host::sprite_lookup_scope::sprite_lookup_scope()
+{
+    ++lookup_depth;
+}
+
+godot_host::sprite_lookup_scope::~sprite_lookup_scope()
+{
+    --lookup_depth;
+}
+
+bool godot_host::sprite_lookup_scope::recording() const
+{
+    return map_recording && lookup_depth == 1;
+}
+
+void godot_host::record_map_sprite( const std::string &id, const std::string &variant,
+                                    int category, int light, int x, int y, int z, int subtile, int rota, int height_3d )
+{
+    map_building.sprites.push_back( { id, variant, category, light, x, y, z, subtile, rota,
+                                      height_3d } );
+}
+
+bool godot_host::take_map_snapshot( uint64_t &sequence, map_snapshot &out )
+{
+    std::lock_guard<std::mutex> lock( map_mutex );
+    if( map_sequence == sequence ) {
+        return false;
+    }
+    out = std::move( map_published );
+    map_published = map_snapshot();
+    sequence = map_sequence;
+    return true;
 }
 
 #endif // CDDA_GODOT
