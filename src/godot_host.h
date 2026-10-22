@@ -137,6 +137,12 @@ struct tileset_info {
 // ends the host process too.
 int run( int argc, const char *argv[] );
 
+// Optional: called on the engine thread with each new frame (RGBA8, tightly
+// packed, top row first) instead of keeping it for take_frame, so the host
+// can copy it into its own buffers off its main thread. Set before run().
+using frame_sink = void ( * )( void *context, const unsigned char *rgba, int width, int height );
+void set_frame_sink( frame_sink sink, void *context );
+
 // If a frame newer than `sequence` has been published, move it into `rgba` (RGBA8,
 // tightly packed, top row first), update `sequence` and return true.
 bool take_frame( uint64_t &sequence, std::vector<unsigned char> &rgba, int &width,

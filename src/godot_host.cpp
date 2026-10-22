@@ -26,6 +26,8 @@ uint64_t frame_sequence = 0;
 std::vector<unsigned char> last_rgba;
 int last_width = 0;
 int last_height = 0;
+godot_host::frame_sink sink = nullptr;
+void *sink_context = nullptr;
 
 std::atomic<uint32_t> engine_window_id{ 0 };
 
@@ -79,6 +81,11 @@ void godot_host::publish_frame( SDL_Renderer *renderer )
         }
         last_width = rgba->w;
         last_height = rgba->h;
+        if( sink != nullptr ) {
+            sink( sink_context, last_rgba.data(), last_width, last_height );
+            SDL_DestroySurface( rgba );
+            return;
+        }
         std::lock_guard<std::mutex> lock( frame_mutex );
         frame_rgba = last_rgba;
         frame_width = rgba->w;
@@ -86,6 +93,12 @@ void godot_host::publish_frame( SDL_Renderer *renderer )
         ++frame_sequence;
     }
     SDL_DestroySurface( rgba );
+}
+
+void godot_host::set_frame_sink( frame_sink new_sink, void *context )
+{
+    sink = new_sink;
+    sink_context = context;
 }
 
 bool godot_host::take_frame( uint64_t &sequence, std::vector<unsigned char> &rgba, int &width,
