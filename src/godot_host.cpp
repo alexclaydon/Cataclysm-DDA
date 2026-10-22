@@ -167,13 +167,15 @@ void godot_host::record_map_sprite( const std::string &id, const std::string &va
 }
 
 void godot_host::record_map_blit( int index, int angle, bool flip_h, bool flip_v, int offset_x,
-                                  int offset_y, int width, int height, float pixelscale )
+                                  int offset_y, int width, int height, float pixelscale, int opaque_x, int opaque_y,
+                                  int opaque_w, int opaque_h )
 {
     if( !map_recording || lookup_depth == 0 || map_building.sprites.empty() ) {
         return;
     }
     map_building.blits.push_back( { static_cast<int>( map_building.sprites.size() ) - 1, index,
-                                    angle, flip_h, flip_v, offset_x, offset_y, width, height, pixelscale } );
+                                    angle, flip_h, flip_v, offset_x, offset_y, width, height, pixelscale,
+                                    opaque_x, opaque_y, opaque_w, opaque_h } );
 }
 
 bool godot_host::tileset_changed( const void *key )

@@ -618,6 +618,7 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
             set( ter_furn_flag::TFLAG_FLAT, godot_host::MOF_FLAT );
             set( ter_furn_flag::TFLAG_FLOWER, godot_host::MOF_FLOWER );
             set( ter_furn_flag::TFLAG_FLAT_SURF, godot_host::MOF_FLAT_SURF );
+            set( ter_furn_flag::TFLAG_CONTAINER, godot_host::MOF_CONTAINER );
             if( furniture ? t.movecost < 0 : t.movecost == 0 ) {
                 f |= godot_host::MOF_IMPASSABLE;
             }
@@ -2855,9 +2856,13 @@ bool cata_tiles::draw_sprite_at(
     }
 
 #if defined(CDDA_GODOT)
-    godot_host::record_map_blit( sprite_index, static_cast<int>( render_angle ),
-                                 ( render_flip & SDL_FLIP_HORIZONTAL ) != 0, ( render_flip & SDL_FLIP_VERTICAL ) != 0,
-                                 tile_offset.x + offset.x, tile_offset.y + offset.y, width, height, tile.pixelscale );
+    {
+        const SDL_Rect opaque = sprite_tex->get_opaque_rect();
+        godot_host::record_map_blit( sprite_index, static_cast<int>( render_angle ),
+                                     ( render_flip & SDL_FLIP_HORIZONTAL ) != 0, ( render_flip & SDL_FLIP_VERTICAL ) != 0,
+                                     tile_offset.x + offset.x, tile_offset.y + offset.y, width, height, tile.pixelscale,
+                                     opaque.x, opaque.y, opaque.w, opaque.h );
+    }
 #endif
     // Record this sprite for silhouette mask replay. Must happen before the
     // actual render because the render path may modify destination (d3d offset

@@ -49,6 +49,10 @@ struct map_blit {
     int width;      // sprite size in tileset pixels
     int height;
     float pixelscale;
+    int opaque_x;   // the sprite's non-transparent bounds, in its own pixels
+    int opaque_y;   // before rotation and flips (all 0 if fully transparent)
+    int opaque_w;
+    int opaque_h;
 };
 
 struct map_snapshot {
@@ -86,6 +90,7 @@ enum map_object_flag : uint32_t {
     MOF_FLAT = 1u << 10,
     MOF_FLOWER = 1u << 11,
     MOF_FLAT_SURF = 1u << 12,    // tables, counters, desks
+    MOF_CONTAINER = 1u << 13,
 };
 
 struct map_object {
@@ -164,7 +169,8 @@ void record_map_sprite( const std::string &id, const std::string &variant, int c
 // A sprite image blitted for the most recently recorded map sprite. Called
 // from cata_tiles::draw_sprite_at; ignored outside a recorded lookup.
 void record_map_blit( int index, int angle, bool flip_h, bool flip_v, int offset_x,
-                      int offset_y, int width, int height, float pixelscale );
+                      int offset_y, int width, int height, float pixelscale, int opaque_x, int opaque_y,
+                      int opaque_w, int opaque_h );
 // Called at each map draw with the tileset in use; `key` identifies it, so
 // the sheets are only copied when it changes.
 bool tileset_changed( const void *key );
