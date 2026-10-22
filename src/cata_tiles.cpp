@@ -1622,10 +1622,26 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     // avatar remembers of them (the 2D view never shows them), recorded by
     // the same layer functions in their memory mode, without drawing.
     if( godot_host::recording_map() ) {
+        const int r = godot_host::snapshot_radius;
+        {
+            // The light on the avatar's storey, for lighting the diorama.
+            const level_cache &cache = here.access_cache( you_pos.z() );
+            const int size = 2 * r + 1;
+            std::vector<godot_host::map_light> &lights = godot_host::record_map_lights(
+                        cache.natural_light_level_cache, you_pos.x() - r, you_pos.y() - r, size );
+            for( int y = std::max( 0, you_pos.y() - r ); y <= std::min( MAPSIZE_Y - 1, you_pos.y() + r ); ++y ) {
+                for( int x = std::max( 0, you_pos.x() - r ); x <= std::min( MAPSIZE_X - 1, you_pos.x() + r ); ++x ) {
+                    const light_color_rgb &color = cache.light_color_cache[x][y];
+                    lights[( y - you_pos.y() + r ) * size + x - you_pos.x() + r] = {
+                        cache.lm[x][y].max(), color.r, color.g, color.b,
+                        cache.light_source_buffer[x][y].luminance
+                    };
+                }
+            }
+        }
         const auto storeys_start = std::chrono::steady_clock::now();
         godot_host::record_only_scope record_only;
         const std::array<bool, 5> unseen = { true, true, true, true, true };
-        const int r = godot_host::snapshot_radius;
         for( int dz = 1; dz <= godot_host::snapshot_levels_below; ++dz ) {
             const int z = you_pos.z() - dz;
             if( z < -OVERMAP_DEPTH ) {

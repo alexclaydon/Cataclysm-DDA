@@ -55,6 +55,14 @@ struct map_blit {
     int opaque_h;
 };
 
+// The light on one tile of the avatar's storey, from the engine's light map
+// (plan 0004, Phase 2). Units are lightmap.h's (LIGHT_AMBIENT_LIT is 10).
+struct map_light {
+    float level;    // the brightest quadrant of the tile's light
+    float r, g, b;  // coloured light energy here; all 0 for white light
+    float source;   // the luminance of a bulk source here (fire, lava), or 0
+};
+
 struct map_snapshot {
     int center[3];  // the view centre (tripoint_bub_ms)
     int player[3];  // the avatar (tripoint_bub_ms)
@@ -62,6 +70,11 @@ struct map_snapshot {
     int storeys_usec;  // the engine's time recording the storeys below
     std::vector<map_sprite> sprites;
     std::vector<map_blit> blits;
+    // The avatar's storey's light: lights_size x lights_size tiles,
+    // row-major, from (lights_x, lights_y); empty if not recorded.
+    float natural_light;
+    int lights_x, lights_y, lights_size;
+    std::vector<map_light> lights;
 };
 
 // One image of the tileset: global sprite indices [first, first + count)
@@ -169,6 +182,9 @@ class record_only_scope
 };
 bool record_only();
 void note_storeys_usec( int usec );
+// The light grid for the snapshot being recorded: sized size x size, zeroed,
+// for cata_tiles::draw to fill.
+std::vector<map_light> &record_map_lights( float natural_light, int x, int y, int size );
 
 // Around the map view's draw: record sprite lookups between begin and end,
 // then publish them. A draw that recorded nothing (aborted, or nothing

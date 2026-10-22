@@ -126,6 +126,11 @@ void godot_host::begin_map_snapshot( int center_x, int center_y, int center_z, i
     map_building.sprites.clear();
     map_building.blits.clear();
     map_building.storeys_usec = 0;
+    map_building.natural_light = 0.0f;
+    map_building.lights_x = 0;
+    map_building.lights_y = 0;
+    map_building.lights_size = 0;
+    map_building.lights.clear();
     map_recording = true;
 }
 
@@ -169,6 +174,17 @@ bool godot_host::record_only()
 void godot_host::note_storeys_usec( int usec )
 {
     map_building.storeys_usec = usec;
+}
+
+std::vector<godot_host::map_light> &godot_host::record_map_lights( float natural_light, int x,
+        int y, int size )
+{
+    map_building.natural_light = natural_light;
+    map_building.lights_x = x;
+    map_building.lights_y = y;
+    map_building.lights_size = size;
+    map_building.lights.assign( static_cast<size_t>( size ) * size, map_light{} );
+    return map_building.lights;
 }
 
 godot_host::sprite_lookup_scope::sprite_lookup_scope()
