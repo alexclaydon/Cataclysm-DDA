@@ -137,6 +137,22 @@ struct tileset_info {
 // ends the host process too.
 int run( int argc, const char *argv[] );
 
+// The VR host's virtual gamepad (plan 0005): Touch controllers reach the
+// engine as an ordinary SDL gamepad, so the controller scheme works
+// unchanged. Ask for it before run(); the engine attaches it when its
+// gamepad subsystem starts.
+constexpr int virtual_pad_axes = 6;  // SDL_GamepadAxis order; triggers 0..32767
+void enable_virtual_pad();
+// Host side, any thread: the pad's state. `buttons` has bit n set for
+// SDL_GamepadButton n held. Applied on the engine thread when SDL next
+// updates its joysticks.
+void set_virtual_pad( uint32_t buttons, const int16_t axes[virtual_pad_axes] );
+// The latest rumble the game asked the virtual pad for, 0..65535 per
+// motor; returns false if unchanged since the last call.
+bool take_virtual_rumble( uint16_t &low, uint16_t &high );
+// Engine side, from sdl_gamepad::init once SDL_INIT_GAMEPAD is up.
+void attach_virtual_pad();
+
 // Optional: called on the engine thread with each new frame (RGBA8, tightly
 // packed, top row first) instead of keeping it for take_frame, so the host
 // can copy it into its own buffers off its main thread. Set before run().

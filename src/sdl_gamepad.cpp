@@ -12,6 +12,9 @@
 #include "point.h"
 #include "ui_manager.h"
 #include "game.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -240,6 +243,10 @@ void init()
         printErrorIf( true, "Init gamepad+timer failed" );
         return;
     }
+#if defined(CDDA_GODOT)
+    // The VR host's Touch controllers, if it asked for them.
+    godot_host::attach_virtual_pad();
+#endif
 
     int num_joysticks = 0;
     SDL_JoystickID *joysticks = SDL_GetJoysticks( &num_joysticks );

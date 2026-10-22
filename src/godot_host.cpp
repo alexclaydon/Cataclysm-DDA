@@ -6,7 +6,9 @@
 
 #include "godot_host.h"
 
+#include <array>
 #include <atomic>
+#include <cstdio>
 #include <cstring>
 #include <mutex>
 
@@ -28,6 +30,37 @@ int last_width = 0;
 int last_height = 0;
 godot_host::frame_sink sink = nullptr;
 void *sink_context = nullptr;
+
+// The virtual pad: the host writes, SDL's Update callback reads on the
+// engine thread.
+std::atomic<bool> virtual_pad_wanted{ false };
+SDL_JoystickID virtual_pad_id = 0;
+std::atomic<uint32_t> virtual_buttons{ 0 };
+std::array<std::atomic<int16_t>, godot_host::virtual_pad_axes> virtual_axes{};
+std::atomic<uint32_t> virtual_rumble{ 0 };  // low << 16 | high
+std::atomic<bool> virtual_rumble_new{ false };
+
+void SDLCALL update_virtual_pad( void * )
+{
+    SDL_Joystick *joystick = SDL_GetJoystickFromID( virtual_pad_id );
+    if( joystick == nullptr ) {
+        return;
+    }
+    const uint32_t buttons = virtual_buttons.load();
+    for( int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT; ++b ) {
+        SDL_SetJoystickVirtualButton( joystick, b, ( buttons >> b ) & 1 );
+    }
+    for( int a = 0; a < godot_host::virtual_pad_axes; ++a ) {
+        SDL_SetJoystickVirtualAxis( joystick, a, virtual_axes[a].load() );
+    }
+}
+
+bool SDLCALL rumble_virtual_pad( void *, Uint16 low, Uint16 high )
+{
+    virtual_rumble.store( static_cast<uint32_t>( low ) << 16 | high );
+    virtual_rumble_new.store( true );
+    return true;
+}
 
 std::atomic<uint32_t> engine_window_id{ 0 };
 
@@ -93,6 +126,56 @@ void godot_host::publish_frame( SDL_Renderer *renderer )
         ++frame_sequence;
     }
     SDL_DestroySurface( rgba );
+}
+
+void godot_host::enable_virtual_pad()
+{
+    virtual_pad_wanted.store( true );
+}
+
+void godot_host::set_virtual_pad( uint32_t buttons, const int16_t axes[virtual_pad_axes] )
+{
+    virtual_buttons.store( buttons );
+    for( int a = 0; a < virtual_pad_axes; ++a ) {
+        virtual_axes[a].store( axes[a] );
+    }
+}
+
+bool godot_host::take_virtual_rumble( uint16_t &low, uint16_t &high )
+{
+    if( !virtual_rumble_new.exchange( false ) ) {
+        return false;
+    }
+    const uint32_t r = virtual_rumble.load();
+    low = static_cast<uint16_t>( r >> 16 );
+    high = static_cast<uint16_t>( r & 0xffff );
+    return true;
+}
+
+void godot_host::attach_virtual_pad()
+{
+    if( !virtual_pad_wanted.load() || virtual_pad_id != 0 ) {
+        return;
+    }
+    // A standard gamepad: SDL maps a virtual joystick of this type by
+    // button and axis number, in SDL_GamepadButton and SDL_GamepadAxis order.
+    SDL_VirtualJoystickDesc desc;
+    SDL_INIT_INTERFACE( &desc );
+    desc.type = SDL_JOYSTICK_TYPE_GAMEPAD;
+    desc.naxes = virtual_pad_axes;
+    desc.nbuttons = SDL_GAMEPAD_BUTTON_DPAD_RIGHT + 1;
+    desc.button_mask = ( 1u << desc.nbuttons ) - 1;
+    desc.axis_mask = ( 1u << virtual_pad_axes ) - 1;
+    desc.name = "Cataclysm VR Touch";
+    desc.Update = update_virtual_pad;
+    desc.Rumble = rumble_virtual_pad;
+    virtual_pad_id = SDL_AttachVirtualJoystick( &desc );
+    if( virtual_pad_id == 0 ) {
+        std::fprintf( stderr, "godot_host: virtual pad not attached: %s\n", SDL_GetError() );
+    } else {
+        std::fprintf( stderr, "godot_host: virtual pad attached (joystick %u, gamepad %d)\n",
+                      static_cast<unsigned>( virtual_pad_id ), SDL_IsGamepad( virtual_pad_id ) ? 1 : 0 );
+    }
 }
 
 void godot_host::set_frame_sink( frame_sink new_sink, void *context )
