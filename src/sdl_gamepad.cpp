@@ -725,7 +725,33 @@ static bool handle_axis_event( SDL_Event &event )
                 int joy_code = -1;
                 input_event_t itype = input_event_t::gamepad;
 
-                if( i == 1 ) {
+                if( i == 0 && is_in_menu() && !alt_modifier_held ) {
+                    // Left stick in menus: the d-pad's arrow keys, repeating
+                    // the same way, for controllers without a d-pad (the VR
+                    // host's Touch). In play the stick only aims. Diagonals
+                    // count as their vertical part: menus are mostly lists.
+                    switch( dir ) {
+                        case direction::N:
+                        case direction::NE:
+                        case direction::NW:
+                            joy_code = KEY_UP;
+                            break;
+                        case direction::S:
+                        case direction::SE:
+                        case direction::SW:
+                            joy_code = KEY_DOWN;
+                            break;
+                        case direction::E:
+                            joy_code = KEY_RIGHT;
+                            break;
+                        case direction::W:
+                            joy_code = KEY_LEFT;
+                            break;
+                        default:
+                            break;
+                    }
+                    itype = input_event_t::keyboard_char;
+                } else if( i == 1 ) {
                     // Right stick (i=1): Map to num keys in menu if the radial menu is not open, or JOY_R_* in gameplay
                     if( is_in_menu() ) {
                         if( !radial_right_open ) {
