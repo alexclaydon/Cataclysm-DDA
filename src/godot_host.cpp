@@ -20,6 +20,12 @@ std::vector<unsigned char> frame_rgba;
 int frame_width = 0;
 int frame_height = 0;
 uint64_t frame_sequence = 0;
+// The last frame published, engine thread only: the engine redraws several
+// times a second while idle (animations, the sidebar) and mostly presents
+// identical pixels, which are not worth the host's upload.
+std::vector<unsigned char> last_rgba;
+int last_width = 0;
+int last_height = 0;
 
 std::atomic<uint32_t> engine_window_id{ 0 };
 
@@ -53,14 +59,24 @@ void godot_host::publish_frame( SDL_Renderer *renderer )
     if( rgba == nullptr ) {
         return;
     }
-    {
-        std::lock_guard<std::mutex> lock( frame_mutex );
-        const size_t row = static_cast<size_t>( rgba->w ) * 4;
-        frame_rgba.resize( row * rgba->h );
-        const unsigned char *src = static_cast<const unsigned char *>( rgba->pixels );
-        for( int y = 0; y < rgba->h; ++y ) {
-            std::memcpy( frame_rgba.data() + row * y, src + static_cast<size_t>( rgba->pitch ) * y, row );
+    const size_t row = static_cast<size_t>( rgba->w ) * 4;
+    const unsigned char *src = static_cast<const unsigned char *>( rgba->pixels );
+    bool same = rgba->w == last_width && rgba->h == last_height;
+    if( same ) {
+        for( int y = 0; y < rgba->h && same; ++y ) {
+            same = std::memcmp( last_rgba.data() + row * y, src + static_cast<size_t>( rgba->pitch ) * y,
+                                row ) == 0;
         }
+    }
+    if( !same ) {
+        last_rgba.resize( row * rgba->h );
+        for( int y = 0; y < rgba->h; ++y ) {
+            std::memcpy( last_rgba.data() + row * y, src + static_cast<size_t>( rgba->pitch ) * y, row );
+        }
+        last_width = rgba->w;
+        last_height = rgba->h;
+        std::lock_guard<std::mutex> lock( frame_mutex );
+        frame_rgba = last_rgba;
         frame_width = rgba->w;
         frame_height = rgba->h;
         ++frame_sequence;
@@ -75,7 +91,9 @@ bool godot_host::take_frame( uint64_t &sequence, std::vector<unsigned char> &rgb
     if( frame_sequence == sequence ) {
         return false;
     }
-    rgba = frame_rgba;
+    // Swap rather than copy: the engine replaces the whole buffer on its
+    // next publish anyway.
+    rgba.swap( frame_rgba );
     width = frame_width;
     height = frame_height;
     sequence = frame_sequence;

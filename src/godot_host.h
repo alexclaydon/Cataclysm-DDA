@@ -84,7 +84,7 @@ struct tileset_info {
 // ends the host process too.
 int run( int argc, const char *argv[] );
 
-// If a frame newer than `sequence` has been published, copy it (RGBA8,
+// If a frame newer than `sequence` has been published, move it into `rgba` (RGBA8,
 // tightly packed, top row first), update `sequence` and return true.
 bool take_frame( uint64_t &sequence, std::vector<unsigned char> &rgba, int &width,
                  int &height );
