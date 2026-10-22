@@ -617,6 +617,7 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
             set( ter_furn_flag::TFLAG_SHORT, godot_host::MOF_SHORT );
             set( ter_furn_flag::TFLAG_FLAT, godot_host::MOF_FLAT );
             set( ter_furn_flag::TFLAG_FLOWER, godot_host::MOF_FLOWER );
+            set( ter_furn_flag::TFLAG_FLAT_SURF, godot_host::MOF_FLAT_SURF );
             if( furniture ? t.movecost < 0 : t.movecost == 0 ) {
                 f |= godot_host::MOF_IMPASSABLE;
             }

@@ -85,6 +85,7 @@ enum map_object_flag : uint32_t {
     MOF_SHORT = 1u << 9,
     MOF_FLAT = 1u << 10,
     MOF_FLOWER = 1u << 11,
+    MOF_FLAT_SURF = 1u << 12,    // tables, counters, desks
 };
 
 struct map_object {
