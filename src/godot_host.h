@@ -70,6 +70,36 @@ struct tileset_sheet {
     int color_key[3];  // RGB made transparent, or -1s
 };
 
+// Static properties of a terrain or furniture type, for the host to choose
+// how to model it (plan 0004, Phase 1). Bits of map_object::flags:
+enum map_object_flag : uint32_t {
+    MOF_WALL = 1u << 0,
+    MOF_DOOR = 1u << 1,
+    MOF_WINDOW = 1u << 2,
+    MOF_TRANSPARENT = 1u << 3,   // doesn't block sight
+    MOF_IMPASSABLE = 1u << 4,    // movecost 0
+    MOF_TREE = 1u << 5,
+    MOF_SHRUB = 1u << 6,         // shrubs and young trees
+    MOF_NO_FLOOR = 1u << 7,      // open air: the level below shows through
+    MOF_THIN_OBSTACLE = 1u << 8, // fences, railings
+    MOF_SHORT = 1u << 9,
+    MOF_FLAT = 1u << 10,
+    MOF_FLOWER = 1u << 11,
+};
+
+struct map_object {
+    std::string id;
+    bool furniture;
+    uint32_t flags;
+    int movecost;
+    int coverage;  // percent
+};
+
+struct map_objects_info {
+    uint64_t generation = 0;  // bumped each time the game data is (re)loaded
+    std::vector<map_object> objects;
+};
+
 struct tileset_info {
     uint64_t generation = 0;  // bumped each time the tileset is (re)loaded
     int tile_width = 0;       // the tileset's grid in pixels
@@ -99,6 +129,10 @@ bool take_map_snapshot( uint64_t &sequence, map_snapshot &out );
 // The tileset the snapshots' sprite indices refer to. Returns false if it
 // is unchanged since `generation`.
 bool take_tileset( uint64_t &generation, tileset_info &out );
+
+// Every terrain and furniture type's properties. Returns false if unchanged
+// since `generation`.
+bool take_map_objects( uint64_t &generation, map_objects_info &out );
 
 // Engine side.
 
@@ -134,6 +168,10 @@ void record_map_blit( int index, int angle, bool flip_h, bool flip_v, int offset
 // the sheets are only copied when it changes.
 bool tileset_changed( const void *key );
 void publish_tileset( tileset_info info );
+// Likewise for the game data: called at each map draw with a key for the
+// loaded terrain and furniture, published only when it changes.
+bool map_objects_changed( uint64_t key );
+void publish_map_objects( map_objects_info info );
 
 } // namespace godot_host
 

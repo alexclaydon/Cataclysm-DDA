@@ -592,6 +592,47 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
         }
         godot_host::publish_tileset( std::move( info ) );
     }
+    // Terrain and furniture properties, for its modelling rules. The key
+    // changes when a world with different data is loaded.
+    if( godot_host::map_objects_changed( ( static_cast<uint64_t>( ter_t::count() ) << 32 ) ^
+                                         furn_t::count() ^ reinterpret_cast<uintptr_t>( &ter_id( 0 ).obj() ) ) ) {
+        // Terrain is impassable at movecost 0; furniture's movecost is a
+        // modifier (move_cost_mod), impassable when negative.
+        const auto props = []( const map_data_common_t &t, bool furniture ) {
+            uint32_t f = 0;
+            const auto set = [&]( ter_furn_flag flag, uint32_t bit ) {
+                if( t.has_flag( flag ) ) {
+                    f |= bit;
+                }
+            };
+            set( ter_furn_flag::TFLAG_WALL, godot_host::MOF_WALL );
+            set( ter_furn_flag::TFLAG_DOOR, godot_host::MOF_DOOR );
+            set( ter_furn_flag::TFLAG_WINDOW, godot_host::MOF_WINDOW );
+            set( ter_furn_flag::TFLAG_TRANSPARENT, godot_host::MOF_TRANSPARENT );
+            set( ter_furn_flag::TFLAG_TREE, godot_host::MOF_TREE );
+            set( ter_furn_flag::TFLAG_SHRUB, godot_host::MOF_SHRUB );
+            set( ter_furn_flag::TFLAG_YOUNG, godot_host::MOF_SHRUB );
+            set( ter_furn_flag::TFLAG_NO_FLOOR, godot_host::MOF_NO_FLOOR );
+            set( ter_furn_flag::TFLAG_THIN_OBSTACLE, godot_host::MOF_THIN_OBSTACLE );
+            set( ter_furn_flag::TFLAG_SHORT, godot_host::MOF_SHORT );
+            set( ter_furn_flag::TFLAG_FLAT, godot_host::MOF_FLAT );
+            set( ter_furn_flag::TFLAG_FLOWER, godot_host::MOF_FLOWER );
+            if( furniture ? t.movecost < 0 : t.movecost == 0 ) {
+                f |= godot_host::MOF_IMPASSABLE;
+            }
+            return f;
+        };
+        godot_host::map_objects_info objects;
+        for( size_t i = 0; i < ter_t::count(); ++i ) {
+            const ter_t &t = ter_id( static_cast<int>( i ) ).obj();
+            objects.objects.push_back( { t.id.str(), false, props( t, false ), t.movecost, t.coverage } );
+        }
+        for( size_t i = 0; i < furn_t::count(); ++i ) {
+            const furn_t &f = furn_id( static_cast<int>( i ) ).obj();
+            objects.objects.push_back( { f.id.str(), true, props( f, true ), f.movecost, f.coverage } );
+        }
+        godot_host::publish_map_objects( std::move( objects ) );
+    }
 #endif
 
     {

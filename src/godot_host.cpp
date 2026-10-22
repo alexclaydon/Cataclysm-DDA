@@ -40,6 +40,9 @@ godot_host::map_snapshot map_published;
 uint64_t map_sequence = 0;
 
 const void *tileset_key = nullptr;
+uint64_t map_objects_key = 0;
+std::mutex map_objects_mutex;
+godot_host::map_objects_info map_objects_published;
 std::mutex tileset_mutex;
 godot_host::tileset_info tileset_published;
 
@@ -197,6 +200,33 @@ bool godot_host::take_tileset( uint64_t &generation, tileset_info &out )
     }
     out = tileset_published;
     generation = tileset_published.generation;
+    return true;
+}
+
+bool godot_host::map_objects_changed( uint64_t key )
+{
+    if( key == map_objects_key ) {
+        return false;
+    }
+    map_objects_key = key;
+    return true;
+}
+
+void godot_host::publish_map_objects( map_objects_info info )
+{
+    std::lock_guard<std::mutex> lock( map_objects_mutex );
+    info.generation = map_objects_published.generation + 1;
+    map_objects_published = std::move( info );
+}
+
+bool godot_host::take_map_objects( uint64_t &generation, map_objects_info &out )
+{
+    std::lock_guard<std::mutex> lock( map_objects_mutex );
+    if( map_objects_published.generation == generation ) {
+        return false;
+    }
+    out = map_objects_published;
+    generation = map_objects_published.generation;
     return true;
 }
 
