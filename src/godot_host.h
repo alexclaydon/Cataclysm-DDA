@@ -153,6 +153,14 @@ bool take_virtual_rumble( uint16_t &low, uint16_t &high );
 // Engine side, from sdl_gamepad::init once SDL_INIT_GAMEPAD is up.
 void attach_virtual_pad();
 
+// Which way is "forward" for the player in VR (plan 0005): degrees
+// clockwise from map north of the direction from the player's head to the
+// avatar on the table. sdl_gamepad turns map-direction stick input by it,
+// so pushing a stick forward means "away from me" however the table is
+// turned. Host side, any thread; 0 outside VR.
+void set_view_yaw( float degrees );
+float view_yaw();
+
 // Optional: called on the engine thread with each new frame (RGBA8, tightly
 // packed, top row first) instead of keeping it for take_frame, so the host
 // can copy it into its own buffers off its main thread. Set before run().

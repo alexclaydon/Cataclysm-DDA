@@ -39,6 +39,7 @@ std::atomic<uint32_t> virtual_buttons{ 0 };
 std::array<std::atomic<int16_t>, godot_host::virtual_pad_axes> virtual_axes{};
 std::atomic<uint32_t> virtual_rumble{ 0 };  // low << 16 | high
 std::atomic<bool> virtual_rumble_new{ false };
+std::atomic<float> view_yaw_degrees{ 0.0f };
 
 void SDLCALL update_virtual_pad( void * )
 {
@@ -126,6 +127,16 @@ void godot_host::publish_frame( SDL_Renderer *renderer )
         ++frame_sequence;
     }
     SDL_DestroySurface( rgba );
+}
+
+void godot_host::set_view_yaw( float degrees )
+{
+    view_yaw_degrees.store( degrees );
+}
+
+float godot_host::view_yaw()
+{
+    return view_yaw_degrees.load();
 }
 
 void godot_host::enable_virtual_pad()

@@ -484,15 +484,30 @@ static int highlighted_radial_slot()
     return -1;
 }
 
-// Calculate 8-way direction from raw axis values using angle
-static direction angle_to_direction( const point &p )
+// How far to turn a stick before reading it as a direction: in VR, by the
+// player's view of the table (godot_host::view_yaw), so forward is "away
+// from me" however the table is turned. Only where the stick means a map
+// direction: menus and the wheels (LT held) stay as on screen.
+static double map_turn()
+{
+#if defined(CDDA_GODOT)
+    if( !is_in_menu() && !alt_modifier_held ) {
+        return godot_host::view_yaw();
+    }
+#endif
+    return 0.0;
+}
+
+// Calculate 8-way direction from raw axis values using angle, turned
+// clockwise by `turn` degrees first (see map_turn).
+static direction angle_to_direction( const point &p, double turn = 0.0 )
 {
     // atan2 returns angle in radians, with 0 pointing right (East)
     // We want 0 to be North, so we use atan2(x, -y)
     double angle = std::atan2( static_cast<double>( p.x ), static_cast<double>( -p.y ) );
 
     // Convert to degrees (0-360, with 0 = North, clockwise)
-    double degrees = angle * 180.0 / M_PI;
+    double degrees = std::fmod( angle * 180.0 / M_PI + turn, 360.0 );
     if( degrees < 0 ) {
         degrees += 360.0;
     }
@@ -668,7 +683,8 @@ static bool handle_axis_event( SDL_Event &event )
             double magnitude = std::sqrt( static_cast<double>( val.x ) * val.x +
                                           static_cast<double>( val.y ) * val.y );
 
-            direction dir = ( magnitude > sticks_threshold ) ? angle_to_direction( val ) : direction::NONE;
+            direction dir = ( magnitude > sticks_threshold ) ? angle_to_direction( val,
+                            map_turn() ) : direction::NONE;
 
             task_t &stick_task = all_tasks[sticks_task_index + i];
             direction old_dir = ( i == 0 ) ? left_stick_dir : right_stick_dir;
