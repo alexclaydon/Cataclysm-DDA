@@ -52,7 +52,14 @@ void SDLCALL update_virtual_pad( void * )
         SDL_SetJoystickVirtualButton( joystick, b, ( buttons >> b ) & 1 );
     }
     for( int a = 0; a < godot_host::virtual_pad_axes; ++a ) {
-        SDL_SetJoystickVirtualAxis( joystick, a, virtual_axes[a].load() );
+        int value = virtual_axes[a].load();
+        if( a == SDL_GAMEPAD_AXIS_LEFT_TRIGGER || a == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER ) {
+            // A virtual gamepad's triggers span the joystick's whole range,
+            // released at the bottom: 0 would read as half pulled, and once
+            // pulled the trigger would never count as released again.
+            value = value * 2 - 32768;
+        }
+        SDL_SetJoystickVirtualAxis( joystick, a, static_cast<Sint16>( value ) );
     }
 }
 
