@@ -91,6 +91,9 @@ enum map_object_flag : uint32_t {
     MOF_FLOWER = 1u << 11,
     MOF_FLAT_SURF = 1u << 12,    // tables, counters, desks
     MOF_CONTAINER = 1u << 13,
+    MOF_LOCKED = 1u << 14,       // locked doors, which lack the DOOR flag
+    MOF_GOES_UP = 1u << 15,      // stairs and ladders
+    MOF_GOES_DOWN = 1u << 16,
 };
 
 struct map_object {
