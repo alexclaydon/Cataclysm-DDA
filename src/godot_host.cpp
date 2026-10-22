@@ -33,6 +33,10 @@ std::mutex map_mutex;
 godot_host::map_snapshot map_published;
 uint64_t map_sequence = 0;
 
+const void *tileset_key = nullptr;
+std::mutex tileset_mutex;
+godot_host::tileset_info tileset_published;
+
 } // namespace
 
 void godot_host::publish_frame( SDL_Renderer *renderer )
@@ -98,6 +102,7 @@ void godot_host::begin_map_snapshot( int center_x, int center_y, int center_z, i
     map_building.player[1] = player_y;
     map_building.player[2] = player_z;
     map_building.sprites.clear();
+    map_building.blits.clear();
     map_recording = true;
 }
 
@@ -106,6 +111,11 @@ void godot_host::end_map_snapshot()
     map_recording = false;
     if( map_building.sprites.empty() ) {
         return;
+    }
+    {
+        // The draw publishes a changed tileset before its first sprite.
+        std::lock_guard<std::mutex> lock( tileset_mutex );
+        map_building.tileset_generation = tileset_published.generation;
     }
     std::lock_guard<std::mutex> lock( map_mutex );
     // The previous snapshot's storage comes back for the next draw.
@@ -133,6 +143,43 @@ void godot_host::record_map_sprite( const std::string &id, const std::string &va
 {
     map_building.sprites.push_back( { id, variant, category, light, x, y, z, subtile, rota,
                                       height_3d } );
+}
+
+void godot_host::record_map_blit( int index, int angle, bool flip_h, bool flip_v, int offset_x,
+                                  int offset_y, int width, int height, float pixelscale )
+{
+    if( !map_recording || lookup_depth == 0 || map_building.sprites.empty() ) {
+        return;
+    }
+    map_building.blits.push_back( { static_cast<int>( map_building.sprites.size() ) - 1, index,
+                                    angle, flip_h, flip_v, offset_x, offset_y, width, height, pixelscale } );
+}
+
+bool godot_host::tileset_changed( const void *key )
+{
+    if( key == tileset_key ) {
+        return false;
+    }
+    tileset_key = key;
+    return true;
+}
+
+void godot_host::publish_tileset( tileset_info info )
+{
+    std::lock_guard<std::mutex> lock( tileset_mutex );
+    info.generation = tileset_published.generation + 1;
+    tileset_published = std::move( info );
+}
+
+bool godot_host::take_tileset( uint64_t &generation, tileset_info &out )
+{
+    std::lock_guard<std::mutex> lock( tileset_mutex );
+    if( tileset_published.generation == generation ) {
+        return false;
+    }
+    out = tileset_published;
+    generation = tileset_published.generation;
+    return true;
 }
 
 bool godot_host::take_map_snapshot( uint64_t &sequence, map_snapshot &out )

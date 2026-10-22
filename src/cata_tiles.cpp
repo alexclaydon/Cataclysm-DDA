@@ -580,6 +580,20 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
 
     has_animated_tiles_ = false;
 
+#if defined(CDDA_GODOT)
+    // The sheets behind the snapshot's sprite indices, for the VR host.
+    if( godot_host::tileset_changed( tileset_ptr.get() ) ) {
+        godot_host::tileset_info info;
+        info.tile_width = tileset_ptr->get_tile_width();
+        info.tile_height = tileset_ptr->get_tile_height();
+        for( const atlas_replay_descriptor &d : tileset_ptr->get_atlas_descriptors() ) {
+            info.sheets.push_back( { d.image_path_u8, d.atlas_offset, d.expected_tilecount,
+                                     d.sprite_width, d.sprite_height, { d.color_key_r, d.color_key_g, d.color_key_b } } );
+        }
+        godot_host::publish_tileset( std::move( info ) );
+    }
+#endif
+
     {
         //set clipping to prevent drawing over stuff we shouldn't
         SDL_Rect clipRect = {dest.x, dest.y, width, height};
@@ -2798,6 +2812,11 @@ bool cata_tiles::draw_sprite_at(
         }
     }
 
+#if defined(CDDA_GODOT)
+    godot_host::record_map_blit( sprite_index, static_cast<int>( render_angle ),
+                                 ( render_flip & SDL_FLIP_HORIZONTAL ) != 0, ( render_flip & SDL_FLIP_VERTICAL ) != 0,
+                                 tile_offset.x + offset.x, tile_offset.y + offset.y, width, height, tile.pixelscale );
+#endif
     // Record this sprite for silhouette mask replay. Must happen before the
     // actual render because the render path may modify destination (d3d offset
     // workaround). Only active for ortho tiles that need tinting.
