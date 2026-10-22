@@ -32,6 +32,7 @@ std::atomic<uint32_t> engine_window_id{ 0 };
 // Recording happens on the engine thread only; the mutex guards the
 // published snapshot the host takes.
 bool map_recording = false;
+bool recording_without_drawing = false;
 int lookup_depth = 0;
 godot_host::map_snapshot map_building;
 
@@ -124,6 +125,7 @@ void godot_host::begin_map_snapshot( int center_x, int center_y, int center_z, i
     map_building.player[2] = player_z;
     map_building.sprites.clear();
     map_building.blits.clear();
+    map_building.storeys_usec = 0;
     map_recording = true;
 }
 
@@ -142,6 +144,31 @@ void godot_host::end_map_snapshot()
     // The previous snapshot's storage comes back for the next draw.
     std::swap( map_published, map_building );
     ++map_sequence;
+}
+
+bool godot_host::recording_map()
+{
+    return map_recording;
+}
+
+godot_host::record_only_scope::record_only_scope()
+{
+    recording_without_drawing = true;
+}
+
+godot_host::record_only_scope::~record_only_scope()
+{
+    recording_without_drawing = false;
+}
+
+bool godot_host::record_only()
+{
+    return recording_without_drawing;
+}
+
+void godot_host::note_storeys_usec( int usec )
+{
+    map_building.storeys_usec = usec;
 }
 
 godot_host::sprite_lookup_scope::sprite_lookup_scope()

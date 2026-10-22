@@ -59,6 +59,7 @@ struct map_snapshot {
     int center[3];  // the view centre (tripoint_bub_ms)
     int player[3];  // the avatar (tripoint_bub_ms)
     uint64_t tileset_generation;  // see take_tileset
+    int storeys_usec;  // the engine's time recording the storeys below
     std::vector<map_sprite> sprites;
     std::vector<map_blit> blits;
 };
@@ -147,6 +148,27 @@ bool take_map_objects( uint64_t &generation, map_objects_info &out );
 
 void publish_frame( SDL_Renderer *renderer );
 void set_window_id( uint32_t id );
+
+// How far around the avatar the snapshot reaches, and how many storeys below
+// the avatar's it adds from map memory (plan 0004, Phase 2).
+constexpr int snapshot_radius = 30;
+constexpr int snapshot_levels_below = 2;
+
+// Whether a map snapshot is being recorded (between begin and end).
+bool recording_map();
+
+// While one of these exists, cata_tiles records sprites without drawing
+// them: for the storeys below, which the 2D view never shows.
+class record_only_scope
+{
+    public:
+        record_only_scope();
+        ~record_only_scope();
+        record_only_scope( const record_only_scope & ) = delete;
+        record_only_scope &operator=( const record_only_scope & ) = delete;
+};
+bool record_only();
+void note_storeys_usec( int usec );
 
 // Around the map view's draw: record sprite lookups between begin and end,
 // then publish them. A draw that recorded nothing (aborted, or nothing

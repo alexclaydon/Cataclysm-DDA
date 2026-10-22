@@ -1617,6 +1617,36 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
         }
     }
 
+#if defined(CDDA_GODOT)
+    // The storeys below the avatar's, for the VR host's diorama: what the
+    // avatar remembers of them (the 2D view never shows them), recorded by
+    // the same layer functions in their memory mode, without drawing.
+    if( godot_host::recording_map() ) {
+        const auto storeys_start = std::chrono::steady_clock::now();
+        godot_host::record_only_scope record_only;
+        const std::array<bool, 5> unseen = { true, true, true, true, true };
+        const int r = godot_host::snapshot_radius;
+        for( int dz = 1; dz <= godot_host::snapshot_levels_below; ++dz ) {
+            const int z = you_pos.z() - dz;
+            if( z < -OVERMAP_DEPTH ) {
+                break;
+            }
+            for( int y = std::max( 0, you_pos.y() - r ); y <= std::min( MAPSIZE_Y - 1, you_pos.y() + r ); ++y ) {
+                for( int x = std::max( 0, you_pos.x() - r ); x <= std::min( MAPSIZE_X - 1, you_pos.x() + r ); ++x ) {
+                    const tripoint_bub_ms p( x, y, z );
+                    int height_3d = 0;
+                    draw_terrain( p, lit_level::MEMORIZED, height_3d, unseen, false );
+                    draw_furniture( p, lit_level::MEMORIZED, height_3d, unseen, false );
+                    draw_trap( p, lit_level::MEMORIZED, height_3d, unseen, false );
+                    draw_vpart_no_roof( p, lit_level::MEMORIZED, height_3d, unseen, false );
+                }
+            }
+        }
+        godot_host::note_storeys_usec( static_cast<int>( std::chrono::duration_cast<std::chrono::microseconds>
+                                       ( std::chrono::steady_clock::now() - storeys_start ).count() ) );
+    }
+#endif
+
     RenderSetClipRect( renderer, nullptr );
 #if SDL_MAJOR_VERSION >= 3
     // Unbind any GPU render state held across sprite batches so ImGui or the
@@ -2739,6 +2769,10 @@ bool cata_tiles::draw_sprite_at(
 
     bool shader_bound = false;
 #if SDL_MAJOR_VERSION >= 3
+#if defined(CDDA_GODOT)
+    // Recording without drawing (the VR host's storeys below): no GPU state.
+    if( !godot_host::record_only() )
+#endif
     // Try the GPU shader variant first. On success the main atlas drives
     // the render and the variant transform happens per-pixel in the
     // fragment shader. On unsupported variant (NORMAL, custom MEMORY
@@ -2865,6 +2899,9 @@ bool cata_tiles::draw_sprite_at(
                                      ( render_flip & SDL_FLIP_HORIZONTAL ) != 0, ( render_flip & SDL_FLIP_VERTICAL ) != 0,
                                      tile_offset.x + offset.x, tile_offset.y + offset.y, width, height, tile.pixelscale,
                                      opaque.x, opaque.y, opaque.w, opaque.h );
+    }
+    if( godot_host::record_only() ) {
+        return true;
     }
 #endif
     // Record this sprite for silhouette mask replay. Must happen before the
