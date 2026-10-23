@@ -8,6 +8,7 @@
 
 #include "debug.h"
 #include "input.h"
+#include "input_context.h"
 #include "input_enums.h"
 #include "point.h"
 #include "ui_manager.h"
@@ -484,14 +485,27 @@ static int highlighted_radial_slot()
     return -1;
 }
 
+// A screen that moves a cursor over the map (looking around, aiming): a
+// menu by the UI stack, but its sticks still mean map directions.
+static bool in_map_cursor()
+{
+    input_context *top = input_context::input_context_stack.back();
+    if( top == nullptr ) {
+        return false;
+    }
+    const std::string &category = top->get_category();
+    return category == "LOOK" || category == "TARGET";
+}
+
 // How far to turn a stick before reading it as a direction: in VR, by the
-// player's view of the table (godot_host::view_yaw), so forward is "away
-// from me" however the table is turned. Only where the stick means a map
-// direction: menus and the wheels (LT held) stay as on screen.
+// way the player faces (godot_host::view_yaw), so forward is "my forward"
+// however the table is turned. Only where the stick means a map direction,
+// in play and on map cursors: menus and the wheels (LT held) stay as on
+// screen.
 static double map_turn()
 {
 #if defined(CDDA_GODOT)
-    if( !is_in_menu() && !alt_modifier_held ) {
+    if( ( !is_in_menu() || in_map_cursor() ) && !alt_modifier_held ) {
         return godot_host::view_yaw();
     }
 #endif
@@ -741,7 +755,13 @@ static bool handle_axis_event( SDL_Event &event )
                 int joy_code = -1;
                 input_event_t itype = input_event_t::gamepad;
 
-                if( i == 0 && is_in_menu() && !alt_modifier_held ) {
+                if( is_in_menu() && in_map_cursor() && !radial_right_open ) {
+                    // Either stick moves a map cursor, eight ways, turned
+                    // like play (map_turn): the left stick's arrows below
+                    // would lose the diagonals.
+                    joy_code = direction_to_num_key( dir );
+                    itype = input_event_t::keyboard_char;
+                } else if( i == 0 && is_in_menu() && !alt_modifier_held ) {
                     // Left stick in menus: the d-pad's arrow keys, repeating
                     // the same way, for controllers without a d-pad (the VR
                     // host's Touch). In play the stick only aims. Diagonals
