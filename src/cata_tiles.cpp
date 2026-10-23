@@ -1641,7 +1641,8 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
                     const light_color_rgb &color = cache.light_color_cache[x][y];
                     lights[( y - you_pos.y() + r ) * size + x - you_pos.x() + r] = {
                         cache.lm[x][y].max(), color.r, color.g, color.b,
-                        cache.light_source_buffer[x][y].luminance
+                        cache.light_source_buffer[x][y].luminance,
+                        here.is_outside( tripoint_bub_ms( x, y, you_pos.z() ) )
                     };
                 }
             }

@@ -61,6 +61,7 @@ struct map_light {
     float level;    // the brightest quadrant of the tile's light
     float r, g, b;  // coloured light energy here; all 0 for white light
     float source;   // the luminance of a bulk source here (fire, lava), or 0
+    bool outside;   // open to the sky (map::is_outside), for rain and snow
 };
 
 struct map_snapshot {
