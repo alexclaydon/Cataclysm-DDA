@@ -55,6 +55,9 @@ std::atomic<int> mouse_y{ 0 };
 std::atomic<uint32_t> mouse_buttons{ 0 };
 std::atomic<int> mouse_wheel{ 0 };
 std::atomic<bool> mouse_pending{ false };
+std::atomic<int> mouse_tile_dx{ 0 };
+std::atomic<int> mouse_tile_dy{ 0 };
+std::atomic<bool> mouse_tile_pending{ false };
 uint32_t mouse_buttons_applied = 0;  // engine thread only
 
 void SDLCALL update_virtual_pad( void * )
@@ -215,6 +218,25 @@ void godot_host::set_mouse( int x, int y, uint32_t buttons, int wheel )
     mouse_buttons.store( buttons );
     mouse_wheel.fetch_add( wheel );
     mouse_pending.store( true );
+}
+
+void godot_host::set_mouse_tile( int dx, int dy, uint32_t buttons )
+{
+    mouse_tile_dx.store( dx );
+    mouse_tile_dy.store( dy );
+    mouse_buttons.store( buttons );
+    mouse_tile_pending.store( true );
+}
+
+bool godot_host::take_mouse_tile( int &dx, int &dy, uint32_t &buttons )
+{
+    if( !mouse_tile_pending.exchange( false ) ) {
+        return false;
+    }
+    dx = mouse_tile_dx.load();
+    dy = mouse_tile_dy.load();
+    buttons = mouse_buttons.load();
+    return true;
 }
 
 void godot_host::apply_mouse()

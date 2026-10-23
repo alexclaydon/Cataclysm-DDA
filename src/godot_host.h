@@ -209,6 +209,12 @@ bool take_ui_windows( uint64_t &sequence, std::vector<ui_window> &out );
 // frame pixels, buttons as SDL_BUTTON_MASK bits, wheel in notches since the
 // last call. Any thread; the engine thread applies it while pumping events.
 void set_mouse( int x, int y, uint32_t buttons, int wheel );
+// The mouse on a map tile instead (pointing at the diorama): `dx`, `dy`
+// tiles from the avatar. The engine thread turns it into the tile's middle
+// in the map view's pixels (cata_tiles::player_to_screen), so it is exact
+// at any zoom or view offset.
+void set_mouse_tile( int dx, int dy, uint32_t buttons );
+bool take_mouse_tile( int &dx, int &dy, uint32_t &buttons );
 
 // If the map has been drawn since `sequence`, move the newest snapshot into
 // `out`, update `sequence` and return true.
