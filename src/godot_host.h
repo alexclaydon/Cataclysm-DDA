@@ -84,6 +84,14 @@ struct map_snapshot {
     int wind_mph;
     int precip;
     bool rains;
+    // The sky, for the diorama's sun and moon: each one's direction (degrees
+    // clockwise from north) and height above the horizon (degrees; the
+    // engine clamps a sun far below it), the moon's phase (moon_phase: 0 new,
+    // 4 full) and the weather's light_modifier (sunny 2, cloudy -20, fog -40).
+    float sun_from, sun_altitude;
+    float moon_from, moon_altitude;
+    int moon_phase;
+    int light_modifier;
 };
 
 // One image of the tileset: global sprite indices [first, first + count)
@@ -225,6 +233,8 @@ void note_storeys_usec( int usec );
 // for cata_tiles::draw to fill.
 std::vector<map_light> &record_map_lights( float natural_light, int x, int y, int size );
 void record_map_weather( int wind_from, int wind_mph, int precip, bool rains );
+void record_map_sky( float sun_from, float sun_altitude, float moon_from, float moon_altitude,
+                     int moon_phase, int light_modifier );
 
 // Around the map view's draw: record sprite lookups between begin and end,
 // then publish them. A draw that recorded nothing (aborted, or nothing

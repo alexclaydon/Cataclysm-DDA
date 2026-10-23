@@ -1629,6 +1629,19 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
             const weather_type &type = weather.weather_id.obj();
             godot_host::record_map_weather( weather.winddirection, weather.windspeed,
                                             static_cast<int>( type.precip ), type.rains );
+            // The engine's azimuth runs from the south, positive to the
+            // west; the host wants compass bearings. The moon trails the sun
+            // by its phase (new with the sun, full opposite it): where the
+            // sun was that long ago is a fair stand-in for where it is.
+            const time_point now = calendar::turn;
+            const int phase = static_cast<int>( get_moon_phase( now ) );
+            const auto sun = sun_azimuth_altitude( now );
+            const auto moon = sun_azimuth_altitude( now - time_duration::from_seconds( phase * 24 * 3600 / 8 ) );
+            godot_host::record_map_sky( static_cast<float>( units::to_degrees( sun.first ) + 180.0 ),
+                                        static_cast<float>( units::to_degrees( sun.second ) ),
+                                        static_cast<float>( units::to_degrees( moon.first ) + 180.0 ),
+                                        static_cast<float>( units::to_degrees( moon.second ) ),
+                                        phase, type.light_modifier );
         }
         {
             // The light on the avatar's storey, for lighting the diorama.

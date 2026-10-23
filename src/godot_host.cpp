@@ -273,6 +273,12 @@ void godot_host::begin_map_snapshot( int center_x, int center_y, int center_z, i
     map_building.wind_mph = 0;
     map_building.precip = 0;
     map_building.rains = false;
+    map_building.sun_from = 0.0f;
+    map_building.sun_altitude = -90.0f;
+    map_building.moon_from = 0.0f;
+    map_building.moon_altitude = -90.0f;
+    map_building.moon_phase = 0;
+    map_building.light_modifier = 0;
     map_recording = true;
 }
 
@@ -335,6 +341,17 @@ void godot_host::record_map_weather( int wind_from, int wind_mph, int precip, bo
     map_building.wind_mph = wind_mph;
     map_building.precip = precip;
     map_building.rains = rains;
+}
+
+void godot_host::record_map_sky( float sun_from, float sun_altitude, float moon_from,
+                                 float moon_altitude, int moon_phase, int light_modifier )
+{
+    map_building.sun_from = sun_from;
+    map_building.sun_altitude = sun_altitude;
+    map_building.moon_from = moon_from;
+    map_building.moon_altitude = moon_altitude;
+    map_building.moon_phase = moon_phase;
+    map_building.light_modifier = light_modifier;
 }
 
 godot_host::sprite_lookup_scope::sprite_lookup_scope()
