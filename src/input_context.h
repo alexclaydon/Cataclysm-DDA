@@ -164,6 +164,11 @@ class input_context
             // NOLINTEND(bugprone-use-after-move)
         }
 
+        // The input category, on every platform (get_category below is
+        // Android's): the gamepad layer asks it which screen is up.
+        const std::string &input_category() const {
+            return category;
+        }
 
 #if defined(__ANDROID__)
         // HACK: hack to allow creating manual keybindings for getch() instances, uilists etc. that don't use an input_context outside of the Android version

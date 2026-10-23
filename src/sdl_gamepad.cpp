@@ -493,7 +493,7 @@ static bool in_map_cursor()
     if( top == nullptr ) {
         return false;
     }
-    const std::string &category = top->get_category();
+    const std::string &category = top->input_category();
     return category == "LOOK" || category == "TARGET";
 }
 
