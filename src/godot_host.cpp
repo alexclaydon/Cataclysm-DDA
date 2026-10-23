@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <deque>
 #include <mutex>
 #include <vector>
 
@@ -50,17 +51,41 @@ std::atomic<float> view_yaw_degrees{ 0.0f };
 std::mutex ui_windows_mutex;
 std::vector<godot_host::ui_window> ui_windows;
 uint64_t ui_windows_sequence = 0;
-std::atomic<int> mouse_x{ 0 };
-std::atomic<int> mouse_y{ 0 };
-std::atomic<uint32_t> mouse_buttons{ 0 };
-std::atomic<int> mouse_wheel{ 0 };
-std::atomic<bool> mouse_pending{ false };
-std::atomic<int> mouse_tile_dx{ 0 };
-std::atomic<int> mouse_tile_dy{ 0 };
-std::atomic<bool> mouse_tile_pending{ false };
-std::atomic<bool> mouse_away_pending{ false };
+// The host's mouse commands, in order, applied one per CheckMessages: the
+// game keeps only the last input event of each poll, and a press and its
+// release must each have their own (a held state lost quick clicks while
+// the engine was busy).
+struct mouse_command {
+    enum kind_t { pixels, tile, away } kind;
+    int x;
+    int y;
+    uint32_t buttons;
+    int wheel;
+};
+std::mutex mouse_mutex;
+std::deque<mouse_command> mouse_queue;
 uint32_t mouse_buttons_applied = 0;  // engine thread only
 bool mouse_is_away = false;  // engine thread only
+
+void push_mouse( const mouse_command &command )
+{
+    std::lock_guard<std::mutex> lock( mouse_mutex );
+    if( !mouse_queue.empty() ) {
+        // A move after a move with the same buttons replaces it.
+        mouse_command &last = mouse_queue.back();
+        if( last.kind == command.kind && command.kind != mouse_command::away &&
+            last.buttons == command.buttons ) {
+            last.x = command.x;
+            last.y = command.y;
+            last.wheel += command.wheel;
+            return;
+        }
+    }
+    if( mouse_queue.size() >= 64 ) {
+        mouse_queue.pop_front();
+    }
+    mouse_queue.push_back( command );
+}
 
 void SDLCALL update_virtual_pad( void * )
 {
@@ -215,42 +240,17 @@ bool godot_host::take_ui_windows( uint64_t &sequence, std::vector<ui_window> &ou
 
 void godot_host::set_mouse( int x, int y, uint32_t buttons, int wheel )
 {
-    mouse_away_pending.store( false );
-    place_mouse( x, y, buttons, wheel );
-}
-
-void godot_host::place_mouse( int x, int y, uint32_t buttons, int wheel )
-{
-    mouse_x.store( x );
-    mouse_y.store( y );
-    mouse_buttons.store( buttons );
-    mouse_wheel.fetch_add( wheel );
-    mouse_pending.store( true );
+    push_mouse( { mouse_command::pixels, x, y, buttons, wheel } );
 }
 
 void godot_host::set_mouse_tile( int dx, int dy, uint32_t buttons )
 {
-    mouse_away_pending.store( false );
-    mouse_tile_dx.store( dx );
-    mouse_tile_dy.store( dy );
-    mouse_buttons.store( buttons );
-    mouse_tile_pending.store( true );
-}
-
-bool godot_host::take_mouse_tile( int &dx, int &dy, uint32_t &buttons )
-{
-    if( !mouse_tile_pending.exchange( false ) ) {
-        return false;
-    }
-    dx = mouse_tile_dx.load();
-    dy = mouse_tile_dy.load();
-    buttons = mouse_buttons.load();
-    return true;
+    push_mouse( { mouse_command::tile, dx, dy, buttons, 0 } );
 }
 
 void godot_host::set_mouse_away()
 {
-    mouse_away_pending.store( true );
+    push_mouse( { mouse_command::away, 0, 0, 0, 0 } );
 }
 
 bool godot_host::mouse_away()
@@ -258,55 +258,22 @@ bool godot_host::mouse_away()
     return mouse_is_away;
 }
 
-// The host's mouse position, buttons and wheel, applied (apply_mouse).
-static void apply_mouse_move()
+void godot_host::apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, int &y ) )
 {
-    SDL_Window *window = SDL_GetWindowFromID( godot_host::window_id() );
+    mouse_command command;
+    {
+        std::lock_guard<std::mutex> lock( mouse_mutex );
+        if( mouse_queue.empty() ) {
+            return;
+        }
+        command = mouse_queue.front();
+        mouse_queue.pop_front();
+    }
+    SDL_Window *window = SDL_GetWindowFromID( window_id() );
     if( window == nullptr ) {
         return;
     }
-    const float x = static_cast<float>( mouse_x.load() );
-    const float y = static_cast<float>( mouse_y.load() );
-    SDL_WarpMouseInWindow( window, x, y );
-    const uint32_t buttons = mouse_buttons.load();
-    for( const Uint8 b : { SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT } ) {
-        const uint32_t mask = SDL_BUTTON_MASK( b );
-        if( ( buttons & mask ) == ( mouse_buttons_applied & mask ) ) {
-            continue;
-        }
-        SDL_Event event{};
-        event.type = ( buttons & mask ) ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
-        event.button.windowID = godot_host::window_id();
-        event.button.button = b;
-        event.button.down = ( buttons & mask ) != 0;
-        event.button.clicks = 1;
-        event.button.x = x;
-        event.button.y = y;
-        SDL_PushEvent( &event );
-    }
-    mouse_buttons_applied = buttons;
-    const int wheel = mouse_wheel.exchange( 0 );
-    if( wheel != 0 ) {
-        SDL_Event event{};
-        event.type = SDL_EVENT_MOUSE_WHEEL;
-        event.wheel.windowID = godot_host::window_id();
-        event.wheel.y = static_cast<float>( wheel );
-        event.wheel.integer_y = wheel;
-        event.wheel.mouse_x = x;
-        event.wheel.mouse_y = y;
-        SDL_PushEvent( &event );
-    }
-}
-
-void godot_host::apply_mouse()
-{
-    if( mouse_pending.exchange( false ) ) {
-        mouse_is_away = false;
-        apply_mouse_move();
-    }
-    // After any move: set_mouse and set_mouse_tile clear a pending away, so
-    // one still pending is the newer.
-    if( mouse_away_pending.exchange( false ) ) {
+    if( command.kind == mouse_command::away ) {
         // A move where the mouse already is, for handle_mouseview to see.
         float x = 0.0f;
         float y = 0.0f;
@@ -318,6 +285,41 @@ void godot_host::apply_mouse()
         event.motion.y = y;
         SDL_PushEvent( &event );
         mouse_is_away = true;
+        return;
+    }
+    if( command.kind == mouse_command::tile &&
+        !tile_to_pixels( command.x, command.y, command.x, command.y ) ) {
+        return;
+    }
+    mouse_is_away = false;
+    const float x = static_cast<float>( command.x );
+    const float y = static_cast<float>( command.y );
+    SDL_WarpMouseInWindow( window, x, y );
+    for( const Uint8 b : { SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT } ) {
+        const uint32_t mask = SDL_BUTTON_MASK( b );
+        if( ( command.buttons & mask ) == ( mouse_buttons_applied & mask ) ) {
+            continue;
+        }
+        SDL_Event event{};
+        event.type = ( command.buttons & mask ) ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+        event.button.windowID = window_id();
+        event.button.button = b;
+        event.button.down = ( command.buttons & mask ) != 0;
+        event.button.clicks = 1;
+        event.button.x = x;
+        event.button.y = y;
+        SDL_PushEvent( &event );
+    }
+    mouse_buttons_applied = command.buttons;
+    if( command.wheel != 0 ) {
+        SDL_Event event{};
+        event.type = SDL_EVENT_MOUSE_WHEEL;
+        event.wheel.windowID = window_id();
+        event.wheel.y = static_cast<float>( command.wheel );
+        event.wheel.integer_y = command.wheel;
+        event.wheel.mouse_x = x;
+        event.wheel.mouse_y = y;
+        SDL_PushEvent( &event );
     }
 }
 

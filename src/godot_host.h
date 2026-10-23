@@ -206,18 +206,18 @@ struct ui_window {
 bool take_ui_windows( uint64_t &sequence, std::vector<ui_window> &out );
 
 // The mouse, from the host (pointing at a window, or desk mode's mouse): in
-// frame pixels, buttons as SDL_BUTTON_MASK bits, wheel in notches since the
-// last call. Any thread; the engine thread applies it while pumping events.
+// frame pixels, buttons as SDL_BUTTON_MASK bits, wheel in notches. Any
+// thread; queued in order, and the engine thread applies one per event
+// pump (apply_mouse), so no press or release is lost.
 void set_mouse( int x, int y, uint32_t buttons, int wheel );
 // The mouse on a map tile instead (pointing at the diorama): `dx`, `dy`
 // tiles from the avatar. The engine thread turns it into the tile's middle
 // in the map view's pixels (cata_tiles::player_to_screen), so it is exact
 // at any zoom or view offset.
 void set_mouse_tile( int dx, int dy, uint32_t buttons );
-bool take_mouse_tile( int &dx, int &dy, uint32_t &buttons );
 // The host's pointer has left the map (the diorama's pointing ended): the
 // game hears a mouse move with no tile under it, so the mouse view closes.
-// Until the next set_mouse, mouse_away() (engine thread) is true.
+// Until the next move, mouse_away() (engine thread) is true.
 void set_mouse_away();
 bool mouse_away();
 
@@ -237,13 +237,11 @@ bool take_map_objects( uint64_t &generation, map_objects_info &out );
 
 void publish_frame( SDL_Renderer *renderer );
 void set_window_id( uint32_t id );
-// set_mouse without cancelling a pending set_mouse_away: CheckMessages
-// placing a set_mouse_tile, which may be older than the away.
-void place_mouse( int x, int y, uint32_t buttons, int wheel );
-// Apply the host's mouse (set_mouse): warp SDL's mouse in the engine's
-// window (the game reads the pointer from SDL's mouse state, not the
-// event) and push button and wheel events. Called from CheckMessages.
-void apply_mouse();
+// Apply the host's next mouse command (set_mouse and co.): warp SDL's
+// mouse in the engine's window (the game reads the pointer from SDL's mouse
+// state, not the event) and push button and wheel events. `tile_to_pixels`
+// places a set_mouse_tile (false: nowhere). Called from CheckMessages.
+void apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, int &y ) );
 
 // How far around the avatar the snapshot reaches, and how many storeys below
 // the avatar's it adds from map memory (plan 0004, Phase 2).

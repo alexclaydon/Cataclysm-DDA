@@ -5235,16 +5235,17 @@ static void CheckMessages()
 #if defined(CDDA_GODOT)
     // The VR host's mouse (pointing at a window, or at a tile on the
     // diorama), queued as events below.
-    int tile_dx = 0;
-    int tile_dy = 0;
-    uint32_t tile_buttons = 0;
-    if( godot_host::take_mouse_tile( tile_dx, tile_dy, tile_buttons ) && tilecontext ) {
-        const point_bub_ms tile = get_avatar().pos_bub().xy() + point( tile_dx, tile_dy );
+    godot_host::apply_mouse( []( int dx, int dy, int &x, int &y ) {
+        if( !tilecontext ) {
+            return false;
+        }
+        const point_bub_ms tile = get_avatar().pos_bub().xy() + point( dx, dy );
         const point px = tilecontext->player_to_screen( tile ) +
                          point( tilecontext->get_tile_width() / 2, tilecontext->get_tile_height() / 2 );
-        godot_host::place_mouse( px.x, px.y, tile_buttons, 0 );
-    }
-    godot_host::apply_mouse();
+        x = px.x;
+        y = px.y;
+        return true;
+    } );
 #endif
 
 #if defined(__ANDROID__)
