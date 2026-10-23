@@ -5232,6 +5232,10 @@ static void CheckMessages()
     bool is_repeat = false;
 
     drain_renderer_recovery();
+#if defined(CDDA_GODOT)
+    // The VR host's mouse (pointing at a window), queued as events below.
+    godot_host::apply_mouse();
+#endif
 
 #if defined(__ANDROID__)
     static uint32_t last_seen_visible_frame_seq = 0;

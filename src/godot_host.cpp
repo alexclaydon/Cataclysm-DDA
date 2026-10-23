@@ -6,14 +6,18 @@
 
 #include "godot_host.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
+#include <vector>
 
 #include <SDL3/SDL.h>
+
+#include "ui_manager.h"
 
 namespace
 {
@@ -41,6 +45,17 @@ std::array<std::atomic<int16_t>, godot_host::virtual_pad_axes> virtual_axes{};
 std::atomic<uint32_t> virtual_rumble{ 0 };  // low << 16 | high
 std::atomic<bool> virtual_rumble_new{ false };
 std::atomic<float> view_yaw_degrees{ 0.0f };
+
+// The open UIs as of the latest frame (publish_frame), and the host's mouse.
+std::mutex ui_windows_mutex;
+std::vector<godot_host::ui_window> ui_windows;
+uint64_t ui_windows_sequence = 0;
+std::atomic<int> mouse_x{ 0 };
+std::atomic<int> mouse_y{ 0 };
+std::atomic<uint32_t> mouse_buttons{ 0 };
+std::atomic<int> mouse_wheel{ 0 };
+std::atomic<bool> mouse_pending{ false };
+uint32_t mouse_buttons_applied = 0;  // engine thread only
 
 void SDLCALL update_virtual_pad( void * )
 {
@@ -118,6 +133,27 @@ godot_host::tileset_info tileset_published;
 
 void godot_host::publish_frame( SDL_Renderer *renderer )
 {
+    {
+        // The open UIs, for the host's floating windows: kept with the
+        // frame they belong to.
+        std::vector<ui_window> windows;
+        for( const ui_adaptor::ui_rect &r : ui_adaptor::ui_rects() ) {
+            windows.push_back( { r.dimensions.p_min.x, r.dimensions.p_min.y,
+                                 r.dimensions.p_max.x - r.dimensions.p_min.x,
+                                 r.dimensions.p_max.y - r.dimensions.p_min.y,
+                                 r.is_shim, r.is_imgui, r.disabling_uis_below
+                               } );
+        }
+        std::lock_guard<std::mutex> lock( ui_windows_mutex );
+        const auto same = []( const ui_window & a, const ui_window & b ) {
+            return a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height &&
+                   a.shim == b.shim && a.imgui == b.imgui && a.hides_below == b.hides_below;
+        };
+        if( !std::equal( windows.begin(), windows.end(), ui_windows.begin(), ui_windows.end(), same ) ) {
+            ui_windows = std::move( windows );
+            ++ui_windows_sequence;
+        }
+    }
     // Read back the composed window target just before it is presented.
     // Presents are event-driven, so this runs a handful of times a second
     // at most outside animations.
@@ -158,6 +194,68 @@ void godot_host::publish_frame( SDL_Renderer *renderer )
         ++frame_sequence;
     }
     SDL_DestroySurface( rgba );
+}
+
+bool godot_host::take_ui_windows( uint64_t &sequence, std::vector<ui_window> &out )
+{
+    std::lock_guard<std::mutex> lock( ui_windows_mutex );
+    if( sequence == ui_windows_sequence ) {
+        return false;
+    }
+    out = ui_windows;
+    sequence = ui_windows_sequence;
+    return true;
+}
+
+void godot_host::set_mouse( int x, int y, uint32_t buttons, int wheel )
+{
+    mouse_x.store( x );
+    mouse_y.store( y );
+    mouse_buttons.store( buttons );
+    mouse_wheel.fetch_add( wheel );
+    mouse_pending.store( true );
+}
+
+void godot_host::apply_mouse()
+{
+    if( !mouse_pending.exchange( false ) ) {
+        return;
+    }
+    SDL_Window *window = SDL_GetWindowFromID( window_id() );
+    if( window == nullptr ) {
+        return;
+    }
+    const float x = static_cast<float>( mouse_x.load() );
+    const float y = static_cast<float>( mouse_y.load() );
+    SDL_WarpMouseInWindow( window, x, y );
+    const uint32_t buttons = mouse_buttons.load();
+    for( const Uint8 b : { SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT } ) {
+        const uint32_t mask = SDL_BUTTON_MASK( b );
+        if( ( buttons & mask ) == ( mouse_buttons_applied & mask ) ) {
+            continue;
+        }
+        SDL_Event event{};
+        event.type = ( buttons & mask ) ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+        event.button.windowID = window_id();
+        event.button.button = b;
+        event.button.down = ( buttons & mask ) != 0;
+        event.button.clicks = 1;
+        event.button.x = x;
+        event.button.y = y;
+        SDL_PushEvent( &event );
+    }
+    mouse_buttons_applied = buttons;
+    const int wheel = mouse_wheel.exchange( 0 );
+    if( wheel != 0 ) {
+        SDL_Event event{};
+        event.type = SDL_EVENT_MOUSE_WHEEL;
+        event.wheel.windowID = window_id();
+        event.wheel.y = static_cast<float>( wheel );
+        event.wheel.integer_y = wheel;
+        event.wheel.mouse_x = x;
+        event.wheel.mouse_y = y;
+        SDL_PushEvent( &event );
+    }
 }
 
 void godot_host::set_view_yaw( float degrees )

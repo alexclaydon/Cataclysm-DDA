@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include "cuboid_rectangle.h"
 #include "point.h"
@@ -246,6 +247,16 @@ class ui_adaptor
         static void redraw_invalidated();
         static void screen_resized();
         static size_t ui_stack_size();
+        /** One open UI's screen area and kind, for the VR host (which floats
+         *  each menu as its own window). */
+        struct ui_rect {
+            rectangle<point> dimensions;  // pixels in tiles builds
+            bool is_shim;
+            bool is_imgui;
+            bool disabling_uis_below;
+        };
+        /** The open UIs, bottom (the main game) first. */
+        static std::vector<ui_rect> ui_rects();
     private:
         static void invalidation_consistency_and_optimization();
 

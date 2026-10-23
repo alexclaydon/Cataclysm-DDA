@@ -266,6 +266,16 @@ size_t ui_adaptor::ui_stack_size()
     return n;
 }
 
+std::vector<ui_adaptor::ui_rect> ui_adaptor::ui_rects()
+{
+    std::vector<ui_rect> rects;
+    rects.reserve( ui_stack.size() );
+    for( const ui_adaptor &ui : ui_stack ) {
+        rects.push_back( { ui.dimensions, ui.is_shim, ui.is_imgui, ui.disabling_uis_below } );
+    }
+    return rects;
+}
+
 // This function does two things:
 // 1. Ensure that any UI that would be overwritten by redrawing a lower invalidated
 //    UI also gets redrawn.

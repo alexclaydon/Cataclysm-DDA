@@ -192,6 +192,23 @@ bool take_frame( uint64_t &sequence, std::vector<unsigned char> &rgba, int &widt
 // The SDL window ID to address pushed events to; 0 until the window exists.
 uint32_t window_id();
 
+// The open UIs (ui_adaptor's stack), bottom (the main game) first, as of
+// the latest published frame, in its pixels (plan 0006: menus float).
+struct ui_window {
+    int x, y, width, height;
+    bool shim;         // an app-shell adaptor, not a screen
+    bool imgui;        // drawn with ImGui
+    bool hides_below;  // hides the UIs beneath it
+};
+// If the list has changed since `sequence`, copy it into `out`, update
+// `sequence` and return true.
+bool take_ui_windows( uint64_t &sequence, std::vector<ui_window> &out );
+
+// The mouse, from the host (pointing at a window, or desk mode's mouse): in
+// frame pixels, buttons as SDL_BUTTON_MASK bits, wheel in notches since the
+// last call. Any thread; the engine thread applies it while pumping events.
+void set_mouse( int x, int y, uint32_t buttons, int wheel );
+
 // If the map has been drawn since `sequence`, move the newest snapshot into
 // `out`, update `sequence` and return true.
 bool take_map_snapshot( uint64_t &sequence, map_snapshot &out );
@@ -208,6 +225,10 @@ bool take_map_objects( uint64_t &generation, map_objects_info &out );
 
 void publish_frame( SDL_Renderer *renderer );
 void set_window_id( uint32_t id );
+// Apply the host's mouse (set_mouse): warp SDL's mouse in the engine's
+// window (the game reads the pointer from SDL's mouse state, not the
+// event) and push button and wheel events. Called from CheckMessages.
+void apply_mouse();
 
 // How far around the avatar the snapshot reaches, and how many storeys below
 // the avatar's it adds from map memory (plan 0004, Phase 2).
