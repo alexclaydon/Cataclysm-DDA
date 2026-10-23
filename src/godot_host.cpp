@@ -58,7 +58,9 @@ std::atomic<bool> mouse_pending{ false };
 std::atomic<int> mouse_tile_dx{ 0 };
 std::atomic<int> mouse_tile_dy{ 0 };
 std::atomic<bool> mouse_tile_pending{ false };
+std::atomic<bool> mouse_away_pending{ false };
 uint32_t mouse_buttons_applied = 0;  // engine thread only
+bool mouse_is_away = false;  // engine thread only
 
 void SDLCALL update_virtual_pad( void * )
 {
@@ -239,11 +241,35 @@ bool godot_host::take_mouse_tile( int &dx, int &dy, uint32_t &buttons )
     return true;
 }
 
+void godot_host::set_mouse_away()
+{
+    mouse_away_pending.store( true );
+}
+
+bool godot_host::mouse_away()
+{
+    return mouse_is_away;
+}
+
 void godot_host::apply_mouse()
 {
+    if( mouse_away_pending.exchange( false ) && !mouse_pending.load() ) {
+        // A move where the mouse already is, for handle_mouseview to see.
+        float x = 0.0f;
+        float y = 0.0f;
+        SDL_GetMouseState( &x, &y );
+        SDL_Event event{};
+        event.type = SDL_EVENT_MOUSE_MOTION;
+        event.motion.windowID = window_id();
+        event.motion.x = x;
+        event.motion.y = y;
+        SDL_PushEvent( &event );
+        mouse_is_away = true;
+    }
     if( !mouse_pending.exchange( false ) ) {
         return;
     }
+    mouse_is_away = false;
     SDL_Window *window = SDL_GetWindowFromID( window_id() );
     if( window == nullptr ) {
         return;

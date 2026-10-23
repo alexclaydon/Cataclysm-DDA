@@ -3307,6 +3307,13 @@ bool game::handle_action()
     if( act == ACTION_NULL ) {
         act = look_up_action( action );
 
+        if( act == ACTION_NULL && ctxt.get_raw_input().type == input_event_t::mouse ) {
+            // An unbound mouse event: a button's press, whose action (SELECT,
+            // SEC_SELECT) comes on its release. Not an unknown command, and
+            // it mustn't clear a click-to-move preview before that release.
+            return false;
+        }
+
         if( act == ACTION_KEYBINDINGS ) {
             // already handled by input context
             return false;

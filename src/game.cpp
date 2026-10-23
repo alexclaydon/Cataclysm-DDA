@@ -114,6 +114,9 @@
 #include "gamemode.h"
 #include "gates.h"
 #include "get_version.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 #include "harvest.h"
 #include "iexamine.h"
 #include "imgui/imgui_stdlib.h"
@@ -2447,9 +2450,15 @@ bool game::handle_mouseview( input_context &ctxt, std::string &action )
     do {
         action = ctxt.handle_input();
         if( action == "MOUSE_MOVE" ) {
-            const std::optional<tripoint_bub_ms> mouse_pos = ctxt.get_coordinates( w_terrain,
+            std::optional<tripoint_bub_ms> mouse_pos = ctxt.get_coordinates( w_terrain,
                     ter_view_p.raw().xy(),
                     true );
+#if defined(CDDA_GODOT)
+            if( godot_host::mouse_away() ) {
+                // The VR host stopped pointing at the diorama.
+                mouse_pos.reset();
+            }
+#endif
             if( mouse_pos && ( !liveview_pos || *mouse_pos != *liveview_pos ) ) {
                 liveview_pos = mouse_pos;
                 liveview.show( liveview_pos->raw() );

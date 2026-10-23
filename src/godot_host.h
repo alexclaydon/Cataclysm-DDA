@@ -215,6 +215,11 @@ void set_mouse( int x, int y, uint32_t buttons, int wheel );
 // at any zoom or view offset.
 void set_mouse_tile( int dx, int dy, uint32_t buttons );
 bool take_mouse_tile( int &dx, int &dy, uint32_t &buttons );
+// The host's pointer has left the map (the diorama's pointing ended): the
+// game hears a mouse move with no tile under it, so the mouse view closes.
+// Until the next set_mouse, mouse_away() (engine thread) is true.
+void set_mouse_away();
+bool mouse_away();
 
 // If the map has been drawn since `sequence`, move the newest snapshot into
 // `out`, update `sequence` and return true.
