@@ -3415,6 +3415,11 @@ void game::draw_panels( bool force_draw )
     panel_manager &mgr = panel_manager::get_manager();
     int y = 0;
     const bool sidebar_right = get_option<std::string>( "SIDEBAR_POSITION" ) == "right";
+#if defined(CDDA_GODOT)
+    // For the VR host's HUD window: where the sidebar (with the message
+    // log) lies in the frame.
+    godot_host::set_sidebar( mgr.get_width_left(), mgr.get_width_right(), TERMX, TERMY );
+#endif
     int spacer = get_option<bool>( "SIDEBAR_SPACERS" ) ? 1 : 0;
     // Total up height used by all panels, and see what is left over for log
     int log_height = 0;

@@ -62,6 +62,7 @@ struct mouse_command {
     uint32_t buttons;
     int wheel;
 };
+std::atomic<uint64_t> sidebar_cells{ 0 };  // set_sidebar, packed in 16 bits each
 std::mutex mouse_mutex;
 std::deque<mouse_command> mouse_queue;
 uint32_t mouse_buttons_applied = 0;  // engine thread only
@@ -236,6 +237,23 @@ bool godot_host::take_ui_windows( uint64_t &sequence, std::vector<ui_window> &ou
     out = ui_windows;
     sequence = ui_windows_sequence;
     return true;
+}
+
+void godot_host::set_sidebar( int left, int right, int columns, int rows )
+{
+    sidebar_cells.store( ( static_cast<uint64_t>( left & 0xffff ) << 48 ) |
+                         ( static_cast<uint64_t>( right & 0xffff ) << 32 ) |
+                         ( static_cast<uint64_t>( columns & 0xffff ) << 16 ) |
+                         static_cast<uint64_t>( rows & 0xffff ) );
+}
+
+void godot_host::get_sidebar( int &left, int &right, int &columns, int &rows )
+{
+    const uint64_t v = sidebar_cells.load();
+    left = static_cast<int>( ( v >> 48 ) & 0xffff );
+    right = static_cast<int>( ( v >> 32 ) & 0xffff );
+    columns = static_cast<int>( ( v >> 16 ) & 0xffff );
+    rows = static_cast<int>( v & 0xffff );
 }
 
 void godot_host::set_mouse( int x, int y, uint32_t buttons, int wheel )

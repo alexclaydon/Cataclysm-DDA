@@ -201,6 +201,12 @@ struct ui_window {
     bool hides_below;  // hides the UIs beneath it
     bool visible;      // on screen (an ImGui window drew itself this pass)
 };
+// The sidebar (status panels and the message log), in terminal cells: its
+// width on the left and on the right (one is 0) of a TERMX x TERMY grid.
+// Engine thread sets it as the panels draw; the host reads it any time.
+void set_sidebar( int left, int right, int columns, int rows );
+void get_sidebar( int &left, int &right, int &columns, int &rows );
+
 // If the list has changed since `sequence`, copy it into `out`, update
 // `sequence` and return true.
 bool take_ui_windows( uint64_t &sequence, std::vector<ui_window> &out );
