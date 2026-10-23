@@ -17,6 +17,7 @@
 class query_popup_impl : public cataimgui::window
 {
         short mouse_selected_option;
+        short clicked_option = -1;
         size_t msg_width;
         nc_color default_text_color;
         query_popup *parent;
@@ -45,6 +46,12 @@ class query_popup_impl : public cataimgui::window
         int get_mouse_selected_option() const {
             return mouse_selected_option;
         }
+        // The button clicked since the last call, or -1.
+        int take_clicked_option() {
+            const int clicked = clicked_option;
+            clicked_option = -1;
+            return clicked;
+        }
     protected:
         void draw_controls() override;
         cataimgui::bounds get_bounds() override {
@@ -68,7 +75,12 @@ void query_popup_impl::draw_controls()
                 ImGui::SameLine();
             }
             ImGui::SetCursorPosX( float( parent->buttons[ind].pos.x ) );
-            ImGui::Button( remove_color_tags( parent->buttons[ind].text ).c_str() );
+            // A click on a button is ImGui's (it captures the mouse over its
+            // windows, so no SELECT reaches the input context): take it
+            // from the button, as uilist does from its rows.
+            if( ImGui::Button( remove_color_tags( parent->buttons[ind].text ).c_str() ) ) {
+                clicked_option = short( ind );
+            }
             if( ImGui::IsItemHovered() ) {
                 mouse_selected_option = ind;
             }
@@ -326,6 +338,12 @@ query_popup::result query_popup::query_once()
         res.action = ctxt.handle_input( 50 );
         res.evt = ctxt.get_raw_input();
 
+        const int clicked = impl->take_clicked_option();
+        if( !options.empty() && clicked != -1 ) {
+            res.action = "CONFIRM";
+            cur = size_t( clicked );
+            break;
+        }
         // If we're tracking mouse movement
         if( !options.empty() && res.action == "SELECT" && impl->get_mouse_selected_option() != -1 ) {
             // Left-click to confirm selection
