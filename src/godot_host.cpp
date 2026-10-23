@@ -8,6 +8,7 @@
 
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
@@ -60,6 +61,29 @@ void SDLCALL update_virtual_pad( void * )
             value = value * 2 - 32768;
         }
         SDL_SetJoystickVirtualAxis( joystick, a, static_cast<Sint16>( value ) );
+    }
+    // A held stick turns with the view: SDL only reports a stick when it
+    // moves, so when the view yaw changes while one is pushed, report it
+    // again and the gamepad layer re-reads it with the new turn.
+    static float reported_yaw = 0.0f;
+    const float yaw = view_yaw_degrees.load();
+    if( std::abs( std::remainder( yaw - reported_yaw, 360.0f ) ) < 1.0f ) {
+        return;
+    }
+    reported_yaw = yaw;
+    constexpr int pushed = 8000;
+    for( const int a : { SDL_GAMEPAD_AXIS_LEFTX, SDL_GAMEPAD_AXIS_RIGHTX } ) {
+        const int x = virtual_axes[a].load();
+        const int y = virtual_axes[a + 1].load();
+        if( std::abs( x ) < pushed && std::abs( y ) < pushed ) {
+            continue;
+        }
+        SDL_Event event{};
+        event.type = SDL_EVENT_GAMEPAD_AXIS_MOTION;
+        event.gaxis.which = virtual_pad_id;
+        event.gaxis.axis = static_cast<Uint8>( a );
+        event.gaxis.value = static_cast<Sint16>( x );
+        SDL_PushEvent( &event );
     }
 }
 
