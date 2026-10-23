@@ -237,6 +237,9 @@ bool take_map_objects( uint64_t &generation, map_objects_info &out );
 
 void publish_frame( SDL_Renderer *renderer );
 void set_window_id( uint32_t id );
+// set_mouse without cancelling a pending set_mouse_away: CheckMessages
+// placing a set_mouse_tile, which may be older than the away.
+void place_mouse( int x, int y, uint32_t buttons, int wheel );
 // Apply the host's mouse (set_mouse): warp SDL's mouse in the engine's
 // window (the game reads the pointer from SDL's mouse state, not the
 // event) and push button and wheel events. Called from CheckMessages.

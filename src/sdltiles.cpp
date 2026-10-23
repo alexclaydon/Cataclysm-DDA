@@ -5242,7 +5242,7 @@ static void CheckMessages()
         const point_bub_ms tile = get_avatar().pos_bub().xy() + point( tile_dx, tile_dy );
         const point px = tilecontext->player_to_screen( tile ) +
                          point( tilecontext->get_tile_width() / 2, tilecontext->get_tile_height() / 2 );
-        godot_host::set_mouse( px.x, px.y, tile_buttons, 0 );
+        godot_host::place_mouse( px.x, px.y, tile_buttons, 0 );
     }
     godot_host::apply_mouse();
 #endif

@@ -215,6 +215,12 @@ bool godot_host::take_ui_windows( uint64_t &sequence, std::vector<ui_window> &ou
 
 void godot_host::set_mouse( int x, int y, uint32_t buttons, int wheel )
 {
+    mouse_away_pending.store( false );
+    place_mouse( x, y, buttons, wheel );
+}
+
+void godot_host::place_mouse( int x, int y, uint32_t buttons, int wheel )
+{
     mouse_x.store( x );
     mouse_y.store( y );
     mouse_buttons.store( buttons );
@@ -224,6 +230,7 @@ void godot_host::set_mouse( int x, int y, uint32_t buttons, int wheel )
 
 void godot_host::set_mouse_tile( int dx, int dy, uint32_t buttons )
 {
+    mouse_away_pending.store( false );
     mouse_tile_dx.store( dx );
     mouse_tile_dy.store( dy );
     mouse_buttons.store( buttons );
@@ -251,26 +258,10 @@ bool godot_host::mouse_away()
     return mouse_is_away;
 }
 
-void godot_host::apply_mouse()
+// The host's mouse position, buttons and wheel, applied (apply_mouse).
+static void apply_mouse_move()
 {
-    if( mouse_away_pending.exchange( false ) && !mouse_pending.load() ) {
-        // A move where the mouse already is, for handle_mouseview to see.
-        float x = 0.0f;
-        float y = 0.0f;
-        SDL_GetMouseState( &x, &y );
-        SDL_Event event{};
-        event.type = SDL_EVENT_MOUSE_MOTION;
-        event.motion.windowID = window_id();
-        event.motion.x = x;
-        event.motion.y = y;
-        SDL_PushEvent( &event );
-        mouse_is_away = true;
-    }
-    if( !mouse_pending.exchange( false ) ) {
-        return;
-    }
-    mouse_is_away = false;
-    SDL_Window *window = SDL_GetWindowFromID( window_id() );
+    SDL_Window *window = SDL_GetWindowFromID( godot_host::window_id() );
     if( window == nullptr ) {
         return;
     }
@@ -285,7 +276,7 @@ void godot_host::apply_mouse()
         }
         SDL_Event event{};
         event.type = ( buttons & mask ) ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
-        event.button.windowID = window_id();
+        event.button.windowID = godot_host::window_id();
         event.button.button = b;
         event.button.down = ( buttons & mask ) != 0;
         event.button.clicks = 1;
@@ -298,12 +289,35 @@ void godot_host::apply_mouse()
     if( wheel != 0 ) {
         SDL_Event event{};
         event.type = SDL_EVENT_MOUSE_WHEEL;
-        event.wheel.windowID = window_id();
+        event.wheel.windowID = godot_host::window_id();
         event.wheel.y = static_cast<float>( wheel );
         event.wheel.integer_y = wheel;
         event.wheel.mouse_x = x;
         event.wheel.mouse_y = y;
         SDL_PushEvent( &event );
+    }
+}
+
+void godot_host::apply_mouse()
+{
+    if( mouse_pending.exchange( false ) ) {
+        mouse_is_away = false;
+        apply_mouse_move();
+    }
+    // After any move: set_mouse and set_mouse_tile clear a pending away, so
+    // one still pending is the newer.
+    if( mouse_away_pending.exchange( false ) ) {
+        // A move where the mouse already is, for handle_mouseview to see.
+        float x = 0.0f;
+        float y = 0.0f;
+        SDL_GetMouseState( &x, &y );
+        SDL_Event event{};
+        event.type = SDL_EVENT_MOUSE_MOTION;
+        event.motion.windowID = window_id();
+        event.motion.x = x;
+        event.motion.y = y;
+        SDL_PushEvent( &event );
+        mouse_is_away = true;
     }
 }
 
