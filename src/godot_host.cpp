@@ -269,6 +269,10 @@ void godot_host::begin_map_snapshot( int center_x, int center_y, int center_z, i
     map_building.lights_y = 0;
     map_building.lights_size = 0;
     map_building.lights.clear();
+    map_building.wind_from = 0;
+    map_building.wind_mph = 0;
+    map_building.precip = 0;
+    map_building.rains = false;
     map_recording = true;
 }
 
@@ -323,6 +327,14 @@ std::vector<godot_host::map_light> &godot_host::record_map_lights( float natural
     map_building.lights_size = size;
     map_building.lights.assign( static_cast<size_t>( size ) * size, map_light{} );
     return map_building.lights;
+}
+
+void godot_host::record_map_weather( int wind_from, int wind_mph, int precip, bool rains )
+{
+    map_building.wind_from = wind_from;
+    map_building.wind_mph = wind_mph;
+    map_building.precip = precip;
+    map_building.rains = rains;
 }
 
 godot_host::sprite_lookup_scope::sprite_lookup_scope()

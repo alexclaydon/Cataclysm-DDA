@@ -1625,6 +1625,12 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     if( godot_host::recording_map() ) {
         const int r = godot_host::snapshot_radius;
         {
+            const weather_manager &weather = get_weather();
+            const weather_type &type = weather.weather_id.obj();
+            godot_host::record_map_weather( weather.winddirection, weather.windspeed,
+                                            static_cast<int>( type.precip ), type.rains );
+        }
+        {
             // The light on the avatar's storey, for lighting the diorama.
             const level_cache &cache = here.access_cache( you_pos.z() );
             const int size = 2 * r + 1;

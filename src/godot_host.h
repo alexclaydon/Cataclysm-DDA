@@ -75,6 +75,14 @@ struct map_snapshot {
     float natural_light;
     int lights_x, lights_y, lights_size;
     std::vector<map_light> lights;
+    // The weather, for the diorama's effects: where the wind blows from
+    // (degrees clockwise from north, as the sidebar's arrow), its speed in
+    // mph (before local shelter), and precipitation (precip_class: 0 none
+    // to 3 heavy), falling as rain or not (snow).
+    int wind_from;
+    int wind_mph;
+    int precip;
+    bool rains;
 };
 
 // One image of the tileset: global sprite indices [first, first + count)
@@ -215,6 +223,7 @@ void note_storeys_usec( int usec );
 // The light grid for the snapshot being recorded: sized size x size, zeroed,
 // for cata_tiles::draw to fill.
 std::vector<map_light> &record_map_lights( float natural_light, int x, int y, int size );
+void record_map_weather( int wind_from, int wind_mph, int precip, bool rains );
 
 // Around the map view's draw: record sprite lookups between begin and end,
 // then publish them. A draw that recorded nothing (aborted, or nothing
