@@ -1087,6 +1087,7 @@ void cataimgui::window::draw()
         ImGui::SetNextWindowSize( ImGui::GetMainViewport()->Size * ImVec2 { cached_bounds.w, cached_bounds.h } );
     }
     if( ImGui::Begin( id.c_str(), &is_open, window_flags ) ) {
+        p_impl->window_adaptor->imgui_drawn_pass = ui_adaptor::redraw_pass();
         draw_controls();
         if( p_impl->window_adaptor->is_on_top && !force_to_back ) {
             ImGui::BringWindowToDisplayFront( ImGui::GetCurrentWindow() );

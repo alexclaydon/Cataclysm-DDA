@@ -34,6 +34,7 @@ static std::optional<SDL_Rect> prev_clip_rect;
 static uint64_t prev_clip_rect_generation = 0;
 #endif
 static ui_stack_t ui_stack;
+static uint64_t redraw_pass_count = 0;
 
 ui_adaptor::ui_adaptor() : is_imgui( false ), disabling_uis_below( false ),
     is_debug_message_ui( false ),
@@ -266,12 +267,19 @@ size_t ui_adaptor::ui_stack_size()
     return n;
 }
 
+uint64_t ui_adaptor::redraw_pass()
+{
+    return redraw_pass_count;
+}
+
 std::vector<ui_adaptor::ui_rect> ui_adaptor::ui_rects()
 {
     std::vector<ui_rect> rects;
     rects.reserve( ui_stack.size() );
     for( const ui_adaptor &ui : ui_stack ) {
-        rects.push_back( { ui.dimensions, ui.is_shim, ui.is_imgui, ui.disabling_uis_below } );
+        rects.push_back( { ui.dimensions, ui.is_shim, ui.is_imgui, ui.disabling_uis_below,
+                           !ui.is_imgui || ui.imgui_drawn_pass == redraw_pass_count
+                         } );
     }
     return rects;
 }
@@ -433,6 +441,7 @@ void ui_adaptor::redraw_invalidated( )
 #endif
     }
     imgui_frame_started = true;
+    ++redraw_pass_count;
 
     // On abnormal exit (exception unwinding a draw callback) close the frame
     // without rendering so the next NewFrame() does not assert. No-op on the

@@ -141,13 +141,14 @@ void godot_host::publish_frame( SDL_Renderer *renderer )
             windows.push_back( { r.dimensions.p_min.x, r.dimensions.p_min.y,
                                  r.dimensions.p_max.x - r.dimensions.p_min.x,
                                  r.dimensions.p_max.y - r.dimensions.p_min.y,
-                                 r.is_shim, r.is_imgui, r.disabling_uis_below
+                                 r.is_shim, r.is_imgui, r.disabling_uis_below, r.visible
                                } );
         }
         std::lock_guard<std::mutex> lock( ui_windows_mutex );
         const auto same = []( const ui_window & a, const ui_window & b ) {
             return a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height &&
-                   a.shim == b.shim && a.imgui == b.imgui && a.hides_below == b.hides_below;
+                   a.shim == b.shim && a.imgui == b.imgui && a.hides_below == b.hides_below &&
+                   a.visible == b.visible;
         };
         if( !std::equal( windows.begin(), windows.end(), ui_windows.begin(), ui_windows.end(), same ) ) {
             ui_windows = std::move( windows );

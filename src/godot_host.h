@@ -199,6 +199,7 @@ struct ui_window {
     bool shim;         // an app-shell adaptor, not a screen
     bool imgui;        // drawn with ImGui
     bool hides_below;  // hides the UIs beneath it
+    bool visible;      // on screen (an ImGui window drew itself this pass)
 };
 // If the list has changed since `sequence`, copy it into `out`, update
 // `sequence` and return true.
