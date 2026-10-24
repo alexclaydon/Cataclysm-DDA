@@ -113,6 +113,10 @@ enum class direction : unsigned int;
 #include "sdltiles.h"
 #endif
 
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
+
 static const bionic_id bio_remote( "bio_remote" );
 
 static const character_modifier_id
@@ -3225,13 +3229,22 @@ bool game::do_regular_action( action_id &act, avatar &player_character,
             break;
 
         case ACTION_ZOOM_IN:
+#if defined(CDDA_GODOT)
+            // VR: the host zooms its table; the 2D tile size is never seen.
+            godot_host::request_zoom( 1 );
+#else
             zoom_in();
             mark_main_ui_adaptor_resize();
+#endif
             break;
 
         case ACTION_ZOOM_OUT:
+#if defined(CDDA_GODOT)
+            godot_host::request_zoom( -1 );
+#else
             zoom_out();
             mark_main_ui_adaptor_resize();
+#endif
             break;
 
         case ACTION_ITEMACTION:

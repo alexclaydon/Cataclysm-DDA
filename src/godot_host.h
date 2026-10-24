@@ -234,6 +234,11 @@ bool mouse_away();
 void set_text_wanted( bool wanted );
 bool text_wanted();
 
+// The game's zoom actions, which in VR zoom the host's table instead of
+// the 2D tile size: steps in (+) or out (-) since the host last took them.
+void request_zoom( int steps );
+int take_zoom_request();
+
 // If the map has been drawn since `sequence`, move the newest snapshot into
 // `out`, update `sequence` and return true.
 bool take_map_snapshot( uint64_t &sequence, map_snapshot &out );

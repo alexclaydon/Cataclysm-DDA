@@ -46,6 +46,7 @@ std::array<std::atomic<int16_t>, godot_host::virtual_pad_axes> virtual_axes{};
 std::atomic<uint32_t> virtual_rumble{ 0 };  // low << 16 | high
 std::atomic<bool> virtual_rumble_new{ false };
 std::atomic<bool> text_is_wanted{ false };
+std::atomic<int> zoom_requested{ 0 };
 std::atomic<float> view_yaw_degrees{ 0.0f };
 
 // The open UIs as of the latest frame (publish_frame), and the host's mouse.
@@ -285,6 +286,16 @@ void godot_host::set_text_wanted( bool wanted )
 bool godot_host::text_wanted()
 {
     return text_is_wanted;
+}
+
+void godot_host::request_zoom( int steps )
+{
+    zoom_requested += steps;
+}
+
+int godot_host::take_zoom_request()
+{
+    return zoom_requested.exchange( 0 );
 }
 
 void godot_host::apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, int &y ) )

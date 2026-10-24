@@ -6309,13 +6309,21 @@ look_around_result game::look_around(
         } else if( action == "CONFIRM" && peeking ) {
             result.peek_action = PA_MOVE;
         } else if( action == "zoom_in" ) {
+#if defined(CDDA_GODOT)
+            godot_host::request_zoom( 1 );
+#else
             center.xy() = lp.xy();
             zoom_in();
             mark_main_ui_adaptor_resize();
+#endif
         } else if( action == "zoom_out" ) {
+#if defined(CDDA_GODOT)
+            godot_host::request_zoom( -1 );
+#else
             center.xy() = lp.xy();
             zoom_out();
             mark_main_ui_adaptor_resize();
+#endif
         }
     } while( action != "QUIT" && action != "CONFIRM" && action != "SELECT" && action != "TRAVEL_TO" &&
              action != "throw_blind" && action != "throw_blind_wielded" );
