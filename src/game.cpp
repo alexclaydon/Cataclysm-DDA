@@ -2468,6 +2468,13 @@ bool game::handle_mouseview( input_context &ctxt, std::string &action )
             }
             ui_manager::redraw();
         }
+#if defined(CDDA_GODOT)
+        if( godot_host::look_pending() ) {
+            // Out to handle_action, which opens look-around.
+            liveview.hide();
+            return false;
+        }
+#endif
     } while( action == "MOUSE_MOVE" ); // Freeze animation when moving the mouse
 
     if( action != "TIMEOUT" ) {

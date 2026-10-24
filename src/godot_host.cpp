@@ -313,6 +313,12 @@ void godot_host::request_look( int dx, int dy )
     push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
 }
 
+bool godot_host::look_pending()
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    return look_requested;
+}
+
 bool godot_host::take_look_request( int &dx, int &dy )
 {
     std::lock_guard<std::mutex> lock( look_mutex );

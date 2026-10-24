@@ -249,6 +249,10 @@ bool mouse_away();
 // thread takes it.
 void request_look( int dx, int dy );
 bool take_look_request( int &dx, int &dy );
+// Whether a request waits, without taking it: game::handle_mouseview stops
+// there, or the mouse view's loop (and get_player_input's, on timeouts)
+// would keep it waiting until a key came.
+bool look_pending();
 
 // Whether the game is waiting for typed text (a string-input or
 // string-editor context on top, or a focused ImGui text field), for the
