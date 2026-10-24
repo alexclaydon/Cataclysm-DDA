@@ -2490,6 +2490,12 @@ std::pair<tripoint_rel_ms, tripoint_rel_ms> game::mouse_edge_scrolling( input_co
         // Fast return when the option is disabled.
         return ret;
     }
+#if defined(CDDA_GODOT)
+    // The VR host's mouse is a laser: it crosses the frame's edges as the
+    // ray leaves a window, and the map or look cursor would run off after
+    // it (and keep going on timeouts). Only the sticks scroll.
+    return ret;
+#endif
     // Ensure the parameters are used even if the #if below is false
     ( void ) ctxt;
     ( void ) speed;

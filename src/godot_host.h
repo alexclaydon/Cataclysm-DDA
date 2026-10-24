@@ -229,7 +229,8 @@ void set_mouse( int x, int y, uint32_t buttons, int wheel );
 void set_mouse_tile( int dx, int dy, uint32_t buttons );
 // The host's pointer has left the map (the diorama's pointing ended): the
 // game hears a mouse move with no tile under it, so the mouse view closes.
-// Until the next move, mouse_away() (engine thread) is true.
+// Until the next tile move, mouse_away() (engine thread) is true; a move in
+// pixels (a ray on a window) leaves it true too.
 void set_mouse_away();
 bool mouse_away();
 
@@ -247,6 +248,11 @@ bool take_look_request( int &dx, int &dy );
 // host reads it any time.
 void set_text_wanted( bool wanted );
 bool text_wanted();
+// Whether a game is being played (main's do_turn loop), not the title
+// screen: the VR host hides the board and the HUD outside one, since the
+// last game's map and sidebar would otherwise stay up, stale.
+void set_in_game( bool playing );
+bool in_game();
 
 
 // If the map has been drawn since `sequence`, move the newest snapshot into

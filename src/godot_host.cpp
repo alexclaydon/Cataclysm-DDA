@@ -46,6 +46,7 @@ std::array<std::atomic<int16_t>, godot_host::virtual_pad_axes> virtual_axes{};
 std::atomic<uint32_t> virtual_rumble{ 0 };  // low << 16 | high
 std::atomic<bool> virtual_rumble_new{ false };
 std::atomic<bool> text_is_wanted{ false };
+std::atomic<bool> game_is_on{ false };
 // The snapshot radius levels the zoom steps through, and the current one.
 constexpr std::array<int, 5> radius_levels = { 15, 20, 30, 45, 60 };
 std::atomic<int> radius_level{ 2 };
@@ -339,6 +340,16 @@ bool godot_host::text_wanted()
     return text_is_wanted;
 }
 
+void godot_host::set_in_game( bool playing )
+{
+    game_is_on = playing;
+}
+
+bool godot_host::in_game()
+{
+    return game_is_on;
+}
+
 int godot_host::snapshot_radius()
 {
     return radius_levels[radius_level.load()];
@@ -392,7 +403,9 @@ void godot_host::apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, 
         !tile_to_pixels( command.x, command.y, command.x, command.y ) ) {
         return;
     }
-    mouse_is_away = false;
+    // Pixels are a window's (a ray on a floating menu): in play the flat
+    // map is never on show, so they don't point at a tile either.
+    mouse_is_away = command.kind != mouse_command::tile;
     const float x = static_cast<float>( command.x );
     const float y = static_cast<float>( command.y );
     SDL_WarpMouseInWindow( window, x, y );

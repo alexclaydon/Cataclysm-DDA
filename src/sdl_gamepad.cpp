@@ -97,6 +97,9 @@ static std::array<int, max_triggers> triggers_state = {0, 0};
 
 static int triggers_threshold = 16000;
 static int sticks_threshold = 16000;
+// A deflected stick stays deflected until it falls this far below the
+// threshold: a thumb resting near it otherwise re-presses.
+static int sticks_release_margin = 4000;
 static int error_margin = 2000;
 
 namespace
@@ -118,6 +121,9 @@ static constexpr int sticks_task_index   = max_buttons;
 static constexpr int triggers_task_index = max_buttons + max_sticks;
 
 static std::array<task_t, max_tasks> all_tasks;
+// The key each stick last sent (and repeats), or -1: a new direction that
+// sends the same key (N to NE in a list, both "up") is not a new press.
+static std::array<int, max_sticks> stick_sent = { -1, -1 };
 
 static int repeat_delay = 400;
 static int repeat_interval = 50;
@@ -697,11 +703,13 @@ static bool handle_axis_event( SDL_Event &event )
             double magnitude = std::sqrt( static_cast<double>( val.x ) * val.x +
                                           static_cast<double>( val.y ) * val.y );
 
-            direction dir = ( magnitude > sticks_threshold ) ? angle_to_direction( val,
-                            map_turn() ) : direction::NONE;
-
             task_t &stick_task = all_tasks[sticks_task_index + i];
             direction old_dir = ( i == 0 ) ? left_stick_dir : right_stick_dir;
+
+            const int threshold = old_dir == direction::NONE ? sticks_threshold :
+                                  sticks_threshold - sticks_release_margin;
+            direction dir = ( magnitude > threshold ) ? angle_to_direction( val,
+                            map_turn() ) : direction::NONE;
 
             if( dir != old_dir ) {
                 direction_changed = true;
@@ -746,11 +754,13 @@ static bool handle_axis_event( SDL_Event &event )
 
                 // Cancel any existing repeat tasks when entering radial mode
                 cancel_task( stick_task );
+                stick_sent[i] = -1;
             } else if( stick_consumed[i] ) {
                 // Spent on a wheel slot and not yet re-centred. Emitting octants
                 // here would walk the player (or reopen look on the right stick)
                 // just for sliding a thumb that never left the stick.
                 cancel_task( stick_task );
+                stick_sent[i] = -1;
             } else {
                 int joy_code = -1;
                 input_event_t itype = input_event_t::gamepad;
@@ -828,10 +838,12 @@ static bool handle_axis_event( SDL_Event &event )
 
                 if( dir == direction::NONE || joy_code == -1 ) {
                     cancel_task( stick_task );
-                } else if( dir != old_dir ) {
-                    // Only send input and schedule repeat if direction changed.
+                    stick_sent[i] = -1;
+                } else if( joy_code != stick_sent[i] ) {
+                    // Only send input and schedule repeat if the key changed.
                     send_input( joy_code, itype );
                     schedule_task( stick_task, now + repeat_delay, joy_code, 1, itype );
+                    stick_sent[i] = joy_code;
                 }
             }
         }

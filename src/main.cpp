@@ -881,9 +881,25 @@ int main( int argc, const char *argv[] )
 
         shared_ptr_fast<ui_adaptor> ui = g->create_or_get_main_ui_adaptor();
         get_event_bus().send<event_type::game_begin>( getVersionString() );
+#if defined(CDDA_GODOT)
+        godot_host::set_in_game( true );
+#endif
         while( !g->do_turn() ) {}
+#if defined(CDDA_GODOT)
+        godot_host::set_in_game( false );
+#endif
     }
 
+#if defined(CDDA_GODOT)
+    // Hosted: hand back to the host, which quits, rather than exit() from
+    // its thread under a running Godot. The same teardown otherwise.
+    deinitDebug();
+    g.reset();
+    catacurses::endwin();
+    imclient.reset();
+    return 0;
+#else
     exit_handler( -999 );
     return 0;
+#endif
 }
