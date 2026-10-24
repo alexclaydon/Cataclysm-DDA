@@ -179,10 +179,13 @@ static void update_state( const std::string &context, const std::string &step )
         // No full-screen background: the host floated it as a big black
         // window around the loading text.
         gLUI->bg = nullptr;
+        // And it hides the UIs below it (the title screen), which would
+        // otherwise go on floating behind it.
+        gLUI->ui = new ui_adaptor( ui_adaptor::disable_uis_below {} );
 #else
         gLUI->bg = new background_pane;
-#endif
         gLUI->ui = new ui_adaptor;
+#endif
         gLUI->ui->is_imgui = true;
         gLUI->ui->on_redraw( []( ui_adaptor & ) {
             redraw();
