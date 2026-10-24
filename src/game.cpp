@@ -6310,7 +6310,8 @@ look_around_result game::look_around(
             result.peek_action = PA_MOVE;
         } else if( action == "zoom_in" ) {
 #if defined(CDDA_GODOT)
-            godot_host::request_zoom( 1 );
+            godot_host::zoom_view( 1 );
+            mark_main_ui_adaptor_resize();
 #else
             center.xy() = lp.xy();
             zoom_in();
@@ -6318,7 +6319,8 @@ look_around_result game::look_around(
 #endif
         } else if( action == "zoom_out" ) {
 #if defined(CDDA_GODOT)
-            godot_host::request_zoom( -1 );
+            godot_host::zoom_view( -1 );
+            mark_main_ui_adaptor_resize();
 #else
             center.xy() = lp.xy();
             zoom_out();

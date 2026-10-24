@@ -685,7 +685,7 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     // patch of world (taller than wide). Beyond the window, drawing is
     // clipped away.
     if( godot_host::recording_map() && !is_isometric() ) {
-        const int r = godot_host::snapshot_radius;
+        const int r = godot_host::snapshot_radius();
         min_col = std::min( min_col, POSX - r );
         max_col = std::max( max_col, POSX + r + 1 );
         min_row = std::min( min_row, POSY - r );
@@ -1637,7 +1637,7 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     // avatar remembers of them (the 2D view never shows them), recorded by
     // the same layer functions in their memory mode, without drawing.
     if( godot_host::recording_map() ) {
-        const int r = godot_host::snapshot_radius;
+        const int r = godot_host::snapshot_radius();
         {
             const weather_manager &weather = get_weather();
             const weather_type &type = weather.weather_id.obj();

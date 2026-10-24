@@ -95,6 +95,9 @@ static void redraw_compact()
             gLUI->placed_extent = extent;
             gLUI->ui->position_absolute( topleft, extent );
         }
+        // On screen this pass, for the host (ui_adaptor::ui_rects): a raw
+        // ImGui window isn't a cataimgui::window, which marks this itself.
+        gLUI->ui->imgui_drawn_pass = ui_adaptor::redraw_pass();
     }
     ImGui::End();
 }

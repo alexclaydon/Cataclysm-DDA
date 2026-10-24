@@ -67,6 +67,7 @@ struct map_light {
 struct map_snapshot {
     int center[3];  // the view centre (tripoint_bub_ms)
     int player[3];  // the avatar (tripoint_bub_ms)
+    int radius;     // tiles around the avatar it covers (snapshot_radius)
     uint64_t tileset_generation;  // see take_tileset
     int storeys_usec;  // the engine's time recording the storeys below
     std::vector<map_sprite> sprites;
@@ -234,10 +235,6 @@ bool mouse_away();
 void set_text_wanted( bool wanted );
 bool text_wanted();
 
-// The game's zoom actions, which in VR zoom the host's table instead of
-// the 2D tile size: steps in (+) or out (-) since the host last took them.
-void request_zoom( int steps );
-int take_zoom_request();
 
 // If the map has been drawn since `sequence`, move the newest snapshot into
 // `out`, update `sequence` and return true.
@@ -262,9 +259,15 @@ void set_window_id( uint32_t id );
 void apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, int &y ) );
 
 // How far around the avatar the snapshot reaches, and how many storeys below
-// the avatar's it adds from map memory (plan 0004, Phase 2).
-constexpr int snapshot_radius = 30;
+// the avatar's it adds from map memory (plan 0004, Phase 2). The radius is
+// the VR player's zoom: the game's zoom actions step it (zoom_view), so
+// zooming out shows more of the surroundings on the same table, as the 2D
+// zoom shows more on the same screen. 60 is the loaded map's reach.
+int snapshot_radius();
 constexpr int snapshot_levels_below = 2;
+// Steps in (+, a smaller radius) or out (-) through the radius levels.
+// Engine thread (the zoom actions), which then redraws the map.
+void zoom_view( int steps );
 
 // Whether a map snapshot is being recorded (between begin and end).
 bool recording_map();

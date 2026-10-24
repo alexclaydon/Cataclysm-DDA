@@ -3230,8 +3230,10 @@ bool game::do_regular_action( action_id &act, avatar &player_character,
 
         case ACTION_ZOOM_IN:
 #if defined(CDDA_GODOT)
-            // VR: the host zooms its table; the 2D tile size is never seen.
-            godot_host::request_zoom( 1 );
+            // VR: the diorama shows more or less of the surroundings; the 2D
+            // tile size is never seen.
+            godot_host::zoom_view( 1 );
+            mark_main_ui_adaptor_resize();
 #else
             zoom_in();
             mark_main_ui_adaptor_resize();
@@ -3240,7 +3242,8 @@ bool game::do_regular_action( action_id &act, avatar &player_character,
 
         case ACTION_ZOOM_OUT:
 #if defined(CDDA_GODOT)
-            godot_host::request_zoom( -1 );
+            godot_host::zoom_view( -1 );
+            mark_main_ui_adaptor_resize();
 #else
             zoom_out();
             mark_main_ui_adaptor_resize();

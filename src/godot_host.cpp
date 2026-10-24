@@ -46,7 +46,9 @@ std::array<std::atomic<int16_t>, godot_host::virtual_pad_axes> virtual_axes{};
 std::atomic<uint32_t> virtual_rumble{ 0 };  // low << 16 | high
 std::atomic<bool> virtual_rumble_new{ false };
 std::atomic<bool> text_is_wanted{ false };
-std::atomic<int> zoom_requested{ 0 };
+// The snapshot radius levels the zoom steps through, and the current one.
+constexpr std::array<int, 5> radius_levels = { 15, 20, 30, 45, 60 };
+std::atomic<int> radius_level{ 2 };
 std::atomic<float> view_yaw_degrees{ 0.0f };
 
 // The open UIs as of the latest frame (publish_frame), and the host's mouse.
@@ -288,14 +290,14 @@ bool godot_host::text_wanted()
     return text_is_wanted;
 }
 
-void godot_host::request_zoom( int steps )
+int godot_host::snapshot_radius()
 {
-    zoom_requested += steps;
+    return radius_levels[radius_level.load()];
 }
 
-int godot_host::take_zoom_request()
+void godot_host::zoom_view( int steps )
 {
-    return zoom_requested.exchange( 0 );
+    radius_level = std::clamp( radius_level.load() - steps, 0, static_cast<int>( radius_levels.size() ) - 1 );
 }
 
 void godot_host::apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, int &y ) )
@@ -464,6 +466,7 @@ void godot_host::begin_map_snapshot( int center_x, int center_y, int center_z, i
     map_building.player[0] = player_x;
     map_building.player[1] = player_y;
     map_building.player[2] = player_z;
+    map_building.radius = snapshot_radius();
     map_building.sprites.clear();
     map_building.blits.clear();
     map_building.storeys_usec = 0;
