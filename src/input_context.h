@@ -69,6 +69,10 @@ class input_context
         // Whatever's on top is our current input context.
         static input_context_stack_impl input_context_stack;
 #endif
+        // The context inside handle_input (waiting for input) right now, or
+        // null: what an input pushed now will reach, which the stack top
+        // isn't always. The gamepad wheel labels its slots from it.
+        static input_context *polling;
         input_context() : category( "default" ), registered_any_input( false ),
             coordinate_input_received( false ), handling_coordinate_input( false ) {
 #if defined(__ANDROID__) || defined(TILES)

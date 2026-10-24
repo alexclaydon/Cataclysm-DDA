@@ -208,6 +208,11 @@ struct ui_window {
 void set_sidebar( int left, int right, int columns, int rows );
 void get_sidebar( int &left, int &right, int &columns, int &rows );
 
+// The gamepad's radial menu, drawn straight onto the frame rather than as
+// a UI: its panel in frame pixels (0 wide when not shown), published as one
+// more window on top of the stack. Engine thread, each present.
+void set_radial_window( int x, int y, int width, int height );
+
 // If the list has changed since `sequence`, copy it into `out`, update
 // `sequence` and return true.
 bool take_ui_windows( uint64_t &sequence, std::vector<ui_window> &out );

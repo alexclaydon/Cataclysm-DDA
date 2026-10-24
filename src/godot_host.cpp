@@ -55,6 +55,7 @@ std::atomic<float> view_yaw_degrees{ 0.0f };
 std::mutex ui_windows_mutex;
 std::vector<godot_host::ui_window> ui_windows;
 uint64_t ui_windows_sequence = 0;
+SDL_Rect radial_window{ 0, 0, 0, 0 };  // engine thread only
 // The host's mouse commands, in order, applied one per CheckMessages: the
 // game keeps only the last input event of each poll, and a press and its
 // release must each have their own (a held state lost quick clicks while
@@ -179,6 +180,11 @@ void godot_host::publish_frame( SDL_Renderer *renderer )
                                  r.is_shim, r.is_imgui, r.disabling_uis_below, r.visible
                                } );
         }
+        if( radial_window.w > 0 ) {
+            windows.push_back( { radial_window.x, radial_window.y, radial_window.w, radial_window.h,
+                                 false, false, false, true
+                               } );
+        }
         std::lock_guard<std::mutex> lock( ui_windows_mutex );
         const auto same = []( const ui_window & a, const ui_window & b ) {
             return a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height &&
@@ -241,6 +247,11 @@ bool godot_host::take_ui_windows( uint64_t &sequence, std::vector<ui_window> &ou
     out = ui_windows;
     sequence = ui_windows_sequence;
     return true;
+}
+
+void godot_host::set_radial_window( int x, int y, int width, int height )
+{
+    radial_window = { x, y, width, height };
 }
 
 void godot_host::set_sidebar( int left, int right, int columns, int rows )

@@ -195,6 +195,7 @@ void input_context_stack_impl::push( std::shared_ptr<input_context_handle> const
 #if defined(__ANDROID__) || defined(TILES)
 input_context_stack_impl input_context::input_context_stack;
 #endif
+input_context *input_context::polling = nullptr;
 
 #if defined(__ANDROID__)
 void input_context::register_manual_key( manual_key mk )
@@ -483,7 +484,10 @@ const std::string &input_context::handle_input( const int timeout )
     const std::string *result = &CATA_ERROR;
     while( true ) {
 
+        input_context *const was_polling = polling;
+        polling = this;
         next_action = inp_mngr.get_input_event( preferred_keyboard_mode );
+        polling = was_polling;
         if( next_action.type == input_event_t::timeout ) {
             result = &TIMEOUT;
             break;

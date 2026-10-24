@@ -4915,6 +4915,10 @@ void draw_virtual_joystick()
 
 static void draw_gamepad_radial_menu()
 {
+#if defined(CDDA_GODOT)
+    // No wheel this frame unless it draws below.
+    godot_host::set_radial_window( 0, 0, 0, 0 );
+#endif
     if( !gamepad::is_active() || !gamepad::is_alt_held() ) {
         return;
     }
@@ -4933,7 +4937,13 @@ static void draw_gamepad_radial_menu()
         return;
     }
 
-    input_context *ctxt = input_context::input_context_stack.back();
+    // The context waiting for input, which a slot's input will reach; the
+    // stack top can be another (in the inventory it was a "default" one, so
+    // every slot read "None").
+    input_context *ctxt = input_context::polling;
+    if( !ctxt ) {
+        ctxt = input_context::input_context_stack.back();
+    }
     if( !ctxt ) {
         return;
     }
@@ -4942,18 +4952,19 @@ static void draw_gamepad_radial_menu()
     int h;
     GetRendererOutputSize( renderer, &w, &h );
 
-    // Draw a semi-transparent black background over the whole screen
-    SetRenderDrawBlendMode( renderer, SDL_BLENDMODE_BLEND );
-    geometry->rect( renderer, { 0, 0, w, h }, { 0, 0, 0, 150 } );
-    SetRenderDrawBlendMode( renderer, SDL_BLENDMODE_NONE );
-
     const point center( w / 2, h / 2 );
+#if defined(CDDA_GODOT)
+    // A floating window, sized in front of the player rather than to fill
+    // a screen: compact, at the font's own size.
+    const float radius = h * 0.22f;
+    float text_scale = 1.0f;
+#else
     const float radius = h * 0.8f / 2.0f;
 
     // Scale font relative to window height.
     // Base scale 1.0 at 720p, for labels to be legible.
     float text_scale = static_cast<float>( h ) / 720.0f * 1.0f;
-    RenderSetScale( renderer, text_scale, text_scale );
+#endif
 
     static const std::vector<gamepad::direction> directions = {
         gamepad::direction::N, gamepad::direction::NE, gamepad::direction::E,
@@ -4961,8 +4972,8 @@ static void draw_gamepad_radial_menu()
         gamepad::direction::W, gamepad::direction::NW
     };
 
-    for( size_t i = 0; i < directions.size(); ++i ) {
-        gamepad::direction dir = directions[i];
+    std::vector<std::string> labels;
+    for( gamepad::direction dir : directions ) {
         int joy_code = gamepad::direction_to_radial_joy( dir, stick_idx );
         input_event event( joy_code, input_event_t::gamepad );
         const std::string &action = ctxt->input_to_action( event );
@@ -4976,6 +4987,38 @@ static void draw_gamepad_radial_menu()
                 label = "None";
             }
         }
+        labels.push_back( label );
+    }
+
+#if defined(CDDA_GODOT)
+    // The VR host floats only UI windows, so the wheel gets one of its own,
+    // on top of the stack: an opaque panel around the labels instead of the
+    // full-screen scrim (which would dim the windows floating beneath it).
+    {
+        int widest = 0;
+        for( const std::string &label : labels ) {
+            widest = std::max( widest, utf8_width( label ) );
+        }
+        const int pad = static_cast<int>( font->height * text_scale );
+        const int half_w = static_cast<int>( radius + font->width * widest * text_scale / 2 ) + pad;
+        const int half_h = static_cast<int>( radius + font->height * text_scale / 2 ) + pad;
+        const SDL_Rect box{ std::max( 0, center.x - half_w ), std::max( 0, center.y - half_h ),
+                            std::min( w, 2 * half_w ), std::min( h, 2 * half_h ) };
+        geometry->rect( renderer, box, { 12, 14, 18, 255 } );
+        godot_host::set_radial_window( box.x, box.y, box.w, box.h );
+    }
+#else
+    // Draw a semi-transparent black background over the whole screen
+    SetRenderDrawBlendMode( renderer, SDL_BLENDMODE_BLEND );
+    geometry->rect( renderer, { 0, 0, w, h }, { 0, 0, 0, 150 } );
+    SetRenderDrawBlendMode( renderer, SDL_BLENDMODE_NONE );
+#endif
+
+    RenderSetScale( renderer, text_scale, text_scale );
+
+    for( size_t i = 0; i < directions.size(); ++i ) {
+        gamepad::direction dir = directions[i];
+        const std::string &label = labels[i];
 
         // Angle in radians (0 is North, clockwise)
         float angle = i * ( 2.0f * M_PI / 8.0f );
