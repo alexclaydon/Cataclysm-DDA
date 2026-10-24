@@ -72,6 +72,16 @@ std::mutex mouse_mutex;
 std::deque<mouse_command> mouse_queue;
 uint32_t mouse_buttons_applied = 0;  // engine thread only
 bool mouse_is_away = false;  // engine thread only
+// A button change waits for a frame before the next command (or
+// BUTTON_FRAME_WAIT ms, if nothing redraws): ImGui reads buttons once per
+// frame, so a press and a release applied between two frames never
+// clicked its buttons (a Touch trigger's quick click on a yes/no prompt).
+// Engine thread only.
+constexpr uint64_t BUTTON_FRAME_WAIT = 150;
+uint64_t frames_published = 0;
+uint64_t button_changed_frame = 0;
+uint64_t button_changed_at = 0;
+bool button_changed = false;
 
 void push_mouse( const mouse_command &command )
 {
@@ -169,6 +179,7 @@ godot_host::tileset_info tileset_published;
 
 void godot_host::publish_frame( SDL_Renderer *renderer )
 {
+    ++frames_published;
     {
         // The open UIs, for the host's floating windows: kept with the
         // frame they belong to.
@@ -313,6 +324,13 @@ void godot_host::zoom_view( int steps )
 
 void godot_host::apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, int &y ) )
 {
+    if( button_changed ) {
+        if( frames_published == button_changed_frame &&
+            SDL_GetTicks() - button_changed_at < BUTTON_FRAME_WAIT ) {
+            return;
+        }
+        button_changed = false;
+    }
     mouse_command command;
     {
         std::lock_guard<std::mutex> lock( mouse_mutex );
@@ -362,6 +380,11 @@ void godot_host::apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, 
         event.button.x = x;
         event.button.y = y;
         SDL_PushEvent( &event );
+    }
+    if( command.buttons != mouse_buttons_applied ) {
+        button_changed = true;
+        button_changed_frame = frames_published;
+        button_changed_at = SDL_GetTicks();
     }
     mouse_buttons_applied = command.buttons;
     if( command.wheel != 0 ) {
