@@ -1,5 +1,8 @@
 #include "loading_ui.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include "cached_options.h"
 #include "input.h"
 #include "options.h"
@@ -47,14 +50,61 @@ struct ui_state {
     std::string tip;
     std::string context;
     std::string step;
+#if defined(CDDA_GODOT)
+    // The rectangle last given to the adaptor (redraw_compact).
+    point placed_topleft = point( -1, -1 );
+    point placed_extent;
+#endif
 };
 } // namespace
 
 static ui_state *gLUI = nullptr;
 
+#if defined(CDDA_GODOT)
+// VR: the host floats each UI as a window in the room, so the loading
+// screen is a short, wide window holding just the tip and the step, centred,
+// with no splash and no full-screen background behind it. Its adaptor
+// follows the window, so the host floats exactly that.
+static void redraw_compact()
+{
+    const ImVec2 viewport = ImGui::GetMainViewport()->Size;
+    const float width = std::floor( viewport.x * 0.8f );
+    ImGui::SetNextWindowSizeConstraints( { width, 0.0f }, { width, viewport.y } );
+    ImGui::SetNextWindowPos( viewport * 0.5f, ImGuiCond_Always, { 0.5f, 0.5f } );
+    if( ImGui::Begin( "Loading…", nullptr,
+                      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings |
+                      ImGuiWindowFlags_AlwaysAutoResize ) ) {
+        const float inner = ImGui::GetContentRegionAvail().x;
+        const float tip_width = cataimgui::get_string_width( gLUI->tip );
+        ImGui::SetCursorPosX( ImGui::GetCursorPosX() + std::max( ( inner - tip_width ) / 2.f, 0.0f ) );
+        cataimgui::draw_colored_text( colorize( gLUI->tip, c_cyan ), inner );
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        const std::string loading_msg = string_format( "%s %s", gLUI->context, gLUI->step );
+        ImGui::SetCursorPosX( ImGui::GetCursorPosX() + std::max( ( inner - cataimgui::get_string_width(
+                                  "Loading files: " ) * 2.f ) / 2.f, 0.0f ) );
+        cataimgui::draw_colored_text( loading_msg, inner );
+        const ImVec2 pos = ImGui::GetWindowPos();
+        const ImVec2 size = ImGui::GetWindowSize();
+        const point topleft( static_cast<int>( pos.x ), static_cast<int>( pos.y ) );
+        const point extent( static_cast<int>( size.x ), static_cast<int>( size.y ) );
+        if( topleft != gLUI->placed_topleft || extent != gLUI->placed_extent ) {
+            gLUI->placed_topleft = topleft;
+            gLUI->placed_extent = extent;
+            gLUI->ui->position_absolute( topleft, extent );
+        }
+    }
+    ImGui::End();
+}
+#endif
+
 static void redraw()
 {
-#ifdef TILES
+#if defined(CDDA_GODOT)
+    redraw_compact();
+#elif defined(TILES)
     ImGui::SetNextWindowSize( ImGui::GetMainViewport()->Size );
     ImGui::SetNextWindowPos( {0, 0}, ImGuiCond_Always );
     ImGui::PushStyleVar( ImGuiStyleVar_WindowBorderSize, 0.0f );
@@ -125,7 +175,13 @@ static void update_state( const std::string &context, const std::string &step )
 {
     if( gLUI == nullptr ) {
         gLUI = new struct ui_state;
+#if defined(CDDA_GODOT)
+        // No full-screen background: the host floated it as a big black
+        // window around the loading text.
+        gLUI->bg = nullptr;
+#else
         gLUI->bg = new background_pane;
+#endif
         gLUI->ui = new ui_adaptor;
         gLUI->ui->is_imgui = true;
         gLUI->ui->on_redraw( []( ui_adaptor & ) {
@@ -162,6 +218,7 @@ static void update_state( const std::string &context, const std::string &step )
 
         gLUI->text_height = gLUI->hint_height + gLUI->loading_msg_height;
 
+#if !defined(CDDA_GODOT)
         // get image
         std::vector<cata_path> imgs;
         std::vector<mod_id> &active_mod_list = world_generator->active_world->active_mod_order;
@@ -217,6 +274,7 @@ static void update_state( const std::string &context, const std::string &step )
             gLUI->splash = CreateTextureFromSurface( get_sdl_renderer(), surf );
         }
         gLUI->window_size = gLUI->splash_size + ImVec2{ 0.0f, 2.0f * ImGui::GetTextLineHeightWithSpacing() };
+#endif // !CDDA_GODOT
 #else
         std::string splash = PATH_INFO::title( get_holiday_from_time() );
         if( get_option<bool>( "ENABLE_ASCII_TITLE" ) ) {
