@@ -3298,6 +3298,20 @@ bool game::handle_action()
         // No auto-move, ask player for input
         ctxt = get_player_input( action );
     }
+#if defined(CDDA_GODOT)
+    // VR: the player pointed at a tile and asked to look at it.
+    {
+        int dx = 0;
+        int dy = 0;
+        if( godot_host::take_look_request( dx, dy ) ) {
+            tripoint_bub_ms center = player_character.pos_bub() + player_character.view_offset;
+            const tripoint_bub_ms start = player_character.pos_bub() + tripoint_rel_ms( dx, dy, 0 );
+            look_around( /*show_window=*/true, center, start, false, false, false, false,
+                         tripoint_bub_ms::zero, true, false );
+            return false;
+        }
+    }
+#endif
 
     // Remove asynchronous animations if any action taken before the input timeout
     // Otherwise repeated input can cause animations to accumulate as the timeout is never reached

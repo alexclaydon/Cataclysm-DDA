@@ -61,13 +61,17 @@ SDL_Rect radial_window{ 0, 0, 0, 0 };  // engine thread only
 // release must each have their own (a held state lost quick clicks while
 // the engine was busy).
 struct mouse_command {
-    enum kind_t { pixels, tile, away } kind;
+    enum kind_t { pixels, tile, away, nudge } kind;
     int x;
     int y;
     uint32_t buttons;
     int wheel;
 };
 std::atomic<uint64_t> sidebar_cells{ 0 };  // set_sidebar, packed in 16 bits each
+std::mutex look_mutex;
+bool look_requested = false;  // request_look's, with its tile
+int look_dx = 0;
+int look_dy = 0;
 std::mutex mouse_mutex;
 std::deque<mouse_command> mouse_queue;
 uint32_t mouse_buttons_applied = 0;  // engine thread only
@@ -297,6 +301,29 @@ void godot_host::set_mouse_away()
     push_mouse( { mouse_command::away, 0, 0, 0, 0 } );
 }
 
+void godot_host::request_look( int dx, int dy )
+{
+    {
+        std::lock_guard<std::mutex> lock( look_mutex );
+        look_requested = true;
+        look_dx = dx;
+        look_dy = dy;
+    }
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_look_request( int &dx, int &dy )
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    if( !look_requested ) {
+        return false;
+    }
+    look_requested = false;
+    dx = look_dx;
+    dy = look_dy;
+    return true;
+}
+
 bool godot_host::mouse_away()
 {
     return mouse_is_away;
@@ -344,8 +371,9 @@ void godot_host::apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, 
     if( window == nullptr ) {
         return;
     }
-    if( command.kind == mouse_command::away ) {
-        // A move where the mouse already is, for handle_mouseview to see.
+    if( command.kind == mouse_command::away || command.kind == mouse_command::nudge ) {
+        // A move where the mouse already is, for handle_mouseview to see
+        // (away), or to wake the play loop for a look request (nudge).
         float x = 0.0f;
         float y = 0.0f;
         SDL_GetMouseState( &x, &y );
@@ -355,7 +383,9 @@ void godot_host::apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, 
         event.motion.x = x;
         event.motion.y = y;
         SDL_PushEvent( &event );
-        mouse_is_away = true;
+        if( command.kind == mouse_command::away ) {
+            mouse_is_away = true;
+        }
         return;
     }
     if( command.kind == mouse_command::tile &&

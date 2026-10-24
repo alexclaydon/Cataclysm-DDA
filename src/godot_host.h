@@ -233,6 +233,14 @@ void set_mouse_tile( int dx, int dy, uint32_t buttons );
 void set_mouse_away();
 bool mouse_away();
 
+// The VR player pointed at a map tile and asked to look at it (`dx`, `dy`
+// tiles from the avatar): game::handle_action opens look-around with its
+// cursor there, as if the look action had been taken and the cursor moved.
+// Host thread asks (waking the play loop with a mouse move); the engine
+// thread takes it.
+void request_look( int dx, int dy );
+bool take_look_request( int &dx, int &dy );
+
 // Whether the game is waiting for typed text (a string-input or
 // string-editor context on top, or a focused ImGui text field), for the
 // host's virtual keyboard. The engine thread sets it each event pump; the
