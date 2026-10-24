@@ -552,6 +552,7 @@ void godot_host::begin_map_snapshot( int center_x, int center_y, int center_z, i
     map_building.lights_y = 0;
     map_building.lights_size = 0;
     map_building.lights.clear();
+    map_building.creatures.clear();
     map_building.wind_from = 0;
     map_building.wind_mph = 0;
     map_building.precip = 0;
@@ -635,6 +636,12 @@ void godot_host::record_map_sky( float sun_from, float sun_altitude, float moon_
     map_building.moon_altitude = moon_altitude;
     map_building.moon_phase = moon_phase;
     map_building.light_modifier = light_modifier;
+}
+
+std::vector<godot_host::map_creature> &godot_host::record_map_creatures()
+{
+    map_building.creatures.clear();
+    return map_building.creatures;
 }
 
 godot_host::sprite_lookup_scope::sprite_lookup_scope()

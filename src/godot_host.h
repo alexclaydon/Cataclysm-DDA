@@ -64,6 +64,13 @@ struct map_light {
     bool outside;   // open to the sky (map::is_outside), for rain and snow
 };
 
+// A creature the avatar sees, for the diorama's coloured bases (a ring
+// under each, by attitude, readable when the cards are too small to).
+struct map_creature {
+    int x, y, z;    // tripoint_bub_ms
+    int attitude;   // 0 the avatar, 1 hostile, 2 neutral, 3 friendly
+};
+
 struct map_snapshot {
     int center[3];  // the view centre (tripoint_bub_ms)
     int player[3];  // the avatar (tripoint_bub_ms)
@@ -77,6 +84,7 @@ struct map_snapshot {
     float natural_light;
     int lights_x, lights_y, lights_size;
     std::vector<map_light> lights;
+    std::vector<map_creature> creatures;
     // The weather, for the diorama's effects: where the wind blows from
     // (degrees clockwise from north, as the sidebar's arrow), its speed in
     // mph (before local shelter), and precipitation (precip_class: 0 none
@@ -309,6 +317,8 @@ std::vector<map_light> &record_map_lights( float natural_light, int x, int y, in
 void record_map_weather( int wind_from, int wind_mph, int precip, bool rains );
 void record_map_sky( float sun_from, float sun_altitude, float moon_from, float moon_altitude,
                      int moon_phase, int light_modifier );
+// The creatures list for the snapshot being recorded, cleared, to fill.
+std::vector<map_creature> &record_map_creatures();
 
 // Around the map view's draw: record sprite lookups between begin and end,
 // then publish them. A draw that recorded nothing (aborted, or nothing

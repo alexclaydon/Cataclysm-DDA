@@ -1658,6 +1658,35 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
                                         phase, type.light_modifier );
         }
         {
+            // Everyone the avatar sees within the snapshot, by attitude
+            // towards it, for the diorama's bases.
+            avatar &you = get_avatar();
+            const tripoint_bub_ms at = you.pos_bub();
+            std::vector<godot_host::map_creature> &creatures = godot_host::record_map_creatures();
+            for( Creature &c : g->all_creatures() ) {
+                const tripoint_bub_ms p = c.pos_bub();
+                if( std::abs( p.x() - at.x() ) > r || std::abs( p.y() - at.y() ) > r ||
+                    ( !c.is_avatar() && !you.sees( here, c ) ) ) {
+                    continue;
+                }
+                int attitude = 0;
+                if( !c.is_avatar() ) {
+                    switch( c.attitude_to( you ) ) {
+                        case Creature::Attitude::HOSTILE:
+                            attitude = 1;
+                            break;
+                        case Creature::Attitude::FRIENDLY:
+                            attitude = 3;
+                            break;
+                        default:
+                            attitude = 2;
+                            break;
+                    }
+                }
+                creatures.push_back( { p.x(), p.y(), p.z(), attitude } );
+            }
+        }
+        {
             // The light on the avatar's storey, for lighting the diorama.
             const level_cache &cache = here.access_cache( you_pos.z() );
             const int size = 2 * r + 1;
