@@ -5246,6 +5246,18 @@ static void CheckMessages()
         y = px.y;
         return true;
     } );
+    // The host shows its virtual keyboard while the game wants typed text,
+    // judged as the Android soft keyboard is (is_string_input, plus a
+    // focused ImGui text field).
+    {
+        input_context *top = input_context::input_context_stack.back();
+        bool wanted = cataimgui::client::want_text_input();
+        if( top != nullptr ) {
+            const std::string &category = top->input_category();
+            wanted = wanted || category == "STRING_INPUT" || category == "STRING_EDITOR";
+        }
+        godot_host::set_text_wanted( wanted );
+    }
 #endif
 
 #if defined(__ANDROID__)

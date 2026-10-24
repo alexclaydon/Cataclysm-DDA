@@ -227,6 +227,13 @@ void set_mouse_tile( int dx, int dy, uint32_t buttons );
 void set_mouse_away();
 bool mouse_away();
 
+// Whether the game is waiting for typed text (a string-input or
+// string-editor context on top, or a focused ImGui text field), for the
+// host's virtual keyboard. The engine thread sets it each event pump; the
+// host reads it any time.
+void set_text_wanted( bool wanted );
+bool text_wanted();
+
 // If the map has been drawn since `sequence`, move the newest snapshot into
 // `out`, update `sequence` and return true.
 bool take_map_snapshot( uint64_t &sequence, map_snapshot &out );

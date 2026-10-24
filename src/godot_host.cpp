@@ -45,6 +45,7 @@ std::atomic<uint32_t> virtual_buttons{ 0 };
 std::array<std::atomic<int16_t>, godot_host::virtual_pad_axes> virtual_axes{};
 std::atomic<uint32_t> virtual_rumble{ 0 };  // low << 16 | high
 std::atomic<bool> virtual_rumble_new{ false };
+std::atomic<bool> text_is_wanted{ false };
 std::atomic<float> view_yaw_degrees{ 0.0f };
 
 // The open UIs as of the latest frame (publish_frame), and the host's mouse.
@@ -274,6 +275,16 @@ void godot_host::set_mouse_away()
 bool godot_host::mouse_away()
 {
     return mouse_is_away;
+}
+
+void godot_host::set_text_wanted( bool wanted )
+{
+    text_is_wanted = wanted;
+}
+
+bool godot_host::text_wanted()
+{
+    return text_is_wanted;
 }
 
 void godot_host::apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, int &y ) )
