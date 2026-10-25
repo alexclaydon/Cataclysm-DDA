@@ -300,8 +300,16 @@ void quit()
     }
 }
 
+// The unit tests (tests/sdl_gamepad_test.cpp) drive the module without a
+// device: in test mode axis reads come from here instead.
+static bool test_mode = false;
+static std::array<Sint16, 8> test_axes = {};
+
 static Sint16 get_controller_axis( int axis )
 {
+    if( test_mode ) {
+        return axis >= 0 && axis < static_cast<int>( test_axes.size() ) ? test_axes[axis] : 0;
+    }
 #if SDL_MAJOR_VERSION >= 3
     return SDL_GetGamepadAxis( controller, static_cast<SDL_GamepadAxis>( axis ) );
 #else
@@ -1192,6 +1200,70 @@ bool is_gamepad_event( const SDL_Event &event )
         default:
             return false;
     }
+}
+
+void test_begin()
+{
+    test_mode = true;
+    test_axes.fill( 0 );
+    triggers_state = { 0, 0 };
+    left_stick_dir = direction::NONE;
+    right_stick_dir = direction::NONE;
+    radial_left_last_dir = direction::NONE;
+    radial_right_last_dir = direction::NONE;
+    radial_left_open = false;
+    radial_right_open = false;
+    alt_modifier_held = false;
+    alt2_modifier_held = false;
+    stick_consumed = { { false, false } };
+    stick_sent = { -1, -1 };
+    for( task_t &task : all_tasks ) {
+        task.counter = 0;
+    }
+}
+
+void test_end()
+{
+    test_begin();
+    test_mode = false;
+}
+
+void test_axis( pad_axis which, int value )
+{
+    static const int axes[] = { CATA_AXIS_LEFTX, CATA_AXIS_LEFTY, CATA_AXIS_RIGHTX, CATA_AXIS_RIGHTY,
+                                CATA_AXIS_TRIGGERLEFT, CATA_AXIS_TRIGGERRIGHT
+                              };
+    const int axis = axes[static_cast<int>( which )];
+    test_axes[axis] = static_cast<Sint16>( value );
+    SDL_Event event{};
+    event.type = CATA_CONTROLLERAXISMOTION;
+#if SDL_MAJOR_VERSION >= 3
+    event.gaxis.axis = static_cast<Uint8>( axis );
+    event.gaxis.value = static_cast<Sint16>( value );
+#else
+    event.caxis.axis = static_cast<Uint8>( axis );
+    event.caxis.value = static_cast<Sint16>( value );
+#endif
+    handle_event( event );
+}
+
+void test_button( pad_button which, bool down )
+{
+    static const int buttons[] = { CATA_BUTTON_A, CATA_BUTTON_B, CATA_BUTTON_X, CATA_BUTTON_Y,
+                                   CATA_BUTTON_LEFTSHOULDER, CATA_BUTTON_RIGHTSHOULDER, CATA_BUTTON_LEFTSTICK,
+                                   CATA_BUTTON_RIGHTSTICK, CATA_BUTTON_START, CATA_BUTTON_BACK, CATA_BUTTON_DPAD_UP,
+                                   CATA_BUTTON_DPAD_DOWN, CATA_BUTTON_DPAD_LEFT, CATA_BUTTON_DPAD_RIGHT
+                                 };
+    SDL_Event event{};
+    event.type = down ? CATA_CONTROLLERBUTTONDOWN : CATA_CONTROLLERBUTTONUP;
+#if SDL_MAJOR_VERSION >= 3
+    event.gbutton.button = static_cast<Uint8>( buttons[static_cast<int>( which )] );
+    event.gbutton.down = down;
+#else
+    event.cbutton.button = static_cast<Uint8>( buttons[static_cast<int>( which )] );
+    event.cbutton.state = down ? SDL_PRESSED : SDL_RELEASED;
+#endif
+    handle_event( event );
 }
 
 bool handle_event( SDL_Event &event )
