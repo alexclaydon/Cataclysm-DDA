@@ -161,6 +161,10 @@ struct map_object {
     uint32_t flags;
     int movecost;
     int coverage;  // percent
+    // A field type (fd_*): only MOF_FLAT is set, for liquids and solids
+    // (blood, gibs, rubble), which lie on the ground; gases and plasma
+    // (smoke, fire) stand.
+    bool field = false;
 };
 
 struct map_objects_info {

@@ -636,6 +636,10 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
             const furn_t &f = furn_id( static_cast<int>( i ) ).obj();
             objects.objects.push_back( { f.id.str(), true, props( f, true ), f.movecost, f.coverage } );
         }
+        for( const field_type &ft : field_types::get_all() ) {
+            const bool flat = ft.phase == phase_id::LIQUID || ft.phase == phase_id::SOLID;
+            objects.objects.push_back( { ft.id.str(), false, flat ? godot_host::MOF_FLAT : 0u, 0, 0, true } );
+        }
         godot_host::publish_map_objects( std::move( objects ) );
     }
 #endif
