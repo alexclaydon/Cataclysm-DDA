@@ -552,6 +552,7 @@ void godot_host::begin_map_snapshot( int center_x, int center_y, int center_z, i
     map_building.radius = snapshot_radius();
     map_building.sprites.clear();
     map_building.blits.clear();
+    map_building.anim_frames.clear();
     map_building.storeys_usec = 0;
     map_building.natural_light = 0.0f;
     map_building.lights_x = 0;
@@ -682,6 +683,20 @@ void godot_host::record_map_blit( int index, int angle, bool flip_h, bool flip_v
     map_building.blits.push_back( { static_cast<int>( map_building.sprites.size() ) - 1, index,
                                     angle, flip_h, flip_v, offset_x, offset_y, width, height, pixelscale,
                                     opaque_x, opaque_y, opaque_w, opaque_h } );
+}
+
+void godot_host::record_map_blit_animation( const std::vector<map_anim_frame> &frames, int base,
+        int total )
+{
+    if( !map_recording || lookup_depth == 0 || map_building.blits.empty() || frames.empty() ) {
+        return;
+    }
+    map_blit &b = map_building.blits.back();
+    b.anim_first = static_cast<int>( map_building.anim_frames.size() );
+    b.anim_count = static_cast<int>( frames.size() );
+    b.anim_base = base;
+    b.anim_total = total;
+    map_building.anim_frames.insert( map_building.anim_frames.end(), frames.begin(), frames.end() );
 }
 
 bool godot_host::tileset_changed( const void *key )

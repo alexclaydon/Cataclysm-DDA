@@ -450,9 +450,14 @@ input_context game::get_player_input( std::string &action )
             }
 
             // Animated tiles need periodic redraws to cycle frames
+#if !defined(CDDA_GODOT)
+            // (Not hosted: the VR host runs the animations itself from the
+            // frames each snapshot carries, and the 2D map isn't on show,
+            // so these redraws would only rebuild the diorama.)
             if( tilecontext->has_animated_tiles() ) {
                 invalidate_main_ui_adaptor();
             }
+#endif
 #endif
 
             if( g->has_blink_curses() && current_turn.blink_timeout() ) {

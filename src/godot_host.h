@@ -38,6 +38,13 @@ struct map_sprite {
 // One sprite image the engine blitted for a map_sprite, after looks_like,
 // fallbacks, multitile subtiles, weighted variants and animation frames are
 // resolved (plan 0004). A lookup can blit several: background first.
+// One frame of an animated sprite: its global sprite index, and how many
+// 17 ms steps it shows (its weight in the tileset).
+struct map_anim_frame {
+    int index;
+    int weight;
+};
+
 struct map_blit {
     int sprite;     // index into map_snapshot::sprites
     int index;      // global sprite index; see tileset_sheet
@@ -53,6 +60,15 @@ struct map_blit {
     int opaque_y;   // before rotation and flips (all 0 if fully transparent)
     int opaque_w;
     int opaque_h;
+    // An animated sprite (anim_count > 0): its frames are
+    // map_snapshot::anim_frames[anim_first, anim_first + anim_count). The
+    // frame showing at steady_clock time t (ms) is the one at
+    // (anim_base + t / 17) % anim_total along their weights, as cata_tiles
+    // picks it, so the host can run the animation on between snapshots.
+    int anim_first = 0;
+    int anim_count = 0;
+    int anim_base = 0;
+    int anim_total = 0;
 };
 
 // The light on one tile of the avatar's storey, from the engine's light map
@@ -79,6 +95,7 @@ struct map_snapshot {
     int storeys_usec;  // the engine's time recording the storeys below
     std::vector<map_sprite> sprites;
     std::vector<map_blit> blits;
+    std::vector<map_anim_frame> anim_frames;
     // The avatar's storey's light: lights_size x lights_size tiles,
     // row-major, from (lights_x, lights_y); empty if not recorded.
     float natural_light;
@@ -350,6 +367,8 @@ void record_map_sprite( const std::string &id, const std::string &variant, int c
 void record_map_blit( int index, int angle, bool flip_h, bool flip_v, int offset_x,
                       int offset_y, int width, int height, float pixelscale, int opaque_x, int opaque_y,
                       int opaque_w, int opaque_h );
+// The animation of the blit just recorded (see map_blit::anim_*).
+void record_map_blit_animation( const std::vector<map_anim_frame> &frames, int base, int total );
 // Called at each map draw with the tileset in use; `key` identifies it, so
 // the sheets are only copied when it changes.
 bool tileset_changed( const void *key );
