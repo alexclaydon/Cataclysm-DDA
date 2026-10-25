@@ -3310,6 +3310,18 @@ bool game::handle_action()
     {
         int dx = 0;
         int dy = 0;
+        int hour = 0;
+        if( godot_host::take_time_request( hour ) ) {
+            // On to the next HH:00 (never back: the world has moved on).
+            const time_point now = calendar::turn;
+            time_point target = now - time_past_midnight( now ) + time_duration::from_hours( hour % 24 );
+            if( target <= now ) {
+                target += 1_days;
+            }
+            calendar::turn = target;
+            add_msg( m_info, "VR time: %s.", to_string_time_of_day( target ) );
+            return false;
+        }
         std::string goto_type;
         if( godot_host::take_goto_request( goto_type ) ) {
             const tripoint_abs_omt dest = overmap_buffer.find_closest( player_character.pos_abs_omt(),

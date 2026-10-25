@@ -271,6 +271,10 @@ bool take_look_request( int &dx, int &dy );
 // debug menu's teleport does; handled beside the look request.
 void request_goto( const std::string &type );
 bool take_goto_request( std::string &type );
+// Another (make vr-mouse "time HH"): move the clock on to the next HH:00,
+// as the debug menu's Change time does, for night scenes.
+void request_time( int hour );
+bool take_time_request( int &hour );
 // Whether a look or goto request waits, without taking it:
 // game::handle_mouseview stops there, or the mouse view's loop (and
 // get_player_input's, on timeouts) would keep it waiting until a key came.

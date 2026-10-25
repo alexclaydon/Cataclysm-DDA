@@ -72,6 +72,7 @@ std::atomic<uint64_t> sidebar_cells{ 0 };  // set_sidebar, packed in 16 bits eac
 std::mutex look_mutex;
 bool look_requested = false;  // request_look's, with its tile
 std::string goto_type;  // request_goto's, empty for none (under look_mutex)
+int time_hour = -1;     // request_time's, -1 for none (under look_mutex)
 int look_dx = 0;
 int look_dy = 0;
 std::mutex mouse_mutex;
@@ -317,7 +318,7 @@ void godot_host::request_look( int dx, int dy )
 bool godot_host::look_pending()
 {
     std::lock_guard<std::mutex> lock( look_mutex );
-    return look_requested || !goto_type.empty();
+    return look_requested || !goto_type.empty() || time_hour >= 0;
 }
 
 void godot_host::request_goto( const std::string &type )
@@ -327,6 +328,26 @@ void godot_host::request_goto( const std::string &type )
         goto_type = type;
     }
     push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+void godot_host::request_time( int hour )
+{
+    {
+        std::lock_guard<std::mutex> lock( look_mutex );
+        time_hour = hour;
+    }
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_time_request( int &hour )
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    if( time_hour < 0 ) {
+        return false;
+    }
+    hour = time_hour;
+    time_hour = -1;
+    return true;
 }
 
 bool godot_host::take_goto_request( std::string &type )
