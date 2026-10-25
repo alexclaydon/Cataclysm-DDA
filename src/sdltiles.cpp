@@ -3689,8 +3689,9 @@ void cata_cursesport::curses_drawwindow( const catacurses::window &w )
 #if defined(CDDA_GODOT)
         {
             const tripoint_bub_ms you = get_avatar().pos_bub();
+            const tripoint_abs_ms you_abs = get_avatar().pos_abs();
             godot_host::begin_map_snapshot( g->ter_view_p.x(), g->ter_view_p.y(), g->ter_view_p.z(),
-                                            you.x(), you.y(), you.z() );
+                                            you.x(), you.y(), you.z(), you_abs.x(), you_abs.y() );
         }
 #endif
         // game::w_terrain can be drawn by the tilecontext.

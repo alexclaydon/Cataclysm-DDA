@@ -90,6 +90,8 @@ struct map_creature {
 struct map_snapshot {
     int center[3];  // the view centre (tripoint_bub_ms)
     int player[3];  // the avatar (tripoint_bub_ms)
+    int player_abs[3];  // the avatar (tripoint_abs_ms): the map's place in the world,
+                        // for what must not change as the map shifts (a tree's variant)
     int radius;     // tiles around the avatar it covers (snapshot_radius)
     uint64_t tileset_generation;  // see take_tileset
     int storeys_usec;  // the engine's time recording the storeys below
@@ -355,7 +357,7 @@ std::vector<map_creature> &record_map_creatures();
 // then publish them. A draw that recorded nothing (aborted, or nothing
 // visible) publishes nothing.
 void begin_map_snapshot( int center_x, int center_y, int center_z, int player_x, int player_y,
-                         int player_z );
+                         int player_z, int player_abs_x, int player_abs_y );
 void end_map_snapshot();
 
 // Held for the duration of each cata_tiles sprite lookup. Lookups recurse

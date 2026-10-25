@@ -583,7 +583,7 @@ void godot_host::set_window_id( uint32_t id )
 }
 
 void godot_host::begin_map_snapshot( int center_x, int center_y, int center_z, int player_x,
-                                     int player_y, int player_z )
+                                     int player_y, int player_z, int player_abs_x, int player_abs_y )
 {
     map_building.center[0] = center_x;
     map_building.center[1] = center_y;
@@ -591,6 +591,9 @@ void godot_host::begin_map_snapshot( int center_x, int center_y, int center_z, i
     map_building.player[0] = player_x;
     map_building.player[1] = player_y;
     map_building.player[2] = player_z;
+    map_building.player_abs[0] = player_abs_x;
+    map_building.player_abs[1] = player_abs_y;
+    map_building.player_abs[2] = player_z;
     map_building.radius = snapshot_radius();
     map_building.sprites.clear();
     map_building.blits.clear();
