@@ -257,6 +257,12 @@ void init()
 
     int num_joysticks = 0;
     SDL_JoystickID *joysticks = SDL_GetJoysticks( &num_joysticks );
+    DebugLog( D_INFO, DC_ALL ) << "Gamepad init: " << num_joysticks << " joystick(s)";
+    for( int i = 0; i < num_joysticks; i++ ) {
+        const char *jname = SDL_GetJoystickNameForID( joysticks[i] );
+        DebugLog( D_INFO, DC_ALL ) << "Gamepad init: " << ( jname ? jname : "?" ) << " (id " << joysticks[i] <<
+                                   ( SDL_IsGamepad( joysticks[i] ) ? ", a gamepad)" : ", not a gamepad)" );
+    }
     if( joysticks && num_joysticks > 0 ) {
         controller = SDL_OpenGamepad( joysticks[0] );
         if( controller ) {
@@ -1032,6 +1038,8 @@ static void handle_device_event( SDL_Event &event )
         cata_controller_t *opened = SDL_OpenGamepad( event.gdevice.which );
         if( opened ) {
             SDL_JoystickID id = SDL_GetGamepadID( opened );
+            const char *name = SDL_GetGamepadName( opened );
+            DebugLog( D_INFO, DC_ALL ) << "Gamepad added: " << ( name ? name : "?" ) << " (id " << id << ")";
 #else
         cata_controller_t *opened = SDL_GameControllerOpen( event.cdevice.which );
         if( opened ) {
