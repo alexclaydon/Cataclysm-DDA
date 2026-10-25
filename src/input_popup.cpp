@@ -1,9 +1,11 @@
 #include "input_popup.h"
 
+#include <algorithm>
 #include <cstddef>
 
 #include "coordinates.h"
 #include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
 #include "imgui/imgui_stdlib.h"
 #include "input_enums.h"
 #include "ret_val.h"
@@ -13,6 +15,9 @@
 #include "uilist.h"
 #include "ui_manager.h"
 #include "uistate.h"
+#if defined(TILES)
+#include "sdl_gamepad.h"
+#endif
 
 input_popup::input_popup( int width, const std::string &title, const point &pos,
                           ImGuiWindowFlags flags ) :
@@ -394,7 +399,19 @@ number_input_popup<T>::number_input_popup( int width, T old_value, const std::st
     value( old_value ),
     old_value( old_value )
 {
-    // potentially register context keys
+#if defined(TILES)
+    // The d-pad spinner reads the raw pad events, which no action carries.
+    ctxt.register_action( "ANY_INPUT" );
+    pad_hint = gamepad::last_input_was_pad();
+#endif
+}
+
+// The hint under a number field opened from the pad.
+static void draw_spinner_hint( bool show )
+{
+    if( show ) {
+        cataimgui::draw_colored_text( _( "D-pad up/down: +1/-1.  LT and d-pad: +10/-10." ), c_light_gray );
+    }
 }
 
 template<>
@@ -402,8 +419,15 @@ void number_input_popup<int>::draw_input_control()
 {
     // todo: maybe set width of input field, default is fairly long
     // step size default values are imgui defaults
+    if( spun ) {
+        // An active field keeps its own text: let go of it, and the focus
+        // request (set_focus) takes it back with the new value.
+        ImGui::ClearActiveID();
+        spun = false;
+    }
     ImGui::InputInt( "##number_input", &value, step_size.value_or( 1 ),
                      fast_step_size.value_or( 100 ) );
+    draw_spinner_hint( pad_hint );
 }
 
 template<>
@@ -411,8 +435,13 @@ void number_input_popup<float>::draw_input_control()
 {
     // todo: maybe set width of input field, default is fairly long
     // step size default values are imgui defaults
+    if( spun ) {
+        ImGui::ClearActiveID();
+        spun = false;
+    }
     cataimgui::InputFloat( "##number_input", &value, step_size.value_or( 0.f ),
                            fast_step_size.value_or( 0.f ) );
+    draw_spinner_hint( pad_hint );
 }
 
 template<typename T>
@@ -426,6 +455,17 @@ T number_input_popup<T>::query()
         if( handle_custom_callbacks( action ) ) {
             continue;
         }
+
+#if defined(TILES)
+        // The d-pad spinner: the pad's up and down step the number, LT with
+        // them by ten, never below zero; the keyboard's arrows are not it.
+        if( const int step = gamepad::number_step( ctxt.get_raw_input() ) ) {
+            value = std::max<T>( 0, value + static_cast<T>( step ) );
+            spun = true;
+            set_focus = true;
+            continue;
+        }
+#endif
 
         if( action == "TEXT.CONFIRM" ) {
             return value;

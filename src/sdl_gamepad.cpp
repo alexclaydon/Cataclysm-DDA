@@ -310,6 +310,7 @@ void quit()
 // device: in test mode axis reads come from here instead.
 static bool test_mode = false;
 static menu_press menu_press_seen = menu_press::none;  // last_menu_press
+static bool pad_input_last = false;  // last_input_was_pad
 static std::array<Sint16, 8> test_axes = {};
 
 static Sint16 get_controller_axis( int axis )
@@ -353,6 +354,7 @@ static void cancel_task( task_t &task )
 static void send_input( int ibtn, input_event_t itype = input_event_t::gamepad )
 {
     last_input = input_event( ibtn, itype );
+    pad_input_last = true;
 }
 
 
@@ -1221,12 +1223,35 @@ menu_press last_menu_press()
 void note_keyboard_input()
 {
     menu_press_seen = menu_press::none;
+    pad_input_last = false;
+}
+
+bool last_input_was_pad()
+{
+    return pad_input_last;
+}
+
+int number_step( const input_event &ev )
+{
+    if( ev.sequence.empty() ) {
+        return 0;
+    }
+    const int code = ev.get_first_input();
+    if( ev.type == input_event_t::gamepad ) {
+        return code == JOY_ALT_UP ? 10 : code == JOY_ALT_DOWN ? -10 : 0;
+    }
+    if( !pad_input_last || ( ev.type != input_event_t::keyboard_char &&
+                             ev.type != input_event_t::keyboard_code ) ) {
+        return 0;
+    }
+    return code == KEY_UP ? 1 : code == KEY_DOWN ? -1 : 0;
 }
 
 void test_begin()
 {
     test_mode = true;
     menu_press_seen = menu_press::none;
+    pad_input_last = false;
     test_axes.fill( 0 );
     triggers_state = { 0, 0 };
     left_stick_dir = direction::NONE;

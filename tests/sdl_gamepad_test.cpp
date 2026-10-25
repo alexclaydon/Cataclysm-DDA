@@ -11,7 +11,8 @@
 // radial wheels (latching, A or LT release firing, B cancelling), a stick
 // spent on a wheel reading centred, and the sticks' hysteresis. All in the
 // gameplay plane (no menu open), but for A and B in a menu, which a
-// yes/no prompt answers Yes and No (query_popup). A rebase that loses one of these shows up
+// yes/no prompt answers Yes and No (query_popup), and the d-pad spinning a
+// number prompt (gamepad::number_step). A rebase that loses one of these shows up
 // here before it reaches the Deck.
 
 using gamepad::pad_axis;
@@ -171,6 +172,36 @@ TEST_CASE( "gamepad_a_and_b_in_a_menu_are_known_as_the_pads", "[gamepad][fork]" 
     press( pad_button::B );
     CHECK( last_code() == KEY_ESCAPE );
     CHECK( gamepad::last_menu_press() == gamepad::menu_press::b );
+}
+
+TEST_CASE( "gamepad_dpad_spins_a_number_prompt", "[gamepad][fork]" )
+{
+    pad_session pad;
+    ui_adaptor game_ui;
+    ui_adaptor menu;
+    REQUIRE( gamepad::is_in_menu() );
+    // In a menu the d-pad arrives as arrow keys; from the pad they step.
+    press( pad_button::DPAD_UP );
+    CHECK( last_code() == KEY_UP );
+    CHECK( gamepad::last_input_was_pad() );
+    CHECK( gamepad::number_step( last_input ) == 1 );
+    press( pad_button::DPAD_DOWN );
+    CHECK( gamepad::number_step( last_input ) == -1 );
+    // With LT held, by ten.
+    gamepad::test_axis( pad_axis::LT, full );
+    press( pad_button::DPAD_UP );
+    CHECK( last_code() == JOY_ALT_UP );
+    CHECK( gamepad::number_step( last_input ) == 10 );
+    press( pad_button::DPAD_DOWN );
+    CHECK( gamepad::number_step( last_input ) == -10 );
+    gamepad::test_axis( pad_axis::LT, 0 );
+    // The keyboard's own arrows keep their meaning.
+    gamepad::note_keyboard_input();
+    CHECK_FALSE( gamepad::last_input_was_pad() );
+    CHECK( gamepad::number_step( input_event( KEY_UP, input_event_t::keyboard_code ) ) == 0 );
+    // Other pad input doesn't step.
+    press( pad_button::A );
+    CHECK( gamepad::number_step( last_input ) == 0 );
 }
 
 #endif // TILES

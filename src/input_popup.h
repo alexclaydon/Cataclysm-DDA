@@ -126,5 +126,9 @@ class number_input_popup : public input_popup
         T old_value;
         std::optional<T> step_size = std::nullopt;
         std::optional<T> fast_step_size = std::nullopt;
+        // The d-pad spinner (gamepad::number_step): opened from the pad, the
+        // popup shows a hint; a step leaves the field to take the new value.
+        bool pad_hint = false;
+        bool spun = false;
 };
 #endif // CATA_SRC_INPUT_POPUP_H

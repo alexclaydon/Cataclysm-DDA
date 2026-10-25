@@ -57,6 +57,16 @@ enum class menu_press { none, a, b };
 menu_press last_menu_press();
 void note_keyboard_input();
 
+// Whether the latest input came from the pad: set by every event it sends
+// (in a menu, its synthesized keys too), cleared by the keyboard
+// (note_keyboard_input).
+bool last_input_was_pad();
+// The step a number prompt takes for `ev` (the d-pad spinner): the pad's
+// up or down +1 or -1 (in a menu they arrive as arrow keys, so only while
+// last_input_was_pad), with LT held +10 or -10 (JOY_ALT_UP/DOWN); 0 for
+// anything else, the keyboard's own arrows included.
+int number_step( const input_event &ev );
+
 // A seam for the unit tests (tests/sdl_gamepad_test.cpp): with no device,
 // test_begin resets all state and makes axis reads come from test_axis,
 // which also delivers the motion as an event; test_button delivers a press

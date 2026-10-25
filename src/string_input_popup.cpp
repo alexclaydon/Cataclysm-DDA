@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <climits>
+#include <cstdlib>
 
 #include "cata_scope_helpers.h"
 #include "catacharset.h"
@@ -19,6 +20,9 @@
 #include "ui_manager.h"
 #include "uistate.h"
 #include "wcwidth.h"
+#if defined(TILES)
+#include "sdl_gamepad.h"
+#endif
 
 #if defined(TILES)
 #include "sdl_wrappers.h"
@@ -383,6 +387,13 @@ std::optional<int64_t> string_input_popup::query_int64_t( const bool loop, const
 const std::string &string_input_popup::query_string( const bool loop, const bool draw_only )
 {
     if( !custom_window && !w_full ) {
+#if defined(TILES)
+        // A number prompt opened from the pad spins on the d-pad: say so.
+        if( _only_digits && gamepad::last_input_was_pad() ) {
+            _description += std::string( _description.empty() ? "" : "\n" ) +
+                            _( "D-pad up/down: +1/-1.  LT and d-pad: +10/-10." );
+        }
+#endif
         create_window();
         _position = -1;
     }
@@ -484,6 +495,23 @@ const std::string &string_input_popup::query_string( const bool loop, const bool
         if( next_loop ) {
             continue;
         }
+
+#if defined(TILES)
+        // The d-pad spinner: the pad's up and down step a number prompt, LT
+        // with them by ten, never below zero. The keyboard's arrows keep
+        // their meaning (gamepad::number_step tells them apart).
+        if( _only_digits ) {
+            const int step = gamepad::number_step( ev );
+            if( step != 0 ) {
+                const int64_t now = std::strtoll( ret.str().c_str(), nullptr, 10 );
+                ret = utf8_wrapper( std::to_string( std::max<int64_t>( 0, now + step ) ) );
+                _position = ret.length();
+                edit = utf8_wrapper();
+                ctxt->set_edittext( std::string() );
+                continue;
+            }
+        }
+#endif
 
         if( desc_view_ptr && desc_view_ptr->handle_navigation( action, *ctxt ) ) {
             // NO FURTHER ACTION REQUIRED
