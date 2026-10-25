@@ -613,7 +613,11 @@ static void WinCreate()
     // Track desired fullscreen mode separately; applied after window creation
     FullscreenMode desired_fullscreen = FullscreenMode::windowed;
 
-#if !defined(__ANDROID__) && !defined(EMSCRIPTEN)
+    // Hosted (CDDA_GODOT), the window is offscreen and the host owns the
+    // screen: always windowed at the terminal's size, whatever FULLSCREEN
+    // says, so the desktop diorama can share the flat game's options.json
+    // (ADR 0007).
+#if !defined(__ANDROID__) && !defined(EMSCRIPTEN) && !defined(CDDA_GODOT)
     if( get_option<std::string>( "FULLSCREEN" ) == "fullscreen" ) {
         desired_fullscreen = FullscreenMode::fullscreen_exclusive;
         fullscreen = true;
