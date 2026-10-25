@@ -71,6 +71,7 @@ struct mouse_command {
 std::atomic<uint64_t> sidebar_cells{ 0 };  // set_sidebar, packed in 16 bits each
 std::mutex look_mutex;
 bool look_requested = false;  // request_look's, with its tile
+std::string goto_type;  // request_goto's, empty for none (under look_mutex)
 int look_dx = 0;
 int look_dy = 0;
 std::mutex mouse_mutex;
@@ -316,7 +317,27 @@ void godot_host::request_look( int dx, int dy )
 bool godot_host::look_pending()
 {
     std::lock_guard<std::mutex> lock( look_mutex );
-    return look_requested;
+    return look_requested || !goto_type.empty();
+}
+
+void godot_host::request_goto( const std::string &type )
+{
+    {
+        std::lock_guard<std::mutex> lock( look_mutex );
+        goto_type = type;
+    }
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_goto_request( std::string &type )
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    if( goto_type.empty() ) {
+        return false;
+    }
+    type = goto_type;
+    goto_type.clear();
+    return true;
 }
 
 bool godot_host::take_look_request( int &dx, int &dy )

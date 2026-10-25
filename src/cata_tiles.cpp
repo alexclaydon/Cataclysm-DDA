@@ -1706,6 +1706,7 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
         const auto storeys_start = std::chrono::steady_clock::now();
         godot_host::record_only_scope record_only;
         const std::array<bool, 5> unseen = { true, true, true, true, true };
+        // Below the avatar: what it remembers there.
         for( int dz = 1; dz <= godot_host::snapshot_levels_below; ++dz ) {
             const int z = you_pos.z() - dz;
             if( z < -OVERMAP_DEPTH ) {
@@ -1719,6 +1720,44 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
                     draw_furniture( p, lit_level::MEMORIZED, height_3d, unseen, false );
                     draw_trap( p, lit_level::MEMORIZED, height_3d, unseen, false );
                     draw_vpart_no_roof( p, lit_level::MEMORIZED, height_3d, unseen, false );
+                }
+            }
+        }
+        // Above it: the terrain itself (upper walls and floors, roofs), as
+        // a building's shell is seen from outside; nothing on it, and never
+        // memorized (draw_terrain's visible path would memorize). From the
+        // ground the avatar sees almost none of it, so memory would show
+        // nothing. The host keeps only what stands on something it shows,
+        // and cuts away what would hide the avatar.
+        {
+            const lit_level above_ll = here.access_cache( you_pos.z() ).natural_light_level_cache >=
+                                       LIGHT_AMBIENT_LIT ? lit_level::LIT : lit_level::LOW;
+            const std::array<bool, 5> seen = { false, false, false, false, false };
+            for( int dz = 1; dz <= godot_host::snapshot_levels_above; ++dz ) {
+                const int z = you_pos.z() + dz;
+                if( z > OVERMAP_HEIGHT ) {
+                    break;
+                }
+                for( int y = std::max( 0, you_pos.y() - r ); y <= std::min( MAPSIZE_Y - 1, you_pos.y() + r ); ++y ) {
+                    for( int x = std::max( 0, you_pos.x() - r ); x <= std::min( MAPSIZE_X - 1, you_pos.x() + r ); ++x ) {
+                        const tripoint_bub_ms p( x, y, z );
+                        const ter_id &t = here.ter( p );
+                        if( !t || t.obj().has_flag( ter_furn_flag::TFLAG_NO_FLOOR ) ) {
+                            continue;
+                        }
+                        int subtile = 0;
+                        int rotation = 0;
+                        const std::bitset<NUM_TERCONN> &connect_group = t.obj().connect_to_groups;
+                        const std::bitset<NUM_TERCONN> &rotate_group = t.obj().rotate_to_groups;
+                        if( connect_group.any() ) {
+                            get_connect_values( p, subtile, rotation, connect_group, rotate_group, {} );
+                        } else {
+                            get_terrain_orientation( p, rotation, subtile, {}, seen, rotate_group );
+                        }
+                        int height_3d = 0;
+                        draw_from_id_string( t.id().str(), TILE_CATEGORY::TERRAIN, empty_string, p, subtile,
+                                             rotation, above_ll, false, height_3d );
+                    }
                 }
             }
         }

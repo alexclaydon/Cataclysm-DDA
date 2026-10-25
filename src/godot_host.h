@@ -266,9 +266,14 @@ bool mouse_away();
 // thread takes it.
 void request_look( int dx, int dy );
 bool take_look_request( int &dx, int &dy );
-// Whether a request waits, without taking it: game::handle_mouseview stops
-// there, or the mouse view's loop (and get_player_input's, on timeouts)
-// would keep it waiting until a key came.
+// A test hook (make vr-mouse "goto TYPE"): teleport the avatar to the
+// closest overmap terrain whose id starts with TYPE ("house"), as the
+// debug menu's teleport does; handled beside the look request.
+void request_goto( const std::string &type );
+bool take_goto_request( std::string &type );
+// Whether a look or goto request waits, without taking it:
+// game::handle_mouseview stops there, or the mouse view's loop (and
+// get_player_input's, on timeouts) would keep it waiting until a key came.
 bool look_pending();
 
 // Whether the game is waiting for typed text (a string-input or
@@ -307,12 +312,13 @@ void set_window_id( uint32_t id );
 void apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, int &y ) );
 
 // How far around the avatar the snapshot reaches, and how many storeys below
-// the avatar's it adds from map memory (plan 0004, Phase 2). The radius is
+// and above the avatar's it adds from map memory (plan 0004, Phase 2). The radius is
 // the VR player's zoom: the game's zoom actions step it (zoom_view), so
 // zooming out shows more of the surroundings on the same table, as the 2D
 // zoom shows more on the same screen. 60 is the loaded map's reach.
 int snapshot_radius();
 constexpr int snapshot_levels_below = 2;
+constexpr int snapshot_levels_above = 2;
 // Steps in (+, a smaller radius) or out (-) through the radius levels.
 // Engine thread (the zoom actions), which then redraws the map.
 void zoom_view( int steps );

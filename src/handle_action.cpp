@@ -74,9 +74,11 @@
 #include "move_mode.h"
 #include "mtype.h"
 #include "mutation.h"
+#include "omdata.h"
 #include "options.h"
 #include "output.h"
 #include "overmap_ui.h"
+#include "overmapbuffer.h"
 #include "panels.h"
 #include "pathfinding.h"
 #include "point.h"
@@ -3308,6 +3310,18 @@ bool game::handle_action()
     {
         int dx = 0;
         int dy = 0;
+        std::string goto_type;
+        if( godot_host::take_goto_request( goto_type ) ) {
+            const tripoint_abs_omt dest = overmap_buffer.find_closest( player_character.pos_abs_omt(),
+                                          goto_type, 200, false, ot_match_type::prefix );
+            if( dest.is_invalid() ) {
+                add_msg( m_info, "VR goto: no %s within 200.", goto_type );
+            } else {
+                g->place_player_overmap( dest );
+                add_msg( m_info, "VR goto: %s.", overmap_buffer.ter( dest ).id().str() );
+            }
+            return false;
+        }
         if( godot_host::take_look_request( dx, dy ) ) {
             tripoint_bub_ms center = player_character.pos_bub() + player_character.view_offset;
             const tripoint_bub_ms start = player_character.pos_bub() + tripoint_rel_ms( dx, dy, 0 );
