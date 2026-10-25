@@ -3424,6 +3424,8 @@ inventory_selector::inventory_selector( Character &u, const inventory_selector_p
     ctxt.register_action( "VIEW_CATEGORY_MODE" );
     ctxt.register_action( "TOGGLE_NUMPAD_NAVIGATION" );
     ctxt.register_action( "ANY_INPUT" ); // For invlets
+    // Item letters only: the pad's X can open the action list.
+    ctxt.allow_action_palette();
     ctxt.register_action( "INVENTORY_FILTER" );
     ctxt.register_action( "RESET_FILTER" );
     ctxt.register_action( "EXAMINE" );
@@ -5339,6 +5341,7 @@ trade_selector::trade_selector( trade_ui *parent, Character &u,
     _ctxt_trade.register_action( ACTION_AUTOBALANCE );
     _ctxt_trade.register_action( ACTION_BANKBALANCE );
     _ctxt_trade.register_action( "ANY_INPUT" );
+    _ctxt_trade.allow_action_palette();
     // duplicate this action in the parent ctxt so it shows up in the keybindings menu
     // CANCEL and OK are already set in inventory_selector
     ctxt.register_action( ACTION_SWITCH_PANES );

@@ -2116,6 +2116,8 @@ static tripoint_abs_omt display()
     }
     // Configure input context for navigating the map.
     ictxt.register_action( "ANY_INPUT" );
+    // The pad's X can open the action list (its any-input is keys only).
+    ictxt.allow_action_palette();
     ictxt.register_directions();
     ictxt.register_action( "CONFIRM" );
     ictxt.register_action( "LEVEL_UP" );

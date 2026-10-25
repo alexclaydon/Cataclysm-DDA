@@ -315,6 +315,8 @@ veh_interact::veh_interact( map &here, vehicle &veh, const point_rel_ms &p )
     main_context.register_action( "HELP_KEYBINDINGS" );
     main_context.register_action( "FILTER" );
     main_context.register_action( "ANY_INPUT" );
+    // Keys only: the pad's X can open the action list.
+    main_context.allow_action_palette();
 
     count_durability();
     cache_tool_availability();

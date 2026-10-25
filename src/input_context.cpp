@@ -37,6 +37,8 @@
 #include "string_input_popup.h"
 #include "translations.h"
 #include "ui_manager.h"
+#include "localized_comparator.h"
+#include "uilist.h"
 #include "sdl_gamepad.h"
 
 enum class kb_menu_status {
@@ -522,6 +524,18 @@ const std::string &input_context::handle_input( const int timeout )
             result = &action;
             break;
         }
+
+#if defined(TILES)
+        // The pad's X where nothing binds it: the action list (the fork's,
+        // ported behaviour from the BN backlog). A cancel returns ERROR,
+        // which screens ignore, so they redraw over the list.
+        if( next_action.type == input_event_t::gamepad && !next_action.sequence.empty() &&
+            next_action.get_first_input() == JOY_X && ( !registered_any_input || action_palette_ok ) ) {
+            const std::string *picked = action_palette();
+            result = picked != nullptr ? picked : &CATA_ERROR;
+            break;
+        }
+#endif
 
         // If we registered to receive any input, return ANY_INPUT
         // to signify that an unregistered key was pressed.
@@ -1282,6 +1296,69 @@ std::optional<point> input_context::get_coordinates_text( const catacurses::wind
     return selected;
 #endif
 }
+
+#if defined(TILES)
+const std::string *input_context::action_palette()
+{
+    // Navigation and plumbing the pad already has (menus synthesize the
+    // arrows, Enter and Escape) or that means nothing in a list.
+    static const std::set<std::string> skip = {
+        "ANY_INPUT", "COORDINATE", "MOUSE_MOVE", "SELECT", "SEC_SELECT", "TIMEOUT",
+        "UP", "DOWN", "LEFT", "RIGHT", "LEFTUP", "LEFTDOWN", "RIGHTUP", "RIGHTDOWN",
+        "PAGE_UP", "PAGE_DOWN", "SCROLL_UP", "SCROLL_DOWN", "HOME", "END",
+        "CONFIRM", "QUIT", "NEXT_TAB", "PREV_TAB", "toggle_language_to_en"
+    };
+    struct entry {
+        std::string name;
+        std::string action;
+        input_event key;
+    };
+    std::vector<entry> entries;
+    for( const std::string &a : registered_actions ) {
+        if( skip.count( a ) > 0 ) {
+            continue;
+        }
+        // Derived, never curated: a display name (nameless is plumbing), a
+        // keyboard key here (the list stands in for the hotkey legend), and
+        // no pad binding (what the pad reaches directly isn't listed).
+        const std::string name = get_action_name( a );
+        if( name.empty() || name == a ) {
+            continue;
+        }
+        const std::vector<input_event> keys = keys_bound_to( a, -1, false, true );
+        if( keys.empty() ) {
+            continue;
+        }
+        const std::vector<input_event> all = keys_bound_to( a, -1, false, false );
+        if( std::any_of( all.begin(), all.end(), []( const input_event & e ) {
+        return e.type == input_event_t::gamepad;
+    } ) ) {
+            continue;
+        }
+        entries.push_back( { name, a, keys.front() } );
+    }
+    if( entries.empty() ) {
+        return nullptr;
+    }
+    std::sort( entries.begin(), entries.end(), []( const entry & l, const entry & r ) {
+        return localized_compare( l.name, r.name );
+    } );
+    uilist menu;
+    menu.title = _( "Actions" );
+    for( size_t i = 0; i < entries.size(); ++i ) {
+        menu.addentry_desc( static_cast<int>( i ), true, MENU_AUTOASSIGN, entries[i].name,
+                            entries[i].key.long_description() );
+    }
+    menu.query();
+    if( menu.ret < 0 || static_cast<size_t>( menu.ret ) >= entries.size() ) {
+        return nullptr;
+    }
+    palette_pick = entries[menu.ret].action;
+    // Screens that read the key rather than the action see its key.
+    next_action = entries[menu.ret].key;
+    return &palette_pick;
+}
+#endif
 
 std::string input_context::get_action_name( const std::string &action_id ) const
 {
