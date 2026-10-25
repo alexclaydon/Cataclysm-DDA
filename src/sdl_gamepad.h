@@ -48,6 +48,19 @@ direction get_radial_right_direction();
 bool is_radial_left_open();
 bool is_radial_right_open();
 bool is_alt_held();
+
+// A seam for the unit tests (tests/sdl_gamepad_test.cpp): with no device,
+// test_begin resets all state and makes axis reads come from test_axis,
+// which also delivers the motion as an event; test_button delivers a press
+// or release. last_input and the getters above show the result.
+enum class pad_button : int {
+    A, B, X, Y, LB, RB, LS, RS, START, BACK, DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT
+};
+enum class pad_axis : int { LEFT_X, LEFT_Y, RIGHT_X, RIGHT_Y, LT, RT };
+void test_begin();
+void test_end();
+void test_axis( pad_axis which, int value );
+void test_button( pad_button which, bool down );
 bool is_in_menu();
 bool is_active();
 
