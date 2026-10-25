@@ -49,6 +49,14 @@ bool is_radial_left_open();
 bool is_radial_right_open();
 bool is_alt_held();
 
+// In a menu the pad's A arrives as Enter and B as Escape. Which pad button
+// sent the latest of those, or none once a key on the keyboard is pressed
+// (note_keyboard_input): so a yes/no prompt can answer A with Yes while the
+// keyboard's Enter keeps the prompt's default (query_popup).
+enum class menu_press { none, a, b };
+menu_press last_menu_press();
+void note_keyboard_input();
+
 // A seam for the unit tests (tests/sdl_gamepad_test.cpp): with no device,
 // test_begin resets all state and makes axis reads come from test_axis,
 // which also delivers the motion as an event; test_button delivers a press

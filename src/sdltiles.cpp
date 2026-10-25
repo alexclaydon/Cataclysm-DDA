@@ -5719,6 +5719,9 @@ static void CheckMessages()
         } else {
             switch( ev.type ) {
                 case CATA_KEYDOWN: {
+                    // An Enter or Escape from here on is the keyboard's,
+                    // not the pad's A or B (query_popup's yes/no).
+                    gamepad::note_keyboard_input();
 #if defined(__ANDROID__)
                     // Toggle virtual keyboard with Android back button. For some reason I get double inputs, so ignore everything once it's already down.
                     if( GetKeysym( ev ).sym == SDLK_AC_BACK && ac_back_down_time == 0 ) {

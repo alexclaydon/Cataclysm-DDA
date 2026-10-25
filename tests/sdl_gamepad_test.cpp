@@ -4,12 +4,14 @@
 #include "input.h"
 #include "input_enums.h"
 #include "sdl_gamepad.h"
+#include "ui_manager.h"
 
 // Our fork's controller scheme (aec-dev), driven through the module's test
 // seam with no device: the LT layer, the LT-then-RT second layer, the
 // radial wheels (latching, A or LT release firing, B cancelling), a stick
 // spent on a wheel reading centred, and the sticks' hysteresis. All in the
-// gameplay plane (no menu open). A rebase that loses one of these shows up
+// gameplay plane (no menu open), but for A and B in a menu, which a
+// yes/no prompt answers Yes and No (query_popup). A rebase that loses one of these shows up
 // here before it reaches the Deck.
 
 using gamepad::pad_axis;
@@ -151,6 +153,24 @@ TEST_CASE( "gamepad_stick_has_hysteresis", "[gamepad][fork]" )
     // ...and needs the full threshold to engage again.
     gamepad::test_axis( pad_axis::LEFT_Y, -14000 );
     CHECK( gamepad::get_left_stick_direction() == gamepad::direction::NONE );
+}
+
+TEST_CASE( "gamepad_a_and_b_in_a_menu_are_known_as_the_pads", "[gamepad][fork]" )
+{
+    pad_session pad;
+    // The game's own UI under a menu: two layers.
+    ui_adaptor game_ui;
+    ui_adaptor menu;
+    REQUIRE( gamepad::is_in_menu() );
+    press( pad_button::A );
+    CHECK( last_code() == '\n' );
+    CHECK( gamepad::last_menu_press() == gamepad::menu_press::a );
+    // A key on the keyboard: its Enter is its own.
+    gamepad::note_keyboard_input();
+    CHECK( gamepad::last_menu_press() == gamepad::menu_press::none );
+    press( pad_button::B );
+    CHECK( last_code() == KEY_ESCAPE );
+    CHECK( gamepad::last_menu_press() == gamepad::menu_press::b );
 }
 
 #endif // TILES

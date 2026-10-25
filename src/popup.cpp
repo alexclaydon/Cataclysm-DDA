@@ -9,10 +9,14 @@
 #include "catacharset.h"
 #include "color.h"
 #include "imgui/imgui.h"
+#include "input.h"
 #include "input_context.h"
 #include "output.h"
 #include "string_formatter.h"
 #include "ui_manager.h"
+#if defined(TILES)
+#include "sdl_gamepad.h"
+#endif
 
 class query_popup_impl : public cataimgui::window
 {
@@ -333,6 +337,7 @@ query_popup::result query_popup::query_once()
     result res;
     // Assign outside construction of `res` to ensure execution order
     res.wait_input = !anykey;
+    bool by_mouse = false;
     do {
         ui_manager::redraw();
         res.action = ctxt.handle_input( 50 );
@@ -342,6 +347,7 @@ query_popup::result query_popup::query_once()
         if( !options.empty() && clicked != -1 ) {
             res.action = "CONFIRM";
             cur = size_t( clicked );
+            by_mouse = true;
             break;
         }
         // If we're tracking mouse movement
@@ -349,6 +355,7 @@ query_popup::result query_popup::query_once()
             // Left-click to confirm selection
             res.action = "CONFIRM";
             cur = size_t( impl->get_mouse_selected_option() );
+            by_mouse = true;
         } else if( res.action == "CONFIRM" && impl->keyboard_selected_option != -1 ) {
             cur = size_t( impl->keyboard_selected_option );
         }
@@ -361,6 +368,29 @@ query_popup::result query_popup::query_once()
         res.evt.type == input_event_t::timeout
     );
 
+    const auto has_option = [&]( const std::string & action ) {
+        return std::any_of( options.begin(), options.end(), [&]( const query_option & o ) {
+            return o.action == action;
+        } );
+    };
+#if defined(TILES)
+    // The pad (the fork's controller scheme): A answers Yes on any prompt
+    // with a Yes, unless the d-pad moved the highlight first; B answers No
+    // where nothing on the prompt takes Escape. The keyboard's Enter and
+    // Escape keep the prompt's own default.
+    const gamepad::menu_press pad = by_mouse ? gamepad::menu_press::none : gamepad::last_menu_press();
+    if( pad == gamepad::menu_press::a && res.action == "CONFIRM" && !highlight_moved && has_option( "YES" ) ) {
+        res.action = "YES";
+        res.wait_input = false;
+        return res;
+    }
+    if( pad == gamepad::menu_press::b && !cancel && res.evt.type == input_event_t::keyboard_code &&
+        res.evt.get_first_input() == KEY_ESCAPE && !has_option( res.action ) && has_option( "NO" ) ) {
+        res.action = "NO";
+        res.wait_input = false;
+        return res;
+    }
+#endif
     if( cancel && res.action == "QUIT" ) {
         res.wait_input = false;
     } else if( res.action == "CONFIRM" ) {
@@ -369,12 +399,14 @@ query_popup::result query_popup::query_once()
             res.action = options[cur].action;
         }
     } else if( res.action == "LEFT" ) {
+        highlight_moved = true;
         if( impl->keyboard_selected_option > 0 ) {
             impl->keyboard_selected_option--;
         } else {
             impl->keyboard_selected_option = short( buttons.size() - 1 );
         }
     } else if( res.action == "RIGHT" ) {
+        highlight_moved = true;
         if( impl->keyboard_selected_option < short( buttons.size() - 1 ) ) {
             impl->keyboard_selected_option++;
         } else {

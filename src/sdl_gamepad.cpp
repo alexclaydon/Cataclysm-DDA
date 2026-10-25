@@ -303,6 +303,7 @@ void quit()
 // The unit tests (tests/sdl_gamepad_test.cpp) drive the module without a
 // device: in test mode axis reads come from here instead.
 static bool test_mode = false;
+static menu_press menu_press_seen = menu_press::none;  // last_menu_press
 static std::array<Sint16, 8> test_axes = {};
 
 static Sint16 get_controller_axis( int axis )
@@ -911,6 +912,7 @@ static bool handle_button_event( SDL_Event &event )
             if( is_in_menu() ) {
                 joy_code = '\n';
                 input_type = input_event_t::keyboard_char;
+                menu_press_seen = menu_press::a;
             } else {
                 joy_code = JOY_A;
             }
@@ -919,6 +921,7 @@ static bool handle_button_event( SDL_Event &event )
             if( is_in_menu() ) {
                 joy_code = KEY_ESCAPE;
                 input_type = input_event_t::keyboard_code;
+                menu_press_seen = menu_press::b;
             } else {
                 joy_code = JOY_B;
             }
@@ -1202,9 +1205,20 @@ bool is_gamepad_event( const SDL_Event &event )
     }
 }
 
+menu_press last_menu_press()
+{
+    return menu_press_seen;
+}
+
+void note_keyboard_input()
+{
+    menu_press_seen = menu_press::none;
+}
+
 void test_begin()
 {
     test_mode = true;
+    menu_press_seen = menu_press::none;
     test_axes.fill( 0 );
     triggers_state = { 0, 0 };
     left_stick_dir = direction::NONE;

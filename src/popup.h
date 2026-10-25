@@ -218,6 +218,9 @@ class query_popup
         bool ontop;
         bool fullscr;
         keyboard_mode pref_kbd_mode;
+        // The highlight moved by the arrow keys (the pad's d-pad): the pad's
+        // A then confirms it rather than answering Yes.
+        bool highlight_moved = false;
 
         struct button {
             button( const std::string &text, const point & );
