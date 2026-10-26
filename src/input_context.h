@@ -308,10 +308,14 @@ class input_context
          *
          * @param evt_filter Only keys satisfying this function will be
          *                   described.
+         *
+         * @param by_device Describe only the device in use (hint_events); false
+         *                  lists every binding (the keybindings screen).
          */
         std::string get_desc( const std::string &action_descriptor,
                               unsigned int max_limit = 0,
-                              const input_event_filter &evt_filter = allow_all_keys ) const;
+                              const input_event_filter &evt_filter = allow_all_keys,
+                              bool by_device = true ) const;
 
         /**
          * Get a description for the action parameter along with a printable hotkey
@@ -513,6 +517,14 @@ class input_context
         input_event first_unassigned_hotkey( const hotkey_queue &queue ) const;
         input_event next_unassigned_hotkey( const hotkey_queue &queue, const input_event &prev ) const;
     private:
+        // The bindings a hint describes (the fork's): those enabled and
+        // passing evt_filter and, by_device, only the pad's while the pad is
+        // in use (gamepad::last_input_was_pad) and only the keyboard's and
+        // mouse's otherwise, each falling back to the other where the action
+        // has none. So a footer reads "[LT+LS SW] Filter" on the pad and
+        // "[/] Filter" on the keyboard, not "[/ or L_RADIAL_SW] Filter".
+        std::vector<input_event> hint_events( const std::string &action_descriptor,
+                                              const input_event_filter &evt_filter, bool by_device ) const;
 #if defined(__ANDROID__)
         std::vector<manual_key> registered_manual_keys;
 #endif

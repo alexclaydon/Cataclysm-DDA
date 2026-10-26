@@ -1,6 +1,7 @@
 #include "input.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <exception>
 #include <functional>
@@ -25,6 +26,9 @@
 #include "json_loader.h"
 #include "path_info.h"
 #include "sdltiles.h" // IWYU pragma: keep
+#if defined(TILES)
+#include "sdl_gamepad.h"
+#endif
 #include "string_formatter.h"
 #include "translations.h"
 
@@ -113,6 +117,47 @@ static const std::vector<std::pair<keymod_t, translation>> keymod_long_desc = {
     { keymod_t::shift, to_translation( "key modifier", "SHIFT-" ) },
 };
 
+#if defined(TILES)
+// A pad binding as the player reads it (the fork's): its portable name
+// ("A", "ALT_X", "L_RADIAL_SW", "LS_UP_RIGHT", from the table below) in
+// words, the face buttons in the GAMEPAD_GLYPHS style. Plain text, no
+// colour tags: some screens print hints raw. The PlayStation shapes are
+// all unifont's and single-width, as the text menus need: Terminus lacks
+// most of them, and shapes from two fonts came out mismatched.
+static std::string gamepad_label( const std::string &name )
+{
+    static const std::map<std::string, std::string> stick_dirs = {
+        { "UP", "N" }, { "UP_RIGHT", "NE" }, { "RIGHT", "E" }, { "DOWN_RIGHT", "SE" },
+        { "DOWN", "S" }, { "DOWN_LEFT", "SW" }, { "LEFT", "W" }, { "UP_LEFT", "NW" }
+    };
+    static const std::map<std::string, std::string> others = {
+        { "UP", "D↑" }, { "DOWN", "D↓" }, { "LEFT", "D←" }, { "RIGHT", "D→" },
+        { "START", "Start" }, { "BACK", "Back" }
+    };
+    const auto starts = [&]( const char *prefix ) {
+        return name.rfind( prefix, 0 ) == 0;
+    };
+    if( starts( "ALT2_" ) ) {
+        return "LT+RT+" + gamepad_label( name.substr( 5 ) );
+    } else if( starts( "ALT_" ) ) {
+        return "LT+" + gamepad_label( name.substr( 4 ) );
+    } else if( starts( "L_RADIAL_" ) || starts( "R_RADIAL_" ) ) {
+        return std::string( name[0] == 'L' ? "LT+LS " : "LT+RS " ) + name.substr( 9 );
+    } else if( ( starts( "LS_" ) || starts( "RS_" ) ) && stick_dirs.count( name.substr( 3 ) ) ) {
+        return name.substr( 0, 2 ) + " " + stick_dirs.at( name.substr( 3 ) );
+    }
+    static const std::array<const char *, 4> faces = { "A", "B", "X", "Y" };
+    static const std::array<const char *, 4> shapes = { "⨯", "⚪", "□", "△" };
+    for( size_t i = 0; i < faces.size(); ++i ) {
+        if( name == faces[i] ) {
+            return gamepad::current_glyph_style() == gamepad::glyph_style::playstation ? shapes[i] : faces[i];
+        }
+    }
+    const auto it = others.find( name );
+    return it != others.end() ? it->second : name;
+}
+#endif
+
 std::string input_event::long_description() const
 {
     std::string rval;
@@ -123,6 +168,12 @@ std::string input_event::long_description() const
         }
     }
     for( const int code : sequence ) {
+#if defined(TILES)
+        if( type == input_event_t::gamepad ) {
+            rval += gamepad_label( inp_mngr.get_keyname( code, type, true ) );
+            continue;
+        }
+#endif
         rval += inp_mngr.get_keyname( code, type );
     }
     return rval;
@@ -145,6 +196,12 @@ std::string input_event::short_description() const
     }
     // TODO: add short description for control keys such as return, tab, etc
     for( const int code : sequence ) {
+#if defined(TILES)
+        if( type == input_event_t::gamepad ) {
+            rval += gamepad_label( inp_mngr.get_keyname( code, type, true ) );
+            continue;
+        }
+#endif
         rval += inp_mngr.get_keyname( code, type );
     }
     return rval;

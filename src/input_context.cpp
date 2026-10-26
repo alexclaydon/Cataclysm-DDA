@@ -312,9 +312,41 @@ bool input_context::allow_all_keys( const input_event & )
     return true;
 }
 
+std::vector<input_event> input_context::hint_events( const std::string &action_descriptor,
+        const input_context::input_event_filter &evt_filter, const bool by_device ) const
+{
+    std::vector<input_event> shown;
+    for( const input_event &evt : inp_mngr.get_input_for_action( action_descriptor, category ) ) {
+        if( is_event_type_enabled( evt.type ) && evt_filter( evt ) ) {
+            shown.push_back( evt );
+        }
+    }
+#if defined(TILES)
+    if( by_device ) {
+        const auto is_pad = []( const input_event & evt ) {
+            return evt.type == input_event_t::gamepad;
+        };
+        const bool pad_in_use = gamepad::is_active() && gamepad::last_input_was_pad();
+        const bool any_pad = std::any_of( shown.begin(), shown.end(), is_pad );
+        const bool any_other = !std::all_of( shown.begin(), shown.end(), is_pad );
+        if( pad_in_use && any_pad ) {
+            shown.erase( std::remove_if( shown.begin(), shown.end(), [&]( const input_event & evt ) {
+                return !is_pad( evt );
+            } ), shown.end() );
+        } else if( !pad_in_use && any_other ) {
+            shown.erase( std::remove_if( shown.begin(), shown.end(), is_pad ), shown.end() );
+        }
+    }
+#else
+    ( void )by_device;
+#endif
+    return shown;
+}
+
 std::string input_context::get_desc( const std::string &action_descriptor,
                                      const unsigned int max_limit,
-                                     const input_context::input_event_filter &evt_filter ) const
+                                     const input_context::input_event_filter &evt_filter,
+                                     const bool by_device ) const
 {
     if( action_descriptor == "ANY_INPUT" ) {
         return "(*)"; // * for wildcard
@@ -333,15 +365,9 @@ std::string input_context::get_desc( const std::string &action_descriptor,
         }
     }
 
-    std::vector<input_event> inputs_to_show;
-    for( const input_event &event : events ) {
-        if( is_event_type_enabled( event.type ) && evt_filter( event ) ) {
-            inputs_to_show.push_back( event );
-        }
-
-        if( max_limit > 0 && inputs_to_show.size() == max_limit ) {
-            break;
-        }
+    std::vector<input_event> inputs_to_show = hint_events( action_descriptor, evt_filter, by_device );
+    if( max_limit > 0 && inputs_to_show.size() > max_limit ) {
+        inputs_to_show.resize( max_limit );
     }
 
     if( inputs_to_show.empty() ) {
@@ -387,12 +413,8 @@ std::string input_context::get_button_text( const std::string &action_descriptor
         return action_text;
     }
 
-    std::vector<input_event> inputs_to_show;
-    for( const input_event &event : events ) {
-        if( is_event_type_enabled( event.type ) ) {
-            inputs_to_show.push_back( event );
-        }
-    }
+    const std::vector<input_event> inputs_to_show = hint_events( action_descriptor, allow_all_keys,
+            true );
 
     if( inputs_to_show.empty() ) {
         return action_text;
@@ -413,28 +435,24 @@ std::string input_context::get_desc(
         return string_format( separate_fmt.translated(), pgettext( "keybinding", "any" ), text );
     }
 
-    const auto &events = inp_mngr.get_input_for_action( action_descriptor, category );
+    const std::vector<input_event> events = hint_events( action_descriptor, evt_filter, true );
 
-    bool na = true;
     for( const input_event &evt : events ) {
-        if( is_event_type_enabled( evt.type ) && evt_filter( evt ) ) {
-            na = false;
-            if( ( evt.type == input_event_t::keyboard_char || evt.type == input_event_t::keyboard_code ) &&
-                evt.modifiers.empty() && evt.sequence.size() == 1 ) {
-                const int ch = evt.get_first_input();
-                if( ch > ' ' && ch <= '~' ) {
-                    const std::string key = utf32_to_utf8( ch );
-                    const int pos = ci_find_substr( text, key );
-                    if( pos >= 0 ) {
-                        return string_format( inline_fmt.translated(), text.substr( 0, pos ),
-                                              key, text.substr( pos + key.size() ) );
-                    }
+        if( ( evt.type == input_event_t::keyboard_char || evt.type == input_event_t::keyboard_code ) &&
+            evt.modifiers.empty() && evt.sequence.size() == 1 ) {
+            const int ch = evt.get_first_input();
+            if( ch > ' ' && ch <= '~' ) {
+                const std::string key = utf32_to_utf8( ch );
+                const int pos = ci_find_substr( text, key );
+                if( pos >= 0 ) {
+                    return string_format( inline_fmt.translated(), text.substr( 0, pos ),
+                                          key, text.substr( pos + key.size() ) );
                 }
             }
         }
     }
 
-    if( na ) {
+    if( events.empty() ) {
         //~ keybinding description for unbound or non-applicable keys
         return string_format( separate_fmt.translated(), pgettext( "keybinding", "n/a" ), text );
     } else {
@@ -811,7 +829,8 @@ void keybindings_ui::draw_controls()
                                               nullptr, &is_hovered );
 
                 ImGui::TableSetColumnIndex( 3 );
-                ImGui::Text( "%s", ctxt->get_desc( action_id ).c_str() );
+                // Every binding, whichever device is in use.
+                ImGui::Text( "%s", ctxt->get_desc( action_id, 0, input_context::allow_all_keys, false ).c_str() );
 
                 // handle the first column last because
                 // ImGui::IsItemVisble() tells you the status of the most

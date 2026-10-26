@@ -14,7 +14,8 @@
 // gameplay plane (no menu open), but for A and B in a menu, which a
 // yes/no prompt answers Yes and No (query_popup), and the d-pad spinning a
 // number prompt (gamepad::number_step), and a which-way prompt taking map
-// directions while a list keeps its arrows. A rebase that loses one of these shows up
+// directions while a list keeps its arrows, and pad bindings named as
+// buttons ("LT+X", "LT+LS SW"). A rebase that loses one of these shows up
 // here before it reaches the Deck.
 
 using gamepad::pad_axis;
@@ -205,6 +206,24 @@ TEST_CASE( "gamepad_a_which_way_prompt_takes_map_directions", "[gamepad][fork]" 
         press( pad_button::DPAD_UP );
         CHECK( last_code() == KEY_UP );
     }
+}
+
+TEST_CASE( "gamepad_bindings_read_as_buttons", "[gamepad][fork]" )
+{
+    // Hints and the keybindings screen name a pad binding as the player
+    // reads it, not by its JSON name. No pad here, so the glyph style is
+    // Xbox letters.
+    const auto label = []( int code ) {
+        return input_event( code, input_event_t::gamepad ).long_description();
+    };
+    CHECK( label( JOY_A ) == "A" );
+    CHECK( label( JOY_LB ) == "LB" );
+    CHECK( label( JOY_ALT_X ) == "LT+X" );
+    CHECK( label( JOY_ALT2_B ) == "LT+RT+B" );
+    CHECK( label( JOY_L_RADIAL_SW ) == "LT+LS SW" );
+    CHECK( label( JOY_RS_UP_RIGHT ) == "RS NE" );
+    CHECK( label( JOY_UP ) == "D\u2191" );
+    CHECK( label( JOY_START ) == "Start" );
 }
 
 TEST_CASE( "gamepad_dpad_spins_a_number_prompt", "[gamepad][fork]" )
