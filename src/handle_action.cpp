@@ -50,6 +50,7 @@
 #include "gates.h"
 #include "gun_mode.h"
 #include "help.h"
+#include "input.h"
 #include "input_context.h"
 #include "input_enums.h"
 #include "input_popup.h"
@@ -3466,12 +3467,23 @@ bool game::handle_action()
             return false;
         }
 
-        if( act == ACTION_PAUSE && !destination_preview.empty() && !veh_ctrl &&
-            !player_character.is_dead_state() &&
-            ctxt.get_raw_input().type == input_event_t::gamepad ) {
-            // Gamepad RT (bound to pause) with a click-to-move route preview
-            // pending commits the route, as the second click would. Handled in
-            // this chain so the any-other-action branch below cannot clear the
+        // With a click-to-move route preview pending (a click by mouse,
+        // trackpad or the VR host's laser), the pad's A walks it and B drops
+        // it: B is bound to pause, and walking a route on the button that
+        // means "back out" nearly killed the player on the Deck. RT (pause)
+        // walks it too, as before.
+        const input_event &pad_evt = ctxt.get_raw_input();
+        const int pad_key = pad_evt.type == input_event_t::gamepad && !pad_evt.sequence.empty() ?
+                            pad_evt.get_first_input() : -1;
+        if( pad_key == JOY_B && !destination_preview.empty() ) {
+            player_character.clear_destination();
+            destination_preview.clear();
+            return false;
+        }
+        if( ( pad_key == JOY_A || ( act == ACTION_PAUSE && pad_key != -1 ) ) &&
+            !destination_preview.empty() && !veh_ctrl && !player_character.is_dead_state() ) {
+            // Commits the route, as the second click would. Handled in this
+            // chain so the any-other-action branch below cannot clear the
             // fresh destination, and so the first step executes this iteration.
             player_character.set_destination( destination_preview );
             destination_preview.clear();
