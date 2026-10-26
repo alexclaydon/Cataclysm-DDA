@@ -494,6 +494,11 @@ class input_context
         std::string get_edittext();
 
         void set_iso( bool mode = true );
+        // Whether its directions are map directions (set_iso): the pad turns
+        // them by the VR host's facing (sdl_gamepad.cpp, in_map_cursor).
+        bool is_iso() const {
+            return iso_mode;
+        }
 
         /**
          * Sets input polling timeout as appropriate for the current interface system.

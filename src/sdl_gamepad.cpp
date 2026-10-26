@@ -516,16 +516,17 @@ static int highlighted_radial_slot()
     return -1;
 }
 
-// A screen that moves a cursor over the map (looking around, aiming): a
-// menu by the UI stack, but its sticks still mean map directions.
+// A screen whose directions are map directions, though a menu by the UI
+// stack: every "which way?" prompt (choose_direction: peek, close, pry...),
+// looking around, aiming, the map editor. They all mark their context with
+// set_iso (upstream's own flag for map directions, which isometric tilesets
+// turn), so the pad treats them as play: sticks turned (map_turn), eight
+// ways, and the d-pad too (dpad_map_key). Screens whose directions are on
+// screen (the overmap, vehicle interaction, lists) don't set it.
 static bool in_map_cursor()
 {
     input_context *top = input_context::input_context_stack.back();
-    if( top == nullptr ) {
-        return false;
-    }
-    const std::string &category = top->input_category();
-    return category == "LOOK" || category == "TARGET";
+    return top != nullptr && top->is_iso();
 }
 
 // How far to turn a stick before reading it as a direction: in VR, by the
@@ -576,6 +577,14 @@ static direction angle_to_direction( const point &p, double turn = 0.0 )
     } else {
         return direction::NW;
     }
+}
+
+// The d-pad on a map screen in a menu (in_map_cursor): the num key for its
+// direction turned like the sticks (map_turn), so up is forward there as on
+// the left stick.
+static int dpad_map_key( const point &step )
+{
+    return direction_to_num_key( angle_to_direction( step, map_turn() ) );
 }
 
 // Helper to send directional movement input
@@ -985,7 +994,7 @@ static bool handle_button_event( SDL_Event &event )
         // If in gameplay, send JOY_* codes for mapped actions
         case CATA_BUTTON_DPAD_UP:
             if( is_in_menu() && !alt_modifier_held ) {
-                joy_code = KEY_UP;
+                joy_code = in_map_cursor() ? dpad_map_key( point::north ) : KEY_UP;
                 input_type = input_event_t::keyboard_char;
             } else {
                 joy_code = JOY_UP;
@@ -993,7 +1002,7 @@ static bool handle_button_event( SDL_Event &event )
             break;
         case CATA_BUTTON_DPAD_DOWN:
             if( is_in_menu() && !alt_modifier_held ) {
-                joy_code = KEY_DOWN;
+                joy_code = in_map_cursor() ? dpad_map_key( point::south ) : KEY_DOWN;
                 input_type = input_event_t::keyboard_char;
             } else {
                 joy_code = JOY_DOWN;
@@ -1001,7 +1010,7 @@ static bool handle_button_event( SDL_Event &event )
             break;
         case CATA_BUTTON_DPAD_LEFT:
             if( is_in_menu() && !alt_modifier_held ) {
-                joy_code = KEY_LEFT;
+                joy_code = in_map_cursor() ? dpad_map_key( point::west ) : KEY_LEFT;
                 input_type = input_event_t::keyboard_char;
             } else {
                 joy_code = JOY_LEFT;
@@ -1009,7 +1018,7 @@ static bool handle_button_event( SDL_Event &event )
             break;
         case CATA_BUTTON_DPAD_RIGHT:
             if( is_in_menu() && !alt_modifier_held ) {
-                joy_code = KEY_RIGHT;
+                joy_code = in_map_cursor() ? dpad_map_key( point::east ) : KEY_RIGHT;
                 input_type = input_event_t::keyboard_char;
             } else {
                 joy_code = JOY_RIGHT;

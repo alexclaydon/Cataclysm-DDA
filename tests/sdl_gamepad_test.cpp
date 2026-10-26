@@ -2,6 +2,7 @@
 
 #include "cata_catch.h"
 #include "input.h"
+#include "input_context.h"
 #include "input_enums.h"
 #include "sdl_gamepad.h"
 #include "ui_manager.h"
@@ -12,7 +13,8 @@
 // spent on a wheel reading centred, and the sticks' hysteresis. All in the
 // gameplay plane (no menu open), but for A and B in a menu, which a
 // yes/no prompt answers Yes and No (query_popup), and the d-pad spinning a
-// number prompt (gamepad::number_step). A rebase that loses one of these shows up
+// number prompt (gamepad::number_step), and a which-way prompt taking map
+// directions while a list keeps its arrows. A rebase that loses one of these shows up
 // here before it reaches the Deck.
 
 using gamepad::pad_axis;
@@ -172,6 +174,37 @@ TEST_CASE( "gamepad_a_and_b_in_a_menu_are_known_as_the_pads", "[gamepad][fork]" 
     press( pad_button::B );
     CHECK( last_code() == KEY_ESCAPE );
     CHECK( gamepad::last_menu_press() == gamepad::menu_press::b );
+}
+
+TEST_CASE( "gamepad_a_which_way_prompt_takes_map_directions", "[gamepad][fork]" )
+{
+    pad_session pad;
+    ui_adaptor game_ui;
+    ui_adaptor prompt;
+    REQUIRE( gamepad::is_in_menu() );
+    SECTION( "a prompt for a map direction (choose_direction's context)" ) {
+        // Marked set_iso, as peek, close and the like ask: sticks and d-pad
+        // as on the map, eight ways (and turned by the VR host's facing).
+        input_context ctxt( "DEFAULTMODE" );
+        ctxt.set_iso( true );
+        gamepad::test_axis( pad_axis::LEFT_X, full );
+        gamepad::test_axis( pad_axis::LEFT_Y, -full );  // up and right
+        CHECK( last_code() == '9' );
+        gamepad::test_axis( pad_axis::LEFT_X, 0 );
+        gamepad::test_axis( pad_axis::LEFT_Y, 0 );
+        press( pad_button::DPAD_UP );
+        CHECK( last_code() == '8' );
+        press( pad_button::DPAD_RIGHT );
+        CHECK( last_code() == '6' );
+    }
+    SECTION( "a list keeps its arrows" ) {
+        input_context ctxt( "INVENTORY" );
+        gamepad::test_axis( pad_axis::LEFT_Y, -full );
+        CHECK( last_code() == KEY_UP );
+        gamepad::test_axis( pad_axis::LEFT_Y, 0 );
+        press( pad_button::DPAD_UP );
+        CHECK( last_code() == KEY_UP );
+    }
 }
 
 TEST_CASE( "gamepad_dpad_spins_a_number_prompt", "[gamepad][fork]" )
