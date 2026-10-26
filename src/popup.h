@@ -218,9 +218,6 @@ class query_popup
         bool ontop;
         bool fullscr;
         keyboard_mode pref_kbd_mode;
-        // The highlight moved by the arrow keys (the pad's d-pad): the pad's
-        // A then confirms it rather than answering Yes.
-        bool highlight_moved = false;
         // The option the pad's B answers (query_once), or -1: its glyph goes
         // on that button.
         int pad_b_option = -1;

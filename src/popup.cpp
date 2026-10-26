@@ -78,14 +78,12 @@ std::vector<int> query_popup_impl::pad_glyphs() const
     if( !gamepad::is_active() || !gamepad::last_input_was_pad() ) {
         return want;
     }
-    // A answers Yes unless the d-pad moved the highlight, then the
-    // highlighted button (query_once).
+    // A answers Yes where there is one, else the highlighted button
+    // (query_once).
     int a = keyboard_selected_option;
-    if( !parent->highlight_moved ) {
-        for( size_t i = 0; i < parent->options.size(); ++i ) {
-            if( parent->options[i].action == "YES" ) {
-                a = int( i );
-            }
+    for( size_t i = 0; i < parent->options.size(); ++i ) {
+        if( parent->options[i].action == "YES" ) {
+            a = int( i );
         }
     }
     if( a >= 0 && a < int( want.size() ) ) {
@@ -483,11 +481,11 @@ query_popup::result query_popup::query_once()
     };
 #if defined(TILES)
     // The pad (the fork's controller scheme): A answers Yes on any prompt
-    // with a Yes, unless the d-pad moved the highlight first; B answers No
-    // where nothing on the prompt takes Escape. The keyboard's Enter and
-    // Escape keep the prompt's own default.
+    // with a Yes, whatever is highlighted; B answers No where nothing on the
+    // prompt takes Escape. The keyboard's Enter and Escape keep the
+    // prompt's own default.
     const gamepad::menu_press pad = by_mouse ? gamepad::menu_press::none : gamepad::last_menu_press();
-    if( pad == gamepad::menu_press::a && res.action == "CONFIRM" && !highlight_moved && has_option( "YES" ) ) {
+    if( pad == gamepad::menu_press::a && res.action == "CONFIRM" && has_option( "YES" ) ) {
         res.action = "YES";
         res.wait_input = false;
         return res;
@@ -499,7 +497,17 @@ query_popup::result query_popup::query_once()
         return res;
     }
 #endif
-    if( cancel && res.action == "QUIT" ) {
+#if defined(TILES)
+    // On a prompt with a Yes the pad answers with A and B alone, so its
+    // d-pad (arrow keys in a menu) moves nothing: the glyphs stay put.
+    const bool pad_arrow = ( res.action == "LEFT" || res.action == "RIGHT" ) &&
+                           gamepad::last_input_was_pad() && has_option( "YES" );
+#else
+    const bool pad_arrow = false;
+#endif
+    if( pad_arrow ) {
+        // Nothing to do.
+    } else if( cancel && res.action == "QUIT" ) {
         res.wait_input = false;
     } else if( res.action == "CONFIRM" ) {
         if( cur < options.size() ) {
@@ -507,14 +515,12 @@ query_popup::result query_popup::query_once()
             res.action = options[cur].action;
         }
     } else if( res.action == "LEFT" ) {
-        highlight_moved = true;
         if( impl->keyboard_selected_option > 0 ) {
             impl->keyboard_selected_option--;
         } else {
             impl->keyboard_selected_option = short( buttons.size() - 1 );
         }
     } else if( res.action == "RIGHT" ) {
-        highlight_moved = true;
         if( impl->keyboard_selected_option < short( buttons.size() - 1 ) ) {
             impl->keyboard_selected_option++;
         } else {
