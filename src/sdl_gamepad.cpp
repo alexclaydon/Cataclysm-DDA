@@ -1,10 +1,12 @@
 #if defined(TILES)
 #include "sdl_gamepad.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <map>
 #include <ostream>
+#include <string>
 
 #include "debug.h"
 #include "input.h"
@@ -13,6 +15,8 @@
 #include "point.h"
 #include "ui_manager.h"
 #include "game.h"
+#include "imgui/imgui.h"
+#include "options.h"
 #if defined(CDDA_GODOT)
 #include "godot_host.h"
 #endif
@@ -1330,6 +1334,129 @@ bool handle_event( SDL_Event &event )
             return false;
         default:
             return false;
+    }
+}
+
+glyph_style current_glyph_style()
+{
+    const std::string style = get_option<std::string>( "GAMEPAD_GLYPHS" );
+    if( style == "xbox" ) {
+        return glyph_style::xbox;
+    } else if( style == "playstation" ) {
+        return glyph_style::playstation;
+    } else if( style == "text" ) {
+        return glyph_style::text;
+    }
+    if( controller != nullptr ) {
+#if SDL_MAJOR_VERSION >= 3
+        switch( SDL_GetGamepadType( controller ) ) {
+            case SDL_GAMEPAD_TYPE_PS3:
+            case SDL_GAMEPAD_TYPE_PS4:
+            case SDL_GAMEPAD_TYPE_PS5:
+                return glyph_style::playstation;
+            default:
+                break;
+        }
+#elif SDL_VERSION_ATLEAST( 2, 0, 14 )
+        switch( SDL_GameControllerGetType( controller ) ) {
+            case SDL_CONTROLLER_TYPE_PS3:
+            case SDL_CONTROLLER_TYPE_PS4:
+            case SDL_CONTROLLER_TYPE_PS5:
+                return glyph_style::playstation;
+            default:
+                break;
+        }
+#endif
+    }
+    return glyph_style::xbox;
+}
+
+static const char *glyph_name( pad_button button )
+{
+    static const std::array<const char *, 14> names = {
+        "A", "B", "X", "Y", "LB", "RB", "LS", "RS", "Start", "Back", "Up", "Down", "Left", "Right"
+    };
+    return names[static_cast<int>( button )];
+}
+
+static bool is_face( pad_button button )
+{
+    return button == pad_button::A || button == pad_button::B || button == pad_button::X ||
+           button == pad_button::Y;
+}
+
+float glyph_width( pad_button button )
+{
+    if( !is_face( button ) || current_glyph_style() == glyph_style::text ) {
+        return ImGui::CalcTextSize( glyph_name( button ) ).x;
+    }
+    return ImGui::GetTextLineHeight() + ImGui::GetStyle().FramePadding.y * 2.0f;
+}
+
+void draw_glyph( pad_button button )
+{
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const float line = ImGui::GetTextLineHeight();
+    const glyph_style glyphs = current_glyph_style();
+    if( !is_face( button ) || glyphs == glyph_style::text ) {
+        // The name, in the face button's colour where it has one.
+        static const std::array<ImU32, 4> colours = {
+            IM_COL32( 110, 200, 70, 255 ), IM_COL32( 235, 80, 70, 255 ),
+            IM_COL32( 80, 140, 240, 255 ), IM_COL32( 240, 200, 60, 255 )
+        };
+        ImGui::AlignTextToFramePadding();
+        ImGui::PushStyleColor( ImGuiCol_Text, is_face( button ) ? colours[static_cast<int>( button )] :
+                               ImGui::GetColorU32( ImGuiCol_Text ) );
+        ImGui::TextUnformatted( glyph_name( button ) );
+        ImGui::PopStyleColor();
+        return;
+    }
+    const float size = glyph_width( button );
+    const ImVec2 at = ImGui::GetCursorScreenPos();
+    ImGui::Dummy( ImVec2( size, line + style.FramePadding.y * 2.0f ) );
+    ImDrawList *draw = ImGui::GetWindowDrawList();
+    const ImVec2 c( at.x + size / 2.0f, at.y + style.FramePadding.y + line / 2.0f );
+    const float r = size * 0.47f;
+    const int face = static_cast<int>( button );
+    if( glyphs == glyph_style::xbox ) {
+        // A disc in the button's colour, its letter dark on it.
+        static const std::array<ImU32, 4> discs = {
+            IM_COL32( 96, 184, 56, 255 ), IM_COL32( 220, 60, 50, 255 ),
+            IM_COL32( 50, 120, 220, 255 ), IM_COL32( 235, 185, 40, 255 )
+        };
+        draw->AddCircleFilled( c, r, discs[face] );
+        const char *letter = glyph_name( button );
+        const ImVec2 text = ImGui::CalcTextSize( letter );
+        draw->AddText( ImVec2( c.x - text.x / 2.0f, c.y - text.y / 2.0f ), IM_COL32( 20, 20, 20, 255 ),
+                       letter );
+        return;
+    }
+    // PlayStation: a dark disc with the shape on it, cross, circle, square
+    // and triangle (south, east, west, north: SDL's A, B, X, Y).
+    static const std::array<ImU32, 4> shapes = {
+        IM_COL32( 125, 170, 235, 255 ), IM_COL32( 235, 95, 110, 255 ),
+        IM_COL32( 225, 130, 200, 255 ), IM_COL32( 70, 200, 165, 255 )
+    };
+    draw->AddCircleFilled( c, r, IM_COL32( 30, 30, 34, 255 ) );
+    const ImU32 col = shapes[face];
+    const float s = r * 0.5f;
+    const float thick = std::max( 1.5f, r * 0.16f );
+    switch( button ) {
+        case pad_button::A:
+            draw->AddLine( ImVec2( c.x - s, c.y - s ), ImVec2( c.x + s, c.y + s ), col, thick );
+            draw->AddLine( ImVec2( c.x - s, c.y + s ), ImVec2( c.x + s, c.y - s ), col, thick );
+            break;
+        case pad_button::B:
+            draw->AddCircle( c, s * 1.05f, col, 0, thick );
+            break;
+        case pad_button::X:
+            draw->AddRect( ImVec2( c.x - s * 0.9f, c.y - s * 0.9f ), ImVec2( c.x + s * 0.9f, c.y + s * 0.9f ),
+                           col, 0.0f, 0, thick );
+            break;
+        default:
+            draw->AddTriangle( ImVec2( c.x, c.y - s * 1.05f ), ImVec2( c.x + s * 1.05f, c.y + s * 0.75f ),
+                               ImVec2( c.x - s * 1.05f, c.y + s * 0.75f ), col, thick );
+            break;
     }
 }
 

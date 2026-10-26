@@ -58,8 +58,8 @@ menu_press last_menu_press();
 void note_keyboard_input();
 
 // Whether the latest input came from the pad: set by every event it sends
-// (in a menu, its synthesized keys too), cleared by the keyboard
-// (note_keyboard_input).
+// (in a menu, its synthesized keys too), cleared by the keyboard and mouse
+// clicks (note_keyboard_input).
 bool last_input_was_pad();
 // The step a number prompt takes for `ev` (the d-pad spinner): the pad's
 // up or down +1 or -1 (in a menu they arrive as arrow keys, so only while
@@ -81,6 +81,18 @@ void test_axis( pad_axis which, int value );
 void test_button( pad_button which, bool down );
 bool is_in_menu();
 bool is_active();
+
+// Button glyphs for hints (the fork's, from the BN backlog): the
+// GAMEPAD_GLYPHS option, where auto follows the pad in use (PlayStation's
+// shapes for a Sony pad, Xbox letters for the rest, the Deck's included).
+enum class glyph_style { xbox, playstation, text };
+glyph_style current_glyph_style();
+// The width draw_glyph takes for it, in pixels.
+float glyph_width( pad_button button );
+// Draws a button's glyph at the ImGui cursor as one item, a framed widget's
+// height (it lines up with a button beside it). The face buttons in the
+// makers' colours; any other button as its short name.
+void draw_glyph( pad_button button );
 
 // Convert direction enum to movement offset
 tripoint direction_to_offset( direction dir );

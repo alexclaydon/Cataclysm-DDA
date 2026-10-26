@@ -5918,6 +5918,8 @@ static void CheckMessages()
                     if( ! mouse.enabled ) {
                         break;
                     }
+                    // A click is not the pad: its glyphs give way (query_popup).
+                    gamepad::note_keyboard_input();
                     if( cataimgui::client::want_capture_mouse() ) {
                         break;
                     }

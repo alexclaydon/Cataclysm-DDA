@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <memory>
 
 #include "cached_options.h"
@@ -26,6 +27,13 @@ class query_popup_impl : public cataimgui::window
         nc_color default_text_color;
         query_popup *parent;
         short last_keyboard_selected_option;
+#if defined(TILES)
+        // The pad's glyphs on each button while the pad is in use (bit 1 A,
+        // bit 2 B: what each answers), and the layout made room for them.
+        std::vector<int> glyphs;
+        std::vector<int> pad_glyphs() const;
+        float glyphs_width( size_t ind ) const;
+#endif
 
         std::vector<std::vector<std::string>> fold_query(
                                                const std::string &category,
@@ -63,9 +71,66 @@ class query_popup_impl : public cataimgui::window
         }
 };
 
+#if defined(TILES)
+std::vector<int> query_popup_impl::pad_glyphs() const
+{
+    std::vector<int> want( parent->options.size(), 0 );
+    if( !gamepad::is_active() || !gamepad::last_input_was_pad() ) {
+        return want;
+    }
+    // A answers Yes unless the d-pad moved the highlight, then the
+    // highlighted button (query_once).
+    int a = keyboard_selected_option;
+    if( !parent->highlight_moved ) {
+        for( size_t i = 0; i < parent->options.size(); ++i ) {
+            if( parent->options[i].action == "YES" ) {
+                a = int( i );
+            }
+        }
+    }
+    if( a >= 0 && a < int( want.size() ) ) {
+        want[a] |= 1;
+    }
+    if( parent->pad_b_option >= 0 && parent->pad_b_option < int( want.size() ) ) {
+        want[parent->pad_b_option] |= 2;
+    }
+    return want;
+}
+
+float query_popup_impl::glyphs_width( size_t ind ) const
+{
+    if( ind >= glyphs.size() ) {
+        return 0.0f;
+    }
+    const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
+    float width = 0.0f;
+    if( glyphs[ind] & 1 ) {
+        width += gamepad::glyph_width( gamepad::pad_button::A ) + gap;
+    }
+    if( glyphs[ind] & 2 ) {
+        width += gamepad::glyph_width( gamepad::pad_button::B ) + gap;
+    }
+    return width;
+}
+#endif
+
 void query_popup_impl::draw_controls()
 {
+#if defined(TILES)
+    // While the pad is in use its glyphs mark what A and B answer, and the
+    // focus frame goes (the keyboard and the mouse bring it back).
+    const std::vector<int> want = pad_glyphs();
+    if( want != glyphs ) {
+        glyphs = want;
+        on_resized();
+    }
+    const bool pad_hints = std::any_of( glyphs.begin(), glyphs.end(), []( int g ) {
+        return g != 0;
+    } );
+    ImGui::SetNavCursorVisible( !pad_hints );
+#else
     ImGui::SetNavCursorVisible( true );
+#endif
     mouse_selected_option = -1;
 
     for( const std::string &line : parent->folded_msg ) {
@@ -79,6 +144,17 @@ void query_popup_impl::draw_controls()
                 ImGui::SameLine();
             }
             ImGui::SetCursorPosX( float( parent->buttons[ind].pos.x ) );
+#if defined(TILES)
+            const int glyph = ind < glyphs.size() ? glyphs[ind] : 0;
+            if( glyph & 1 ) {
+                gamepad::draw_glyph( gamepad::pad_button::A );
+                ImGui::SameLine( 0.0f, ImGui::GetStyle().ItemInnerSpacing.x );
+            }
+            if( glyph & 2 ) {
+                gamepad::draw_glyph( gamepad::pad_button::B );
+                ImGui::SameLine( 0.0f, ImGui::GetStyle().ItemInnerSpacing.x );
+            }
+#endif
             // A click on a button is ImGui's (it captures the mouse over its
             // windows, so no SELECT reaches the input context): take it
             // from the button, as uilist does from its rows.
@@ -121,12 +197,23 @@ void query_popup_impl::on_resized()
     auto btn_padding = [&frame_padding, &item_padding]( size_t num_buttons ) {
         return ( frame_padding * ( num_buttons - 1 ) ) + ( item_padding * ( num_buttons - 1 ) );
     };
+    // A button's width, its pad glyphs included (the options in order).
+    auto opt_width = [this]( size_t ind, const std::string & opt ) {
+        int width = get_text_width( remove_color_tags( opt ) );
+#if defined(TILES)
+        width += int( std::ceil( glyphs_width( ind ) ) );
+#else
+        ( void )ind;
+#endif
+        return width;
+    };
     // Calculate width with query buttons
+    size_t opt_idx = 0;
     for( const auto &line : folded_query ) {
         if( !line.empty() ) {
             int button_width = 0;
             for( const auto &opt : line ) {
-                button_width += get_text_width( remove_color_tags( opt ) );
+                button_width += opt_width( opt_idx++, opt );
             }
             // extra item padding needed here to account for space left at the beginning of the window by ImGui
             msg_width = std::max( msg_width, button_width + btn_padding( line.size() ) + item_padding );
@@ -137,13 +224,16 @@ void query_popup_impl::on_resized()
     // Calculate height with query buttons & button positions
     parent->buttons.clear();
     size_t line_idx = 0;
+    opt_idx = 0;
     if( !folded_query.empty() ) {
         for( const auto &line : folded_query ) {
             if( !line.empty() ) {
                 int button_width = 0;
+                const size_t line_first = opt_idx;
                 for( const auto &opt : line ) {
-                    button_width += get_text_width( remove_color_tags( opt ) );
+                    button_width += opt_width( opt_idx++, opt );
                 }
+                opt_idx = line_first;
                 button_width += btn_padding( line.size() );
                 // Right align.
                 // TODO: multi-line buttons
@@ -151,7 +241,7 @@ void query_popup_impl::on_resized()
                                   size_t( msg_width - button_width );
                 for( const auto &opt : line ) {
                     parent->buttons.emplace_back( opt, point( button_x, line_idx ) );
-                    button_x += get_text_width( remove_color_tags( opt ) ) + frame_padding + item_padding;
+                    button_x += opt_width( opt_idx++, opt ) + frame_padding + item_padding;
                 }
             }
             line_idx++;
@@ -333,6 +423,24 @@ query_popup::result query_popup::query_once()
     if( cancel ) {
         ctxt.register_action( "QUIT" );
     }
+
+#if defined(TILES)
+    // What the pad's B answers (below): the option taking Escape, else No
+    // where nothing can cancel. Its glyph goes on that button.
+    pad_b_option = -1;
+    const std::string &escape_action = ctxt.input_to_action( input_event( KEY_ESCAPE,
+                                       input_event_t::keyboard_code ) );
+    for( size_t i = 0; i < options.size(); ++i ) {
+        if( options[i].action == escape_action ) {
+            pad_b_option = int( i );
+        }
+    }
+    for( size_t i = 0; i < options.size() && pad_b_option < 0 && !cancel; ++i ) {
+        if( options[i].action == "NO" ) {
+            pad_b_option = int( i );
+        }
+    }
+#endif
 
     result res;
     // Assign outside construction of `res` to ensure execution order
