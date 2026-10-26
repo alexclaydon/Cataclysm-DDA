@@ -684,16 +684,18 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     int max_row = top_any_tile_range.p_max.y;
 #if defined(CDDA_GODOT)
     // The VR host's diorama: record the whole snapshot square around the
-    // view's centre (column POSX, row POSY), not only what the 2D zoom fits
-    // in the window, which made the game's zoom grow or shrink the table's
-    // patch of world (taller than wide). Beyond the window, drawing is
-    // clipped away.
+    // avatar, not only what the 2D zoom fits in the window, which made the
+    // game's zoom grow or shrink the table's patch of world (taller than
+    // wide). Around the avatar, not the view's centre: the diorama is built
+    // about the avatar, and a view offset (look-around's pan) slid the square
+    // off one edge of the board. Beyond the window, drawing is clipped away.
     if( godot_host::recording_map() && !is_isometric() ) {
         const int r = godot_host::snapshot_radius();
-        min_col = std::min( min_col, POSX - r );
-        max_col = std::max( max_col, POSX + r + 1 );
-        min_row = std::min( min_row, POSY - r );
-        max_row = std::max( max_row, POSY + r + 1 );
+        const point at = player_to_tile( get_avatar().pos_bub().xy() );
+        min_col = std::min( min_col, at.x - r );
+        max_col = std::max( max_col, at.x + r + 1 );
+        min_row = std::min( min_row, at.y - r );
+        max_row = std::max( max_row, at.y + r + 1 );
     }
 #endif
 
