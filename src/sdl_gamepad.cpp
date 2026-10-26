@@ -36,6 +36,8 @@ static constexpr Uint32 CATA_CONTROLLERBUTTONDOWN    = SDL_EVENT_GAMEPAD_BUTTON_
 static constexpr Uint32 CATA_CONTROLLERBUTTONUP      = SDL_EVENT_GAMEPAD_BUTTON_UP;
 static constexpr Uint32 CATA_CONTROLLERAXISMOTION    = SDL_EVENT_GAMEPAD_AXIS_MOTION;
 static constexpr Uint32 CATA_CONTROLLERDEVICEADDED   = SDL_EVENT_GAMEPAD_ADDED;
+static constexpr Uint32 CATA_JOYDEVICEADDED         = SDL_EVENT_JOYSTICK_ADDED;
+static constexpr Uint32 CATA_JOYDEVICEREMOVED       = SDL_EVENT_JOYSTICK_REMOVED;
 static constexpr Uint32 CATA_CONTROLLERDEVICEREMOVED = SDL_EVENT_GAMEPAD_REMOVED;
 static constexpr int CATA_AXIS_TRIGGERLEFT  = SDL_GAMEPAD_AXIS_LEFT_TRIGGER;
 static constexpr int CATA_AXIS_TRIGGERRIGHT = SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
@@ -62,6 +64,8 @@ static constexpr Uint32 CATA_CONTROLLERBUTTONDOWN    = SDL_CONTROLLERBUTTONDOWN;
 static constexpr Uint32 CATA_CONTROLLERBUTTONUP      = SDL_CONTROLLERBUTTONUP;
 static constexpr Uint32 CATA_CONTROLLERAXISMOTION    = SDL_CONTROLLERAXISMOTION;
 static constexpr Uint32 CATA_CONTROLLERDEVICEADDED   = SDL_CONTROLLERDEVICEADDED;
+static constexpr Uint32 CATA_JOYDEVICEADDED         = SDL_JOYDEVICEADDED;
+static constexpr Uint32 CATA_JOYDEVICEREMOVED       = SDL_JOYDEVICEREMOVED;
 static constexpr Uint32 CATA_CONTROLLERDEVICEREMOVED = SDL_CONTROLLERDEVICEREMOVED;
 static constexpr int CATA_AXIS_TRIGGERLEFT  = SDL_CONTROLLER_AXIS_TRIGGERLEFT;
 static constexpr int CATA_AXIS_TRIGGERRIGHT = SDL_CONTROLLER_AXIS_TRIGGERRIGHT;
@@ -1040,7 +1044,7 @@ static bool handle_button_event( SDL_Event &event )
 
 // Opens a pad SDL lists and keeps it with the others (the first becomes the
 // one polled). SDL3 takes the instance id, SDL2 the device index.
-static void add_controller( int which )
+static void add_controller( int which, const char *how )
 {
 #if SDL_MAJOR_VERSION >= 3
     if( open_controllers.count( static_cast<SDL_JoystickID>( which ) ) ) {
@@ -1066,7 +1070,8 @@ static void add_controller( int which )
     const SDL_JoystickID id = SDL_JoystickInstanceID( SDL_GameControllerGetJoystick( opened ) );
     const char *name = SDL_GameControllerName( opened );
 #endif
-    DebugLog( D_INFO, DC_ALL ) << "Gamepad added: " << ( name ? name : "?" ) << " (id " << id << ")";
+    DebugLog( D_INFO, DC_ALL ) << "Gamepad added: " << ( name ? name : "?" ) << " (id " << id << ", by " <<
+                               how << ")";
     open_controllers[id] = opened;
     if( controller == nullptr ) {
         controller = opened;
@@ -1074,11 +1079,11 @@ static void add_controller( int which )
     }
 }
 
-static void remove_controller( SDL_JoystickID gone )
+static void remove_controller( SDL_JoystickID gone, const char *how )
 {
     auto it = open_controllers.find( gone );
     if( it != open_controllers.end() ) {
-        DebugLog( D_INFO, DC_ALL ) << "Gamepad removed: id " << gone;
+        DebugLog( D_INFO, DC_ALL ) << "Gamepad removed: id " << gone << " (by " << how << ")";
 #if SDL_MAJOR_VERSION >= 3
         SDL_CloseGamepad( it->second );
 #else
@@ -1103,19 +1108,32 @@ static void remove_controller( SDL_JoystickID gone )
 
 static void handle_device_event( SDL_Event &event )
 {
+    // Every hotplug event SDL sends is logged, the joystick-level ones too
+    // (a pad SDL saw but couldn't take as a gamepad shows only those): a
+    // woken Steam Controller's pad never arrived on the Deck (see
+    // rescan_controllers).
+    if( event.type == CATA_JOYDEVICEADDED || event.type == CATA_JOYDEVICEREMOVED ) {
+#if SDL_MAJOR_VERSION >= 3
+        const int which = static_cast<int>( event.jdevice.which );
+#else
+        const int which = event.jdevice.which;
+#endif
+        DebugLog( D_INFO, DC_ALL ) << "Joystick " << ( event.type == CATA_JOYDEVICEADDED ? "added" :
+                                   "removed" ) << " event: " << which;
+        return;
+    }
+#if SDL_MAJOR_VERSION >= 3
+    const int which = static_cast<int>( event.gdevice.which );
+#else
+    const int which = event.cdevice.which;
+#endif
+    DebugLog( D_INFO, DC_ALL ) << "Gamepad " << ( event.type == CATA_CONTROLLERDEVICEADDED ? "added" :
+                               "removed" ) << " event: " << which;
     if( event.type == CATA_CONTROLLERDEVICEADDED ) {
-#if SDL_MAJOR_VERSION >= 3
-        // SDL3: event provides instance ID directly; SDL_OpenGamepad takes it.
-        add_controller( static_cast<int>( event.gdevice.which ) );
-#else
-        add_controller( event.cdevice.which );
-#endif
+        // SDL3: the event gives the instance id, which SDL_OpenGamepad takes.
+        add_controller( which, "event" );
     } else if( event.type == CATA_CONTROLLERDEVICEREMOVED ) {
-#if SDL_MAJOR_VERSION >= 3
-        remove_controller( event.gdevice.which );
-#else
-        remove_controller( event.cdevice.which );
-#endif
+        remove_controller( static_cast<SDL_JoystickID>( which ), "event" );
     }
 }
 
@@ -1131,14 +1149,14 @@ static void rescan_controllers()
     SDL_JoystickID *ids = SDL_GetGamepads( &count );
     for( int i = 0; ids && i < count; ++i ) {
         present.insert( ids[i] );
-        add_controller( static_cast<int>( ids[i] ) );
+        add_controller( static_cast<int>( ids[i] ), "rescan" );
     }
     SDL_free( ids );
 #else
     for( int i = 0; i < SDL_NumJoysticks(); ++i ) {
         if( SDL_IsGameController( i ) ) {
             present.insert( SDL_JoystickGetDeviceInstanceID( i ) );
-            add_controller( i );
+            add_controller( i, "rescan" );
         }
     }
 #endif
@@ -1154,7 +1172,7 @@ static void rescan_controllers()
         }
     }
     for( const SDL_JoystickID id : gone ) {
-        remove_controller( id );
+        remove_controller( id, "rescan" );
     }
 }
 
@@ -1287,6 +1305,8 @@ bool is_gamepad_event( const SDL_Event &event )
         case CATA_CONTROLLERAXISMOTION:
         case CATA_CONTROLLERDEVICEADDED:
         case CATA_CONTROLLERDEVICEREMOVED:
+        case CATA_JOYDEVICEADDED:
+        case CATA_JOYDEVICEREMOVED:
         case SDL_GAMEPAD_SCHEDULER:
             return true;
         default:
@@ -1402,6 +1422,8 @@ bool handle_event( SDL_Event &event )
             return handle_axis_event( event );
         case CATA_CONTROLLERDEVICEADDED:
         case CATA_CONTROLLERDEVICEREMOVED:
+        case CATA_JOYDEVICEADDED:
+        case CATA_JOYDEVICEREMOVED:
             handle_device_event( event );
             return false;
         case SDL_GAMEPAD_SCHEDULER:
