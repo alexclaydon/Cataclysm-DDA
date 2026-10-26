@@ -7,6 +7,7 @@
 #include <map>
 #include <ostream>
 #include <string>
+#include <vector>
 
 #include "debug.h"
 #include "input.h"
@@ -626,6 +627,169 @@ static void send_direction_movement()
     }
 }
 
+// The host's shoulder wheels (ADR 0009). In play, where the host draws
+// wheels, a bare shoulder is a tap or a hold: let go before the wheel opens
+// and it sends its binding, as a press does without wheels; hold it
+// (wheel_hold_ms, or push a stick) and its wheel opens. While open the pad
+// is the wheel's: the sticks, A and B go to the host as wheel events, the
+// rest is swallowed, until the shoulder's release or the host's answer.
+// The engine knows nothing of slots or rings; the host picks and answers
+// with an action (godot_host::wheel_done).
+namespace
+{
+enum class wheel_phase { none, pending, open, done };
+} // namespace
+static wheel_phase wheel_state = wheel_phase::none;
+static int wheel_button = -1;  // the shoulder (CATA_BUTTON_*) while not none
+static uint32_t wheel_pressed_at = 0;
+static int wheel_serial = 0;
+// Whether the left stick was pushed (aiming) when the shoulder went down:
+// then it neither opens the wheel nor picks until it re-centres.
+static std::array<bool, max_sticks> wheel_stick_was_pushed = {{false, false}};
+static constexpr uint32_t wheel_hold_ms = 250;
+static bool test_wheels = false;  // test_enable_wheels
+static uint32_t test_ticks = 0;   // test_advance: added to GetTicks
+static std::vector<int> test_wheel_kinds;  // test_take_wheel_events
+
+static uint32_t now_ms()
+{
+    return GetTicks() + test_ticks;
+}
+
+static bool wheels_on()
+{
+    if( test_wheels ) {
+        return true;
+    }
+#if defined(CDDA_GODOT)
+    return godot_host::wheels_enabled() && godot_host::in_game();
+#else
+    return false;
+#endif
+}
+
+static bool wheel_capturing()
+{
+    return wheel_state == wheel_phase::open;
+}
+
+static void send_wheel_event( int kind, float x = 0.0f, float y = 0.0f )
+{
+    // Recorded as the host's queue keeps them: a stick replaces a stick.
+    if( test_mode && !( kind == 1 && !test_wheel_kinds.empty() && test_wheel_kinds.back() == 1 ) ) {
+        test_wheel_kinds.push_back( kind );
+    }
+#if defined(CDDA_GODOT)
+    godot_host::wheel_event event;
+    event.kind = static_cast<godot_host::wheel_event::kind_t>( kind );
+    event.serial = wheel_serial;
+    event.wheel = wheel_button == CATA_BUTTON_LEFTSHOULDER ? 0 : 1;
+    event.x = x;
+    event.y = y;
+    godot_host::push_wheel_event( std::move( event ) );
+#else
+    ( void )x;
+    ( void )y;
+#endif
+}
+
+// Sticks still pushed as a wheel closes are spent (as after the LT wheels),
+// so nothing walks or aims with them by accident.
+static void end_wheel( wheel_phase next )
+{
+    wheel_state = next;
+    if( next == wheel_phase::none ) {
+        wheel_button = -1;
+    }
+    stick_consumed[0] = left_stick_dir != direction::NONE;
+    stick_consumed[1] = right_stick_dir != direction::NONE;
+    if( g ) {
+        g->invalidate_main_ui_adaptor();
+    }
+}
+
+static void send_wheel_stick();
+
+static void open_wheel()
+{
+    wheel_state = wheel_phase::open;
+    ++wheel_serial;
+    // The aim is where the left stick pointed as the shoulder went down; a
+    // stick pushed now is spent, so it picks nothing until it re-centres.
+    const tripoint aim = direction_to_offset( stick_dir( 0 ) );
+    stick_consumed[0] = wheel_stick_was_pushed[0];
+    stick_consumed[1] = wheel_stick_was_pushed[1];
+    for( task_t &task : all_tasks ) {
+        cancel_task( task );
+    }
+    stick_sent = { -1, -1 };
+    if( test_mode ) {
+        test_wheel_kinds.push_back( 0 );
+    }
+#if defined(CDDA_GODOT)
+    godot_host::wheel_event event;
+    event.kind = godot_host::wheel_event::opened;
+    event.serial = wheel_serial;
+    event.wheel = wheel_button == CATA_BUTTON_LEFTSHOULDER ? 0 : 1;
+    event.aim_dx = aim.x;
+    event.aim_dy = aim.y;
+    if( !test_mode ) {
+        event.actions = godot_host::wheel_catalogue( aim.x, aim.y );
+    }
+    godot_host::set_wheel_aim( wheel_serial, aim.x, aim.y );
+    godot_host::push_wheel_event( std::move( event ) );
+#else
+    ( void )aim;
+#endif
+    // Where the picking stick is already (SDL reports a stick only as it moves).
+    send_wheel_stick();
+    if( g ) {
+        g->invalidate_main_ui_adaptor();
+    }
+}
+
+// The picking stick: of the sticks not spent, the one pushed further, as
+// -1..1 with y up.
+static void send_wheel_stick()
+{
+    float best = -1.0f;
+    float x = 0.0f;
+    float y = 0.0f;
+    for( int i = 0; i < max_sticks; ++i ) {
+        if( stick_consumed[i] ) {
+            continue;
+        }
+        const float sx = get_controller_axis( sticks_axis[i][0] ) / 32767.0f;
+        const float sy = -get_controller_axis( sticks_axis[i][1] ) / 32767.0f;
+        const float m = sx * sx + sy * sy;
+        if( m > best ) {
+            best = m;
+            x = sx;
+            y = sy;
+        }
+    }
+    send_wheel_event( 1, std::clamp( x, -1.0f, 1.0f ), std::clamp( y, -1.0f, 1.0f ) );
+}
+
+// Each pad event first: the host's answer closes the wheel, and so does
+// leaving play (a menu the game opened itself, the game ending).
+static void check_wheel()
+{
+    if( wheel_state != wheel_phase::open ) {
+        return;
+    }
+#if defined(CDDA_GODOT)
+    if( godot_host::take_wheel_done( wheel_serial ) ) {
+        end_wheel( wheel_phase::done );
+        return;
+    }
+#endif
+    if( !wheels_on() || ( is_in_menu() && !test_mode ) ) {
+        send_wheel_event( 5 );
+        end_wheel( wheel_phase::done );
+    }
+}
+
 static bool handle_axis_event( SDL_Event &event )
 {
     if( event.type != CATA_CONTROLLERAXISMOTION ) {
@@ -663,6 +827,17 @@ static bool handle_axis_event( SDL_Event &event )
         task_t &task = all_tasks[triggers_task_index + idx];
         bool trigger_pressed = value > triggers_threshold + error_margin;
         bool trigger_released = value < triggers_threshold - error_margin;
+
+        if( wheel_capturing() ) {
+            // The wheel has the pad: a trigger only keeps its state.
+            if( !state && trigger_pressed ) {
+                triggers_state[idx] = 1;
+            }
+            if( state && trigger_released ) {
+                triggers_state[idx] = 0;
+            }
+            return false;
+        }
 
         if( idx == 1 ) {
             // Right trigger (RT)
@@ -761,6 +936,20 @@ static bool handle_axis_event( SDL_Event &event )
             // Physically back at centre, so the stick is live again.
             if( dir == direction::NONE ) {
                 stick_consumed[i] = false;
+                wheel_stick_was_pushed[i] = false;
+            }
+
+            // A stick pushed while a shoulder is held opens its wheel at once
+            // (not the one already aiming when it went down).
+            if( wheel_state == wheel_phase::pending && dir != direction::NONE &&
+                !wheel_stick_was_pushed[i] ) {
+                open_wheel();
+            }
+            if( wheel_capturing() ) {
+                cancel_task( stick_task );
+                stick_sent[i] = -1;
+                send_wheel_stick();
+                continue;
             }
 
             if( alt_modifier_held && !alt2_modifier_held && !stick_consumed[i] ) {
@@ -905,6 +1094,47 @@ static bool handle_button_event( SDL_Event &event )
         if( button < max_buttons ) {
             cancel_task( all_tasks[button] );
         }
+        if( wheel_state != wheel_phase::none && button == wheel_button ) {
+            const wheel_phase was = wheel_state;
+            if( was == wheel_phase::pending ) {
+                // A tap: the shoulder's own binding, on release.
+                wheel_state = wheel_phase::none;
+                wheel_button = -1;
+                send_input( button == CATA_BUTTON_LEFTSHOULDER ? JOY_LB : JOY_RB );
+                return false;
+            }
+            if( was == wheel_phase::open ) {
+                send_wheel_event( 4 );
+            }
+            end_wheel( wheel_phase::none );
+            return true;
+        }
+        return false;
+    }
+
+    if( wheel_capturing() ) {
+        // A and B are the wheel's (confirm, back); the rest are swallowed.
+        if( button == CATA_BUTTON_A ) {
+            send_wheel_event( 2 );
+        } else if( button == CATA_BUTTON_B ) {
+            send_wheel_event( 3 );
+        }
+        return false;
+    }
+    if( wheel_state == wheel_phase::pending ) {
+        // Another button before the wheel opened: swallowed, as it would be
+        // a moment later. (Sending the shoulder's tap and this button both
+        // would lose one: a poll keeps only the last input.)
+        return false;
+    }
+    if( ( button == CATA_BUTTON_LEFTSHOULDER || button == CATA_BUTTON_RIGHTSHOULDER ) &&
+        wheel_state == wheel_phase::none && wheels_on() && !is_in_menu() && !alt_modifier_held &&
+        !any_radial_open() ) {
+        wheel_state = wheel_phase::pending;
+        wheel_button = button;
+        wheel_pressed_at = now_ms();
+        // Only the left stick aims: a right stick already pushed picks.
+        wheel_stick_was_pushed = { { left_stick_dir != direction::NONE, false } };
         return false;
     }
 
@@ -1145,6 +1375,9 @@ static void handle_device_event( SDL_Event &event )
 
 static void handle_scheduler_event( SDL_Event &/*event*/ )
 {
+    if( wheel_state == wheel_phase::pending && now_ms() - wheel_pressed_at >= wheel_hold_ms ) {
+        open_wheel();
+    }
     uint32_t now = GetTicks();
     for( size_t i = 0; i < all_tasks.size(); ++i ) {
         gamepad::task_t &task = all_tasks[i];
@@ -1328,6 +1561,37 @@ void test_begin()
     for( task_t &task : all_tasks ) {
         task.counter = 0;
     }
+    wheel_state = wheel_phase::none;
+    wheel_button = -1;
+    wheel_stick_was_pushed = { { false, false } };
+    test_wheels = false;
+    test_ticks = 0;
+    test_wheel_kinds.clear();
+}
+
+void test_enable_wheels()
+{
+    test_wheels = true;
+}
+
+void test_advance( int ms )
+{
+    test_ticks += ms;
+    SDL_Event event{};
+    event.type = SDL_GAMEPAD_SCHEDULER;
+    handle_event( event );
+}
+
+std::vector<int> test_take_wheel_events()
+{
+    std::vector<int> out;
+    out.swap( test_wheel_kinds );
+    return out;
+}
+
+bool wheel_is_open()
+{
+    return wheel_state == wheel_phase::open;
 }
 
 void test_end()
@@ -1376,6 +1640,7 @@ void test_button( pad_button which, bool down )
 
 bool handle_event( SDL_Event &event )
 {
+    check_wheel();
     switch( event.type ) {
         case CATA_CONTROLLERBUTTONDOWN:
         case CATA_CONTROLLERBUTTONUP:

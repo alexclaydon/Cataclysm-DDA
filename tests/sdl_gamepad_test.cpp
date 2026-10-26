@@ -1,5 +1,7 @@
 #if defined(TILES)
 
+#include <vector>
+
 #include "cata_catch.h"
 #include "input.h"
 #include "input_context.h"
@@ -254,6 +256,97 @@ TEST_CASE( "gamepad_dpad_spins_a_number_prompt", "[gamepad][fork]" )
     // Other pad input doesn't step.
     press( pad_button::A );
     CHECK( gamepad::number_step( last_input ) == 0 );
+}
+
+// The host's shoulder wheels (ADR 0009): kinds as godot_host::wheel_event.
+namespace
+{
+constexpr int wheel_opened = 0;
+constexpr int wheel_stick = 1;
+constexpr int wheel_confirm = 2;
+constexpr int wheel_released = 4;
+} // namespace
+
+TEST_CASE( "gamepad_shoulders_without_host_wheels_are_as_ever", "[gamepad][fork]" )
+{
+    pad_session pad;
+    gamepad::test_button( pad_button::LB, true );
+    CHECK( last_code() == JOY_LB );  // on press
+    gamepad::test_button( pad_button::LB, false );
+    gamepad::test_advance( 1000 );
+    CHECK_FALSE( gamepad::wheel_is_open() );
+}
+
+TEST_CASE( "gamepad_shoulder_tap_sends_its_binding_on_release", "[gamepad][fork]" )
+{
+    pad_session pad;
+    gamepad::test_enable_wheels();
+    gamepad::test_button( pad_button::RB, true );
+    CHECK( last_code() == -1 );
+    gamepad::test_advance( 100 );
+    gamepad::test_button( pad_button::RB, false );
+    CHECK( last_code() == JOY_RB );
+    CHECK_FALSE( gamepad::wheel_is_open() );
+    CHECK( gamepad::test_take_wheel_events().empty() );
+}
+
+TEST_CASE( "gamepad_shoulder_held_opens_its_wheel_and_captures_the_pad", "[gamepad][fork]" )
+{
+    pad_session pad;
+    gamepad::test_enable_wheels();
+    gamepad::test_button( pad_button::LB, true );
+    gamepad::test_advance( 300 );
+    REQUIRE( gamepad::wheel_is_open() );
+    gamepad::test_axis( pad_axis::RIGHT_X, full );
+    press( pad_button::A );
+    gamepad::test_axis( pad_axis::RT, full );  // swallowed: no walking, no pause
+    press( pad_button::X );                    // swallowed
+    CHECK( last_code() == -1 );
+    gamepad::test_button( pad_button::LB, false );
+    CHECK_FALSE( gamepad::wheel_is_open() );
+    CHECK( last_code() == -1 );  // no tap after a wheel
+    const std::vector<int> kinds = gamepad::test_take_wheel_events();
+    REQUIRE( kinds.size() == 4 );
+    CHECK( kinds[0] == wheel_opened );
+    CHECK( kinds[1] == wheel_stick );
+    CHECK( kinds[2] == wheel_confirm );
+    CHECK( kinds[3] == wheel_released );
+    // The stick that picked is spent: it doesn't aim until it re-centres.
+    CHECK( gamepad::get_right_stick_direction() == gamepad::direction::NONE );
+    gamepad::test_axis( pad_axis::RT, 0 );
+}
+
+TEST_CASE( "gamepad_a_stick_pushed_opens_a_wheel_but_not_the_aiming_one", "[gamepad][fork]" )
+{
+    pad_session pad;
+    gamepad::test_enable_wheels();
+    gamepad::test_axis( pad_axis::LEFT_X, full );  // aiming east
+    gamepad::test_button( pad_button::LB, true );
+    gamepad::test_axis( pad_axis::LEFT_Y, -full );  // still aiming: no wheel yet
+    CHECK_FALSE( gamepad::wheel_is_open() );
+    gamepad::test_axis( pad_axis::RIGHT_Y, -full );  // the other stick opens it
+    REQUIRE( gamepad::wheel_is_open() );
+    gamepad::test_button( pad_button::LB, false );
+    gamepad::test_axis( pad_axis::RIGHT_Y, 0 );
+    // The aiming stick was spent on the wheel: centred until it re-centres.
+    CHECK( gamepad::get_left_stick_direction() == gamepad::direction::NONE );
+    gamepad::test_axis( pad_axis::LEFT_X, 0 );
+    gamepad::test_axis( pad_axis::LEFT_Y, 0 );
+    gamepad::test_axis( pad_axis::LEFT_X, full );
+    CHECK( gamepad::get_left_stick_direction() == gamepad::direction::E );
+}
+
+TEST_CASE( "gamepad_lt_with_a_shoulder_stays_its_alt_twin", "[gamepad][fork]" )
+{
+    pad_session pad;
+    gamepad::test_enable_wheels();
+    gamepad::test_axis( pad_axis::LT, full );
+    gamepad::test_button( pad_button::LB, true );
+    CHECK( last_code() == JOY_ALT_LB );  // on press, as ever
+    gamepad::test_button( pad_button::LB, false );
+    gamepad::test_advance( 1000 );
+    CHECK_FALSE( gamepad::wheel_is_open() );
+    gamepad::test_axis( pad_axis::LT, 0 );
 }
 
 #endif // TILES

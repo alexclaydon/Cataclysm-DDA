@@ -2,6 +2,8 @@
 #ifndef CATA_SRC_SDL_GAMEPAD_H
 #define CATA_SRC_SDL_GAMEPAD_H
 #if defined(TILES)
+#include <vector>
+
 #include "input_enums.h"
 #include "sdl_wrappers.h"
 
@@ -79,6 +81,14 @@ void test_begin();
 void test_end();
 void test_axis( pad_axis which, int value );
 void test_button( pad_button which, bool down );
+// The host's shoulder wheels (ADR 0009): test_enable_wheels turns them on
+// as a host drawing wheels would; test_advance moves the clock on and runs
+// the scheduler; test_take_wheel_events returns the kinds of the wheel
+// events sent since (godot_host::wheel_event::kind_t).
+void test_enable_wheels();
+void test_advance( int ms );
+std::vector<int> test_take_wheel_events();
+bool wheel_is_open();
 bool is_in_menu();
 bool is_active();
 

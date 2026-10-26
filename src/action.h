@@ -608,6 +608,19 @@ point_rel_ms get_delta_from_movement_action( action_id act, iso_rotate rot );
  */
 action_id handle_action_menu( map &here );
 
+/** One of the action menu's categories: a stable id ("look"), its translated name, its actions. */
+struct action_menu_category {
+    std::string id;
+    std::string name;
+    std::vector<action_id> actions;
+};
+
+/**
+ * The action menu's categories (Look to Misc, not Debug) and their actions, in the menu's
+ * order: what handle_action_menu lists, as data, for other front ends (the Godot host's wheels).
+ */
+std::vector<action_menu_category> action_menu_categories();
+
 /**
  * Show a context-sensitive action menu for a specific tile.
  *

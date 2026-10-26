@@ -75,6 +75,18 @@ std::string goto_type;  // request_goto's, empty for none (under look_mutex)
 int time_hour = -1;     // request_time's, -1 for none (under look_mutex)
 int look_dx = 0;
 int look_dy = 0;
+// The wheels (ADR 0009): the events for the host, and its answers.
+std::atomic<bool> wheels_wanted{ false };
+std::mutex wheel_mutex;
+std::deque<godot_host::wheel_event> wheel_events;
+std::atomic<int> wheel_done_serial{ 0 };
+// Under look_mutex: the action the host chose, from which wheel, and the
+// aim each wheel opened with.
+std::string action_requested;
+int action_serial = 0;
+int aim_serial = 0;
+int aim_x = 0;
+int aim_y = 0;
 std::mutex mouse_mutex;
 std::deque<mouse_command> mouse_queue;
 uint32_t mouse_buttons_applied = 0;  // engine thread only
@@ -318,7 +330,82 @@ void godot_host::request_look( int dx, int dy )
 bool godot_host::look_pending()
 {
     std::lock_guard<std::mutex> lock( look_mutex );
-    return look_requested || !goto_type.empty() || time_hour >= 0;
+    return look_requested || !goto_type.empty() || time_hour >= 0 || !action_requested.empty();
+}
+
+void godot_host::enable_wheels()
+{
+    wheels_wanted = true;
+}
+
+bool godot_host::wheels_enabled()
+{
+    return wheels_wanted;
+}
+
+void godot_host::push_wheel_event( wheel_event event )
+{
+    std::lock_guard<std::mutex> lock( wheel_mutex );
+    if( event.kind == wheel_event::stick && !wheel_events.empty() &&
+        wheel_events.back().kind == wheel_event::stick ) {
+        // Only where the stick is now matters.
+        wheel_events.back() = std::move( event );
+        return;
+    }
+    if( wheel_events.size() >= 256 ) {
+        wheel_events.pop_front();
+    }
+    wheel_events.push_back( std::move( event ) );
+}
+
+void godot_host::take_wheel_events( std::vector<wheel_event> &out )
+{
+    out.clear();
+    std::lock_guard<std::mutex> lock( wheel_mutex );
+    out.assign( std::make_move_iterator( wheel_events.begin() ),
+                std::make_move_iterator( wheel_events.end() ) );
+    wheel_events.clear();
+}
+
+void godot_host::wheel_done( int serial, const std::string &action )
+{
+    wheel_done_serial = serial;
+    if( !action.empty() ) {
+        std::lock_guard<std::mutex> lock( look_mutex );
+        action_requested = action;
+        action_serial = serial;
+    }
+    // Wake the engine: the gamepad layer closes the wheel on its next
+    // event, and the play loop takes the action.
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_wheel_done( int serial )
+{
+    int expected = serial;
+    return wheel_done_serial.compare_exchange_strong( expected, 0 );
+}
+
+void godot_host::set_wheel_aim( int serial, int aim_dx, int aim_dy )
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    aim_serial = serial;
+    aim_x = aim_dx;
+    aim_y = aim_dy;
+}
+
+bool godot_host::take_action_request( std::string &action, int &aim_dx, int &aim_dy )
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    if( action_requested.empty() ) {
+        return false;
+    }
+    action = action_requested;
+    action_requested.clear();
+    const bool aimed = action_serial == aim_serial;
+    aim_dx = aimed ? aim_x : 0;
+    aim_dy = aimed ? aim_y : 0;
+    return true;
 }
 
 void godot_host::request_goto( const std::string &type )

@@ -281,7 +281,7 @@ bool take_goto_request( std::string &type );
 // as the debug menu's Change time does, for night scenes.
 void request_time( int hour );
 bool take_time_request( int &hour );
-// Whether a look or goto request waits, without taking it:
+// Whether a look, goto or wheel action request waits, without taking it:
 // game::handle_mouseview stops there, or the mouse view's loop (and
 // get_player_input's, on timeouts) would keep it waiting until a key came.
 bool look_pending();
@@ -298,6 +298,73 @@ bool text_wanted();
 void set_in_game( bool playing );
 bool in_game();
 
+
+// Wheels on the pad's shoulders, drawn by the host (ADR 0009). In play, a
+// bare shoulder held opens a wheel: LB the local one (what to do at the
+// aimed tile), RB the global one (every action by category). The engine
+// captures the pad while one is open and sends what it does as wheel
+// events; the host draws the wheel, picks, and answers with wheel_done. A
+// tap is the shoulder's binding, as without wheels.
+//
+// Host side: ask for them before run(); without that the shoulders are as
+// in the flat game.
+void enable_wheels();
+bool wheels_enabled();
+
+// One action a wheel can offer: one of the action menu's (action.cpp).
+struct wheel_action {
+    std::string id;             // the action's id, as keybindings.json has it
+    std::string name;           // its display name
+    std::string category;       // the action menu's category: "look", "interact"...
+    std::string category_name;  // its display name
+    bool applies;               // possible now (for a tile verb: at the aim)
+    bool at_tile;               // takes the aimed tile as its target
+};
+
+struct wheel_event {
+    enum kind_t : int {
+        opened = 0,    // a wheel opened: `aim_*` and `actions` are set
+        stick = 1,     // the picking stick moved: `x`, `y`
+        confirm = 2,   // A
+        back = 3,      // B
+        released = 4,  // the shoulder was let go: pick what is highlighted
+        closed = 5,    // the engine closed it (the game left play): drop it
+    };
+    kind_t kind = opened;
+    int serial = 0;  // which opening this belongs to, for wheel_done
+    int wheel = 0;   // 0 local (LB), 1 global (RB)
+    // The picking stick (whichever is pushed further and not spent): -1..1,
+    // x to the right, y up, as on the pad (not turned by the view).
+    float x = 0.0f;
+    float y = 0.0f;
+    // The aimed tile, from the avatar, turned like the left stick; 0, 0
+    // with the stick at rest when the shoulder went down.
+    int aim_dx = 0;
+    int aim_dy = 0;
+    std::vector<wheel_action> actions;
+};
+
+// Host side, any thread: the events since the last call, oldest first.
+void take_wheel_events( std::vector<wheel_event> &out );
+// Host side, any thread: the wheel opened as `serial` is done. `action` is
+// an id from its actions to perform (at the aim, for a tile verb), or empty
+// for none. Ignored if that wheel has already closed and another opened.
+void wheel_done( int serial, const std::string &action );
+
+// Engine side. The gamepad layer opens and feeds a wheel; the catalogue is
+// built by game code (godot_wheels.cpp), as the wheel opens.
+void push_wheel_event( wheel_event event );
+std::vector<wheel_action> wheel_catalogue( int aim_dx, int aim_dy );
+// Whether the action `id` takes the aimed tile as its target.
+bool wheel_action_at_tile( const std::string &id );
+// The aim the wheel opened as `serial` targets, for its action request.
+void set_wheel_aim( int serial, int aim_dx, int aim_dy );
+// Whether the host has finished the wheel opened as `serial` (and takes
+// that answer). The action itself, if any, waits for the play loop:
+bool take_wheel_done( int serial );
+// game::handle_action takes it as if its key had been pressed, with the
+// aim to use as the target. Counted by look_pending().
+bool take_action_request( std::string &action, int &aim_dx, int &aim_dy );
 
 // If the map has been drawn since `sequence`, move the newest snapshot into
 // `out`, update `sequence` and return true.

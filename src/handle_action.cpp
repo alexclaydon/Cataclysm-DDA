@@ -3318,6 +3318,20 @@ bool game::handle_action()
         ctxt = get_player_input( action );
     }
 #if defined(CDDA_GODOT)
+    // The host's shoulder wheel chose an action (ADR 0009): taken as if its
+    // key had been pressed, aimed where the wheel opened.
+    std::optional<tripoint_rel_ms> wheel_aim;
+    {
+        std::string wheel_action;
+        int aim_dx = 0;
+        int aim_dy = 0;
+        if( godot_host::take_action_request( wheel_action, aim_dx, aim_dy ) ) {
+            action = wheel_action;
+            if( ( aim_dx != 0 || aim_dy != 0 ) && godot_host::wheel_action_at_tile( wheel_action ) ) {
+                wheel_aim = tripoint_rel_ms( aim_dx, aim_dy, 0 );
+            }
+        }
+    }
     // VR: the player pointed at a tile and asked to look at it.
     {
         int dx = 0;
@@ -3405,8 +3419,13 @@ bool game::handle_action()
             }
         }
 
+#if defined(CDDA_GODOT)
+        if( wheel_aim ) {
+            mouse_target = player_character.pos_bub() + *wheel_aim;
+        }
+#endif
 #if defined(TILES)
-        if( gamepad::is_active() ) {
+        if( !mouse_target && gamepad::is_active() ) {
             gamepad::direction dir = gamepad::get_left_stick_direction();
             if( dir != gamepad::direction::NONE ) {
                 // List of actions that can use the directional cursor

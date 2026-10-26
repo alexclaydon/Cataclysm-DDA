@@ -787,6 +787,62 @@ action_id handle_interact( map &here, const tripoint_bub_ms &pos )
     return static_cast<action_id>( tmenu.ret );
 }
 
+std::vector<action_menu_category> action_menu_categories()
+{
+    std::vector<action_menu_category> categories;
+    categories.push_back( { "look", _( "Look" ), {
+            ACTION_LOOK, ACTION_PEEK, ACTION_LIST_ITEMS, ACTION_ZONES, ACTION_MAP, ACTION_SKY
+        }
+    } );
+    categories.push_back( { "interact", _( "Interact" ), {
+            ACTION_EXAMINE, ACTION_EXAMINE_AND_PICKUP, ACTION_SMASH, ACTION_MOVE_DOWN, ACTION_MOVE_UP,
+            ACTION_OPEN, ACTION_CLOSE, ACTION_CHAT, ACTION_PICKUP, ACTION_PICKUP_ALL, ACTION_GRAB,
+            ACTION_HAUL, ACTION_HAUL_TOGGLE, ACTION_BUTCHER, ACTION_LOOT
+        }
+    } );
+    // Everything after DIR_DROP can be accessed through the inventory screen,
+    // so it's sorted to the end of the list.
+    categories.push_back( { "inventory", _( "Inventory" ), {
+            ACTION_INVENTORY, ACTION_ADVANCEDINV, ACTION_SORT_ARMOR, ACTION_DIR_DROP,
+            ACTION_INSERT_ITEM, ACTION_UNLOAD_CONTAINER, ACTION_DROP, ACTION_COMPARE, ACTION_ORGANIZE,
+            ACTION_USE, ACTION_WEAR, ACTION_TAKE_OFF, ACTION_EAT, ACTION_OPEN_CONSUME, ACTION_READ,
+            ACTION_WIELD, ACTION_UNLOAD
+        }
+    } );
+    categories.push_back( { "combat", _( "Combat" ), {
+            ACTION_CYCLE_MOVE, ACTION_RESET_MOVE, ACTION_TOGGLE_RUN, ACTION_TOGGLE_CROUCH,
+            ACTION_TOGGLE_PRONE, ACTION_OPEN_MOVEMENT, ACTION_FIRE, ACTION_RELOAD_ITEM,
+            ACTION_RELOAD_WEAPON, ACTION_RELOAD_WIELDED, ACTION_CAST_SPELL, ACTION_RECAST_SPELL,
+            ACTION_SELECT_FIRE_MODE, ACTION_SELECT_DEFAULT_AMMO, ACTION_THROW, ACTION_THROW_WIELDED,
+            ACTION_FIRE_BURST, ACTION_PICK_STYLE, ACTION_TOGGLE_AUTO_TRAVEL_MODE,
+            ACTION_TOGGLE_SAFEMODE, ACTION_TOGGLE_AUTOSAFE, ACTION_IGNORE_ENEMY,
+            ACTION_TOGGLE_AUTO_FEATURES, ACTION_TOGGLE_AUTO_PULP_BUTCHER, ACTION_TOGGLE_AUTO_MINING,
+            ACTION_TOGGLE_AUTO_FORAGING
+        }
+    } );
+    categories.push_back( { "craft", _( "Craft" ), {
+            ACTION_CRAFT, ACTION_RECRAFT, ACTION_LONGCRAFT, ACTION_CONSTRUCT, ACTION_DISASSEMBLE
+        }
+    } );
+    categories.push_back( { "info", _( "Info" ), {
+            ACTION_PL_INFO, ACTION_MISSIONS, ACTION_FACTIONS, ACTION_MORALE, ACTION_MEDICAL,
+            ACTION_BODYSTATUS, ACTION_MESSAGES, ACTION_DIARY
+        }
+    } );
+    categories.push_back( { "misc", _( "Misc" ), {
+            ACTION_WAIT, ACTION_SLEEP, ACTION_WORKOUT, ACTION_BIONICS, ACTION_MUTATIONS,
+            ACTION_CONTROL_VEHICLE, ACTION_ITEMACTION, ACTION_TOGGLE_THIEF_MODE
+        }
+    } );
+#if defined(TILES)
+    if( use_tiles ) {
+        categories.back().actions.push_back( ACTION_ZOOM_OUT );
+        categories.back().actions.push_back( ACTION_ZOOM_IN );
+    }
+#endif
+    return categories;
+}
+
 action_id handle_action_menu( map &here )
 {
     const input_context ctxt = get_default_mode_input_context();
@@ -876,6 +932,7 @@ action_id handle_action_menu( map &here )
                std::back_inserter<std::vector<std::pair<action_id, int> > >( sorted_pairs ) );
     std::reverse( sorted_pairs.begin(), sorted_pairs.end() );
 
+    const std::vector<action_menu_category> categories = action_menu_categories();
     // Default category is called "back"
     std::string category = "back";
 
@@ -893,13 +950,9 @@ action_id handle_action_menu( map &here )
                 }
             }
 
-            REGISTER_CATEGORY( _( "Look" ) );
-            REGISTER_CATEGORY( _( "Interact" ) );
-            REGISTER_CATEGORY( _( "Inventory" ) );
-            REGISTER_CATEGORY( _( "Combat" ) );
-            REGISTER_CATEGORY( _( "Craft" ) );
-            REGISTER_CATEGORY( _( "Info" ) );
-            REGISTER_CATEGORY( _( "Misc" ) );
+            for( const action_menu_category &c : categories ) {
+                REGISTER_CATEGORY( c.name );
+            }
             if( hotkey_for_action( ACTION_QUICKSAVE, /*maximum_modifier_count=*/1 ).has_value() ) {
                 REGISTER_ACTION( ACTION_QUICKSAVE );
             }
@@ -922,35 +975,6 @@ action_id handle_action_menu( map &here )
                     entry->hotkey = hotkey_for_action( ACTION_DEBUG, /*maximum_modifier_count=*/1 );
                 }
             }
-        } else if( category == _( "Look" ) ) {
-            REGISTER_ACTION( ACTION_LOOK );
-            REGISTER_ACTION( ACTION_PEEK );
-            REGISTER_ACTION( ACTION_LIST_ITEMS );
-            REGISTER_ACTION( ACTION_ZONES );
-            REGISTER_ACTION( ACTION_MAP );
-            REGISTER_ACTION( ACTION_SKY );
-        } else if( category == _( "Inventory" ) ) {
-            REGISTER_ACTION( ACTION_INVENTORY );
-            REGISTER_ACTION( ACTION_ADVANCEDINV );
-            REGISTER_ACTION( ACTION_SORT_ARMOR );
-            REGISTER_ACTION( ACTION_DIR_DROP );
-
-            // Everything below here can be accessed through
-            // the inventory screen, so it's sorted to the
-            // end of the list.
-            REGISTER_ACTION( ACTION_INSERT_ITEM );
-            REGISTER_ACTION( ACTION_UNLOAD_CONTAINER );
-            REGISTER_ACTION( ACTION_DROP );
-            REGISTER_ACTION( ACTION_COMPARE );
-            REGISTER_ACTION( ACTION_ORGANIZE );
-            REGISTER_ACTION( ACTION_USE );
-            REGISTER_ACTION( ACTION_WEAR );
-            REGISTER_ACTION( ACTION_TAKE_OFF );
-            REGISTER_ACTION( ACTION_EAT );
-            REGISTER_ACTION( ACTION_OPEN_CONSUME );
-            REGISTER_ACTION( ACTION_READ );
-            REGISTER_ACTION( ACTION_WIELD );
-            REGISTER_ACTION( ACTION_UNLOAD );
         } else if( category == _( "Debug" ) ) {
             REGISTER_ACTION( ACTION_DEBUG );
             if( ( entry = &entries.back() ) ) {
@@ -977,79 +1001,14 @@ action_id handle_action_menu( map &here )
             REGISTER_ACTION( ACTION_DISPLAY_RADIATION );
             REGISTER_ACTION( ACTION_DISPLAY_NPC_ATTACK_POTENTIAL );
             REGISTER_ACTION( ACTION_TOGGLE_DEBUG_MODE );
-        } else if( category == _( "Interact" ) ) {
-            REGISTER_ACTION( ACTION_EXAMINE );
-            REGISTER_ACTION( ACTION_EXAMINE_AND_PICKUP );
-            REGISTER_ACTION( ACTION_SMASH );
-            REGISTER_ACTION( ACTION_MOVE_DOWN );
-            REGISTER_ACTION( ACTION_MOVE_UP );
-            REGISTER_ACTION( ACTION_OPEN );
-            REGISTER_ACTION( ACTION_CLOSE );
-            REGISTER_ACTION( ACTION_CHAT );
-            REGISTER_ACTION( ACTION_PICKUP );
-            REGISTER_ACTION( ACTION_PICKUP_ALL );
-            REGISTER_ACTION( ACTION_GRAB );
-            REGISTER_ACTION( ACTION_HAUL );
-            REGISTER_ACTION( ACTION_HAUL_TOGGLE );
-            REGISTER_ACTION( ACTION_BUTCHER );
-            REGISTER_ACTION( ACTION_LOOT );
-        } else if( category == _( "Combat" ) ) {
-            REGISTER_ACTION( ACTION_CYCLE_MOVE );
-            REGISTER_ACTION( ACTION_RESET_MOVE );
-            REGISTER_ACTION( ACTION_TOGGLE_RUN );
-            REGISTER_ACTION( ACTION_TOGGLE_CROUCH );
-            REGISTER_ACTION( ACTION_TOGGLE_PRONE );
-            REGISTER_ACTION( ACTION_OPEN_MOVEMENT );
-            REGISTER_ACTION( ACTION_FIRE );
-            REGISTER_ACTION( ACTION_RELOAD_ITEM );
-            REGISTER_ACTION( ACTION_RELOAD_WEAPON );
-            REGISTER_ACTION( ACTION_RELOAD_WIELDED );
-            REGISTER_ACTION( ACTION_CAST_SPELL );
-            REGISTER_ACTION( ACTION_RECAST_SPELL );
-            REGISTER_ACTION( ACTION_SELECT_FIRE_MODE );
-            REGISTER_ACTION( ACTION_SELECT_DEFAULT_AMMO );
-            REGISTER_ACTION( ACTION_THROW );
-            REGISTER_ACTION( ACTION_THROW_WIELDED );
-            REGISTER_ACTION( ACTION_FIRE_BURST );
-            REGISTER_ACTION( ACTION_PICK_STYLE );
-            REGISTER_ACTION( ACTION_TOGGLE_AUTO_TRAVEL_MODE );
-            REGISTER_ACTION( ACTION_TOGGLE_SAFEMODE );
-            REGISTER_ACTION( ACTION_TOGGLE_AUTOSAFE );
-            REGISTER_ACTION( ACTION_IGNORE_ENEMY );
-            REGISTER_ACTION( ACTION_TOGGLE_AUTO_FEATURES );
-            REGISTER_ACTION( ACTION_TOGGLE_AUTO_PULP_BUTCHER );
-            REGISTER_ACTION( ACTION_TOGGLE_AUTO_MINING );
-            REGISTER_ACTION( ACTION_TOGGLE_AUTO_FORAGING );
-        } else if( category == _( "Craft" ) ) {
-            REGISTER_ACTION( ACTION_CRAFT );
-            REGISTER_ACTION( ACTION_RECRAFT );
-            REGISTER_ACTION( ACTION_LONGCRAFT );
-            REGISTER_ACTION( ACTION_CONSTRUCT );
-            REGISTER_ACTION( ACTION_DISASSEMBLE );
-        } else if( category == _( "Info" ) ) {
-            REGISTER_ACTION( ACTION_PL_INFO );
-            REGISTER_ACTION( ACTION_MISSIONS );
-            REGISTER_ACTION( ACTION_FACTIONS );
-            REGISTER_ACTION( ACTION_MORALE );
-            REGISTER_ACTION( ACTION_MEDICAL );
-            REGISTER_ACTION( ACTION_BODYSTATUS );
-            REGISTER_ACTION( ACTION_MESSAGES );
-            REGISTER_ACTION( ACTION_DIARY );
-        } else if( category == _( "Misc" ) ) {
-            REGISTER_ACTION( ACTION_WAIT );
-            REGISTER_ACTION( ACTION_SLEEP );
-            REGISTER_ACTION( ACTION_WORKOUT );
-            REGISTER_ACTION( ACTION_BIONICS );
-            REGISTER_ACTION( ACTION_MUTATIONS );
-            REGISTER_ACTION( ACTION_CONTROL_VEHICLE );
-            REGISTER_ACTION( ACTION_ITEMACTION );
-            REGISTER_ACTION( ACTION_TOGGLE_THIEF_MODE );
-#if defined(TILES)
-            if( use_tiles ) {
-                REGISTER_ACTION( ACTION_ZOOM_OUT );
-                REGISTER_ACTION( ACTION_ZOOM_IN );
+        } else {
+            for( const action_menu_category &c : categories ) {
+                if( category == c.name ) {
+                    for( const action_id act : c.actions ) {
+                        REGISTER_ACTION( act );
+                    }
+                }
             }
-#endif
         }
 
         if( category != "back" ) {
