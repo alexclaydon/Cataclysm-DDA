@@ -6695,15 +6695,21 @@ static window_dimensions get_window_dimensions( const catacurses::window &win,
         const point &pos, const point &size )
 {
     window_dimensions dim;
-    if( use_tiles && g && win == g->w_terrain ) {
+    // Only a real window can be the map or the overmap: with no window (a
+    // UI positioned by cells), the empty w_overmap of a closed overmap
+    // matched, and the UI got the overmap's size, nothing until it was first
+    // opened (the advanced inventory's rectangle, lost to the VR host).
+    const bool is_terrain = win && g && win == g->w_terrain;
+    const bool is_overmap = win && g && win == g->w_overmap;
+    if( use_tiles && is_terrain ) {
         // tiles might have different dimensions than standard font
         dim.scaled_font_size.x = tilecontext->get_tile_width();
         dim.scaled_font_size.y = tilecontext->get_tile_height();
-    } else if( map_font && g && win == g->w_terrain ) {
+    } else if( map_font && is_terrain ) {
         // map font (if any) might differ from standard font
         dim.scaled_font_size.x = map_font->width;
         dim.scaled_font_size.y = map_font->height;
-    } else if( overmap_font && g && win == g->w_overmap ) {
+    } else if( overmap_font && is_overmap ) {
         if( use_tiles && use_tiles_overmap ) {
             // tiles might have different dimensions than standard font
             dim.scaled_font_size.x = overmap_tilecontext->get_tile_width();
@@ -6734,11 +6740,11 @@ static window_dimensions get_window_dimensions( const catacurses::window &win,
     dim.window_pos_pixel = point( dim.window_pos_cell.x * fontwidth,
                                   dim.window_pos_cell.y * fontheight );
     // But the size of the window might not be.
-    if( use_tiles && g && win == g->w_terrain ) {
+    if( use_tiles && is_terrain ) {
         // The terrain GUI has special size during rendering.
         dim.window_size_pixel.x = TERRAIN_WINDOW_TERM_WIDTH * fontwidth;
         dim.window_size_pixel.y = TERRAIN_WINDOW_TERM_HEIGHT * fontheight;
-    } else if( use_tiles && use_tiles_overmap && g && win == g->w_overmap ) {
+    } else if( use_tiles && use_tiles_overmap && is_overmap ) {
         // The overmap GUI has special size during rendering.
         dim.window_size_pixel.x = OVERMAP_WINDOW_TERM_WIDTH * fontwidth;
         dim.window_size_pixel.y = OVERMAP_WINDOW_TERM_HEIGHT * fontheight;
