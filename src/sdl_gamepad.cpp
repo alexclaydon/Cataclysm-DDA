@@ -6,9 +6,7 @@
 #include <cmath>
 #include <map>
 #include <ostream>
-#include <set>
 #include <string>
-#include <vector>
 
 #include "debug.h"
 #include "input.h"
@@ -1044,7 +1042,7 @@ static bool handle_button_event( SDL_Event &event )
 
 // Opens a pad SDL lists and keeps it with the others (the first becomes the
 // one polled). SDL3 takes the instance id, SDL2 the device index.
-static void add_controller( int which, const char *how )
+static void add_controller( int which )
 {
 #if SDL_MAJOR_VERSION >= 3
     if( open_controllers.count( static_cast<SDL_JoystickID>( which ) ) ) {
@@ -1070,8 +1068,7 @@ static void add_controller( int which, const char *how )
     const SDL_JoystickID id = SDL_JoystickInstanceID( SDL_GameControllerGetJoystick( opened ) );
     const char *name = SDL_GameControllerName( opened );
 #endif
-    DebugLog( D_INFO, DC_ALL ) << "Gamepad added: " << ( name ? name : "?" ) << " (id " << id << ", by " <<
-                               how << ")";
+    DebugLog( D_INFO, DC_ALL ) << "Gamepad added: " << ( name ? name : "?" ) << " (id " << id << ")";
     open_controllers[id] = opened;
     if( controller == nullptr ) {
         controller = opened;
@@ -1079,11 +1076,11 @@ static void add_controller( int which, const char *how )
     }
 }
 
-static void remove_controller( SDL_JoystickID gone, const char *how )
+static void remove_controller( SDL_JoystickID gone )
 {
     auto it = open_controllers.find( gone );
     if( it != open_controllers.end() ) {
-        DebugLog( D_INFO, DC_ALL ) << "Gamepad removed: id " << gone << " (by " << how << ")";
+        DebugLog( D_INFO, DC_ALL ) << "Gamepad removed: id " << gone;
 #if SDL_MAJOR_VERSION >= 3
         SDL_CloseGamepad( it->second );
 #else
@@ -1109,9 +1106,9 @@ static void remove_controller( SDL_JoystickID gone, const char *how )
 static void handle_device_event( SDL_Event &event )
 {
     // Every hotplug event SDL sends is logged, the joystick-level ones too
-    // (a pad SDL saw but couldn't take as a gamepad shows only those): a
-    // woken Steam Controller's pad never arrived on the Deck (see
-    // rescan_controllers).
+    // (a pad SDL saw but couldn't take as a gamepad shows only those). In
+    // the rootless distrobox SDL must not use udev, whose hotplug events
+    // never arrive there: the launchers set SDL_JOYSTICK_DISABLE_UDEV.
     if( event.type == CATA_JOYDEVICEADDED || event.type == CATA_JOYDEVICEREMOVED ) {
 #if SDL_MAJOR_VERSION >= 3
         const int which = static_cast<int>( event.jdevice.which );
@@ -1131,59 +1128,15 @@ static void handle_device_event( SDL_Event &event )
                                "removed" ) << " event: " << which;
     if( event.type == CATA_CONTROLLERDEVICEADDED ) {
         // SDL3: the event gives the instance id, which SDL_OpenGamepad takes.
-        add_controller( which, "event" );
+        add_controller( which );
     } else if( event.type == CATA_CONTROLLERDEVICEREMOVED ) {
-        remove_controller( static_cast<SDL_JoystickID>( which ), "event" );
-    }
-}
-
-// Every couple of seconds, the pads SDL lists against the ones open: opens
-// what's missing and closes what's gone. A Steam Controller waking from
-// sleep on the Deck came back with no added event reaching the game (Dark
-// Forest, in its container), and its buttons never arrived until a restart.
-static void rescan_controllers()
-{
-    std::set<SDL_JoystickID> present;
-#if SDL_MAJOR_VERSION >= 3
-    int count = 0;
-    SDL_JoystickID *ids = SDL_GetGamepads( &count );
-    for( int i = 0; ids && i < count; ++i ) {
-        present.insert( ids[i] );
-        add_controller( static_cast<int>( ids[i] ), "rescan" );
-    }
-    SDL_free( ids );
-#else
-    for( int i = 0; i < SDL_NumJoysticks(); ++i ) {
-        if( SDL_IsGameController( i ) ) {
-            present.insert( SDL_JoystickGetDeviceInstanceID( i ) );
-            add_controller( i, "rescan" );
-        }
-    }
-#endif
-    std::vector<SDL_JoystickID> gone;
-    for( const auto &open : open_controllers ) {
-#if SDL_MAJOR_VERSION >= 3
-        const bool attached = SDL_GamepadConnected( open.second );
-#else
-        const bool attached = SDL_GameControllerGetAttached( open.second );
-#endif
-        if( !present.count( open.first ) || !attached ) {
-            gone.push_back( open.first );
-        }
-    }
-    for( const SDL_JoystickID id : gone ) {
-        remove_controller( id, "rescan" );
+        remove_controller( static_cast<SDL_JoystickID>( which ) );
     }
 }
 
 static void handle_scheduler_event( SDL_Event &/*event*/ )
 {
     uint32_t now = GetTicks();
-    static uint32_t last_rescan = 0;
-    if( !test_mode && now - last_rescan >= 2000 ) {
-        last_rescan = now;
-        rescan_controllers();
-    }
     for( size_t i = 0; i < all_tasks.size(); ++i ) {
         gamepad::task_t &task = all_tasks[i];
         if( task.counter && task.when <= now ) {
