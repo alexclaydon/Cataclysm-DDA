@@ -1108,7 +1108,13 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
         // in the layer loop. Revisit when SDL_gpu or a shader-based tint path
         // is available.
         const bool zlev_has_color = zlev_cache.has_colored_lights && !iso;
-        for( int row = cur_any_tile_range.p_min.y; row < cur_any_tile_range.p_max.y; row ++ ) {
+        // Flat tilesets draw min_row to max_row: the window's rows, or the VR
+        // host's whole snapshot square while recording. The window's own range
+        // left the diorama a strip as tall as the 2D view (the columns, taken
+        // from draw_points_cache, were already the whole square).
+        const int first_row = iso ? cur_any_tile_range.p_min.y : min_row;
+        const int end_row = iso ? cur_any_tile_range.p_max.y : max_row;
+        for( int row = first_row; row < end_row; row ++ ) {
             if( renderer_should_abort_frame() ) {
                 // Abort emitting tiles mid-draw. Post-loop bookkeeping still runs
                 // so map memory and overrides stay consistent; invalidation kept
