@@ -369,14 +369,22 @@ void godot_host::take_wheel_events( std::vector<wheel_event> &out )
 
 void godot_host::wheel_done( int serial, const std::string &action )
 {
+    // The gamepad layer closes the wheel on its next event (its scheduler
+    // ticks every 50 ms, so no wake is needed for that).
     wheel_done_serial = serial;
-    if( !action.empty() ) {
+    if( action.empty() ) {
+        // No nudge: in play a mouse move with nothing waiting for it opens
+        // the mouse view, which counts as a menu, so the next held shoulder
+        // wouldn't open a wheel.
+        return;
+    }
+    {
         std::lock_guard<std::mutex> lock( look_mutex );
         action_requested = action;
         action_serial = serial;
     }
-    // Wake the engine: the gamepad layer closes the wheel on its next
-    // event, and the play loop takes the action.
+    // Wake the play loop to take the action (look_pending keeps the mouse
+    // view from taking the nudge).
     push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
 }
 
