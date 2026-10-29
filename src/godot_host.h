@@ -80,7 +80,7 @@ struct map_light {
     bool outside;   // open to the sky (map::is_outside), for rain and snow
 };
 
-// A creature the avatar sees, for the diorama's coloured bases (a ring
+// A creature the avatar sees, for the 3D view's coloured bases (a ring
 // under each, by attitude, readable when the cards are too small to).
 struct map_creature {
     int x, y, z;    // tripoint_bub_ms
@@ -104,7 +104,7 @@ struct map_snapshot {
     int lights_x, lights_y, lights_size;
     std::vector<map_light> lights;
     std::vector<map_creature> creatures;
-    // The weather, for the diorama's effects: where the wind blows from
+    // The weather, for the 3D view's effects: where the wind blows from
     // (degrees clockwise from north, as the sidebar's arrow), its speed in
     // mph (before local shelter), and precipitation (precip_class: 0 none
     // to 3 heavy), falling as rain or not (snow).
@@ -112,7 +112,7 @@ struct map_snapshot {
     int wind_mph;
     int precip;
     bool rains;
-    // The sky, for the diorama's sun and moon: each one's direction (degrees
+    // The sky, for the 3D view's sun and moon: each one's direction (degrees
     // clockwise from north) and height above the horizon (degrees; the
     // engine clamps a sun far below it), the moon's phase (moon_phase: 0 new,
     // 4 full) and the weather's light_modifier (sunny 2, cloudy -20, fog -40).
@@ -253,12 +253,12 @@ bool take_ui_windows( uint64_t &sequence, std::vector<ui_window> &out );
 // thread; queued in order, and the engine thread applies one per event
 // pump (apply_mouse), so no press or release is lost.
 void set_mouse( int x, int y, uint32_t buttons, int wheel );
-// The mouse on a map tile instead (pointing at the diorama): `dx`, `dy`
+// The mouse on a map tile instead (pointing at the 3D view): `dx`, `dy`
 // tiles from the avatar. The engine thread turns it into the tile's middle
 // in the map view's pixels (cata_tiles::player_to_screen), so it is exact
 // at any zoom or view offset.
 void set_mouse_tile( int dx, int dy, uint32_t buttons );
-// The host's pointer has left the map (the diorama's pointing ended): the
+// The host's pointer has left the map (the 3D view's pointing ended): the
 // game hears a mouse move with no tile under it, so the mouse view closes.
 // Until the next tile move, mouse_away() (engine thread) is true; a move in
 // pixels (a ray on a window) leaves it true too.

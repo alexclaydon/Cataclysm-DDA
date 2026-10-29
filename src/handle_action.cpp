@@ -456,7 +456,7 @@ input_context game::get_player_input( std::string &action )
 #if !defined(CDDA_GODOT)
             // (Not hosted: the VR host runs the animations itself from the
             // frames each snapshot carries, and the 2D map isn't on show,
-            // so these redraws would only rebuild the diorama.)
+            // so these redraws would only rebuild the 3D view.)
             if( tilecontext->has_animated_tiles() ) {
                 invalidate_main_ui_adaptor();
             }
@@ -3238,7 +3238,7 @@ bool game::do_regular_action( action_id &act, avatar &player_character,
 
         case ACTION_ZOOM_IN:
 #if defined(CDDA_GODOT)
-            // VR: the diorama shows more or less of the surroundings; the 2D
+            // VR: the 3D view shows more or less of the surroundings; the 2D
             // tile size is never seen.
             godot_host::zoom_view( 1 );
             mark_main_ui_adaptor_resize();

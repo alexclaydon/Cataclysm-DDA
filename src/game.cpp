@@ -2455,7 +2455,7 @@ bool game::handle_mouseview( input_context &ctxt, std::string &action )
                     true );
 #if defined(CDDA_GODOT)
             if( godot_host::mouse_away() ) {
-                // The VR host stopped pointing at the diorama.
+                // The VR host stopped pointing at the 3D view.
                 mouse_pos.reset();
             }
 #endif

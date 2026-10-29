@@ -615,7 +615,7 @@ static void WinCreate()
 
     // Hosted (CDDA_GODOT), the window is offscreen and the host owns the
     // screen: always windowed at the terminal's size, whatever FULLSCREEN
-    // says, so the desktop diorama can share the flat game's options.json
+    // says, so Dark Forest can share the flat game's options.json
     // (ADR 0007).
 #if !defined(__ANDROID__) && !defined(EMSCRIPTEN) && !defined(CDDA_GODOT)
     if( get_option<std::string>( "FULLSCREEN" ) == "fullscreen" ) {
@@ -5282,7 +5282,7 @@ static void CheckMessages()
     drain_renderer_recovery();
 #if defined(CDDA_GODOT)
     // The VR host's mouse (pointing at a window, or at a tile on the
-    // diorama), queued as events below.
+    // 3D view), queued as events below.
     godot_host::apply_mouse( []( int dx, int dy, int &x, int &y ) {
         if( !tilecontext ) {
             return false;

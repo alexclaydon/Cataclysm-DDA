@@ -683,10 +683,10 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     int min_row = bottom_any_tile_range.p_min.y;
     int max_row = top_any_tile_range.p_max.y;
 #if defined(CDDA_GODOT)
-    // The VR host's diorama: record the whole snapshot square around the
+    // The VR host's 3D view: record the whole snapshot square around the
     // view's centre (column POSX, row POSY), not only what the 2D zoom fits
     // in the window, which made the game's zoom grow or shrink the table's
-    // patch of world (taller than wide). The diorama is built about the
+    // patch of world (taller than wide). The 3D view is built about the
     // view's centre too, so look-around's pan moves the board as it moves
     // the flat game's view. Beyond the window, drawing is clipped away.
     if( godot_host::recording_map() && !is_isometric() ) {
@@ -1111,7 +1111,7 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
         const bool zlev_has_color = zlev_cache.has_colored_lights && !iso;
         // Flat tilesets draw min_row to max_row: the window's rows, or the VR
         // host's whole snapshot square while recording. The window's own range
-        // left the diorama a strip as tall as the 2D view (the columns, taken
+        // left the 3D view a strip as tall as the 2D view (the columns, taken
         // from draw_points_cache, were already the whole square).
         const int first_row = iso ? cur_any_tile_range.p_min.y : min_row;
         const int end_row = iso ? cur_any_tile_range.p_max.y : max_row;
@@ -1644,7 +1644,7 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     }
 
 #if defined(CDDA_GODOT)
-    // The storeys below the avatar's, for the VR host's diorama: what the
+    // The storeys below the avatar's, for the VR host's 3D view: what the
     // avatar remembers of them (the 2D view never shows them), recorded by
     // the same layer functions in their memory mode, without drawing.
     if( godot_host::recording_map() ) {
@@ -1674,7 +1674,7 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
         }
         {
             // Everyone the avatar sees within the snapshot, by attitude
-            // towards it, for the diorama's bases.
+            // towards it, for the 3D view's bases.
             avatar &you = get_avatar();
             std::vector<godot_host::map_creature> &creatures = godot_host::record_map_creatures();
             for( Creature &c : g->all_creatures() ) {
@@ -1701,7 +1701,7 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
             }
         }
         {
-            // The light on the avatar's storey, for lighting the diorama.
+            // The light on the avatar's storey, for lighting the 3D view.
             const level_cache &cache = here.access_cache( you_pos.z() );
             const int size = 2 * r + 1;
             std::vector<godot_host::map_light> &lights = godot_host::record_map_lights(
