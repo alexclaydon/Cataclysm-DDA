@@ -92,7 +92,7 @@ struct map_snapshot {
     int player[3];  // the avatar (tripoint_bub_ms)
     int player_abs[3];  // the avatar (tripoint_abs_ms): the map's place in the world,
                         // for what must not change as the map shifts (a tree's variant)
-    int radius;     // tiles around the avatar it covers (snapshot_radius)
+    int radius;     // tiles around the view centre it covers (snapshot_radius)
     uint64_t tileset_generation;  // see take_tileset
     int storeys_usec;  // the engine's time recording the storeys below
     std::vector<map_sprite> sprites;

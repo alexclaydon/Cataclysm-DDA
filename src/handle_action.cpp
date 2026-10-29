@@ -2223,18 +2223,7 @@ static void do_deathcam_action( const action_id &act, avatar &player_character )
         break;
 
         case ACTION_LOOK:
-#if defined(CDDA_GODOT)
-        {
-            // Hosted, the camera is the host's and the 2D view is never seen:
-            // look starts on the avatar and never keeps its pan (a kept pan
-            // moved nothing visible, and the next look started from it).
-            tripoint_bub_ms center = player_character.pos_bub();
-            g->look_around( /*show_window=*/true, center, center, false, false, false, false,
-                            tripoint_bub_ms::zero, true, false );
-        }
-#else
             g->look_around( /*persist_offset=*/true );
-#endif
             break;
 
         case ACTION_KEYBINDINGS: // already handled by input context

@@ -684,18 +684,17 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     int max_row = top_any_tile_range.p_max.y;
 #if defined(CDDA_GODOT)
     // The VR host's diorama: record the whole snapshot square around the
-    // avatar, not only what the 2D zoom fits in the window, which made the
-    // game's zoom grow or shrink the table's patch of world (taller than
-    // wide). Around the avatar, not the view's centre: the diorama is built
-    // about the avatar, and a view offset (look-around's pan) slid the square
-    // off one edge of the board. Beyond the window, drawing is clipped away.
+    // view's centre (column POSX, row POSY), not only what the 2D zoom fits
+    // in the window, which made the game's zoom grow or shrink the table's
+    // patch of world (taller than wide). The diorama is built about the
+    // view's centre too, so look-around's pan moves the board as it moves
+    // the flat game's view. Beyond the window, drawing is clipped away.
     if( godot_host::recording_map() && !is_isometric() ) {
         const int r = godot_host::snapshot_radius();
-        const point at = player_to_tile( get_avatar().pos_bub().xy() );
-        min_col = std::min( min_col, at.x - r );
-        max_col = std::max( max_col, at.x + r + 1 );
-        min_row = std::min( min_row, at.y - r );
-        max_row = std::max( max_row, at.y + r + 1 );
+        min_col = std::min( min_col, POSX - r );
+        max_col = std::max( max_col, POSX + r + 1 );
+        min_row = std::min( min_row, POSY - r );
+        max_row = std::max( max_row, POSY + r + 1 );
     }
 #endif
 
@@ -1650,6 +1649,10 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     // the same layer functions in their memory mode, without drawing.
     if( godot_host::recording_map() ) {
         const int r = godot_host::snapshot_radius();
+        // The square the snapshot covers: about the view's centre, as the
+        // board is (the avatar's storey, though: look-around's cursor can
+        // change storeys, the board doesn't).
+        const point mid = center.xy().raw();
         {
             const weather_manager &weather = get_weather();
             const weather_type &type = weather.weather_id.obj();
@@ -1673,11 +1676,10 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
             // Everyone the avatar sees within the snapshot, by attitude
             // towards it, for the diorama's bases.
             avatar &you = get_avatar();
-            const tripoint_bub_ms at = you.pos_bub();
             std::vector<godot_host::map_creature> &creatures = godot_host::record_map_creatures();
             for( Creature &c : g->all_creatures() ) {
                 const tripoint_bub_ms p = c.pos_bub();
-                if( std::abs( p.x() - at.x() ) > r || std::abs( p.y() - at.y() ) > r ||
+                if( std::abs( p.x() - mid.x ) > r || std::abs( p.y() - mid.y ) > r ||
                     ( !c.is_avatar() && !you.sees( here, c ) ) ) {
                     continue;
                 }
@@ -1703,11 +1705,11 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
             const level_cache &cache = here.access_cache( you_pos.z() );
             const int size = 2 * r + 1;
             std::vector<godot_host::map_light> &lights = godot_host::record_map_lights(
-                        cache.natural_light_level_cache, you_pos.x() - r, you_pos.y() - r, size );
-            for( int y = std::max( 0, you_pos.y() - r ); y <= std::min( MAPSIZE_Y - 1, you_pos.y() + r ); ++y ) {
-                for( int x = std::max( 0, you_pos.x() - r ); x <= std::min( MAPSIZE_X - 1, you_pos.x() + r ); ++x ) {
+                        cache.natural_light_level_cache, mid.x - r, mid.y - r, size );
+            for( int y = std::max( 0, mid.y - r ); y <= std::min( MAPSIZE_Y - 1, mid.y + r ); ++y ) {
+                for( int x = std::max( 0, mid.x - r ); x <= std::min( MAPSIZE_X - 1, mid.x + r ); ++x ) {
                     const light_color_rgb &color = cache.light_color_cache[x][y];
-                    lights[( y - you_pos.y() + r ) * size + x - you_pos.x() + r] = {
+                    lights[( y - mid.y + r ) * size + x - mid.x + r] = {
                         cache.lm[x][y].max(), color.r, color.g, color.b,
                         cache.light_source_buffer[x][y].luminance,
                         here.is_outside( tripoint_bub_ms( x, y, you_pos.z() ) )
@@ -1724,8 +1726,8 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
             if( z < -OVERMAP_DEPTH ) {
                 break;
             }
-            for( int y = std::max( 0, you_pos.y() - r ); y <= std::min( MAPSIZE_Y - 1, you_pos.y() + r ); ++y ) {
-                for( int x = std::max( 0, you_pos.x() - r ); x <= std::min( MAPSIZE_X - 1, you_pos.x() + r ); ++x ) {
+            for( int y = std::max( 0, mid.y - r ); y <= std::min( MAPSIZE_Y - 1, mid.y + r ); ++y ) {
+                for( int x = std::max( 0, mid.x - r ); x <= std::min( MAPSIZE_X - 1, mid.x + r ); ++x ) {
                     const tripoint_bub_ms p( x, y, z );
                     int height_3d = 0;
                     draw_terrain( p, lit_level::MEMORIZED, height_3d, unseen, false );
@@ -1750,8 +1752,8 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
                 if( z > OVERMAP_HEIGHT ) {
                     break;
                 }
-                for( int y = std::max( 0, you_pos.y() - r ); y <= std::min( MAPSIZE_Y - 1, you_pos.y() + r ); ++y ) {
-                    for( int x = std::max( 0, you_pos.x() - r ); x <= std::min( MAPSIZE_X - 1, you_pos.x() + r ); ++x ) {
+                for( int y = std::max( 0, mid.y - r ); y <= std::min( MAPSIZE_Y - 1, mid.y + r ); ++y ) {
+                    for( int x = std::max( 0, mid.x - r ); x <= std::min( MAPSIZE_X - 1, mid.x + r ); ++x ) {
                         const tripoint_bub_ms p( x, y, z );
                         const ter_id &t = here.ter( p );
                         if( !t || t.obj().has_flag( ter_furn_flag::TFLAG_NO_FLOOR ) ) {
