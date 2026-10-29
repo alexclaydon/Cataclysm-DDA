@@ -246,6 +246,12 @@ static void InitSDL()
     // offscreen window never receives focus.
     SDL_SetHint( SDL_HINT_VIDEO_DRIVER, "offscreen" );
     SDL_SetHint( SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1" );
+#if defined(__APPLE__)
+    // macOS SDL backs a window surface with a GPU renderer by default, and
+    // in Godot's process that reaches Godot's own MoltenVK. Frames are read
+    // back from the software renderer's target, so a plain surface will do.
+    SDL_SetHint( SDL_HINT_FRAMEBUFFER_ACCELERATION, "0" );
+#endif
 #endif
 
 #if defined(__linux__) && SDL_MAJOR_VERSION < 3

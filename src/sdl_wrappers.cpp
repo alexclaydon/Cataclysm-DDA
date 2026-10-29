@@ -1378,8 +1378,22 @@ SDL_Window_Ptr CreateGameWindow( const char *title, const int display, const int
 {
 #if SDL_MAJOR_VERSION >= 3
     ( void )display;
+#if defined(CDDA_GODOT) && defined(__APPLE__)
+    // Hosted on macOS: SDL3 makes a window with no graphics API an OpenGL
+    // one there, and the offscreen driver then fails to load EGL. The
+    // renderer is the software one, so the window needs no context.
+    const SDL_PropertiesID props = SDL_CreateProperties();
+    SDL_SetStringProperty( props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title );
+    SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, w );
+    SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, h );
+    SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_FLAGS_NUMBER, flags );
+    SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_EXTERNAL_GRAPHICS_CONTEXT_BOOLEAN, true );
+    SDL_Window_Ptr result( SDL_CreateWindowWithProperties( props ) );
+    SDL_DestroyProperties( props );
+#else
     // SDL3: SDL_CreateWindow takes (title, w, h, flags) -- no position params.
     SDL_Window_Ptr result( SDL_CreateWindow( title, w, h, flags ) );
+#endif
     printErrorIf( !result, "SDL_CreateWindow failed" );
     return result;
 #else
