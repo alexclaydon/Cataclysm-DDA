@@ -897,6 +897,13 @@ int main( int argc, const char *argv[] )
     g.reset();
     catacurses::endwin();
     imclient.reset();
+#if defined(__APPLE__)
+    // Quit SDL here, on the thread that started it. Left to the atexit
+    // handler, it runs on the host's main thread, and macOS SDL's joystick
+    // shutdown unschedules its HID manager from this thread's run loop,
+    // gone by then: a crash on every quit. The atexit call is then a no-op.
+    SDL_Quit();
+#endif
     return 0;
 #else
     exit_handler( -999 );
