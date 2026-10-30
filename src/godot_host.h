@@ -278,6 +278,12 @@ bool take_look_request( int &dx, int &dy );
 // CheckMessages and resizes its window, as a desktop window resize does.
 void request_terminal( int columns, int rows );
 bool take_terminal_request( int &columns, int &rows );
+// The sidebar as a band of `rows` across the top of the terminal (Dark
+// Forest in portrait), 0 for the usual column: the map below it, the
+// panels flowed into columns of the narrow layout (game::draw_panels).
+// Set by the host before the terminal request it goes with.
+void set_sidebar_band( int rows );
+int sidebar_band();
 // A test hook (make vr-mouse "goto TYPE"): teleport the avatar to the
 // closest overmap terrain whose id starts with TYPE ("house"), as the
 // debug menu's teleport does; handled beside the look request.

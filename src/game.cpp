@@ -116,6 +116,7 @@
 #include "get_version.h"
 #if defined(CDDA_GODOT)
 #include "godot_host.h"
+#include "widget.h"
 #endif
 #include "harvest.h"
 #include "iexamine.h"
@@ -3184,10 +3185,19 @@ shared_ptr_fast<ui_adaptor> game::create_or_get_main_ui_adaptor()
         ui->on_screen_resize( [this]( ui_adaptor & ui ) {
             // remove some space for the sidebar, this is the maximal space
             // (using standard font) that the terrain window can have
-            const int sidebar_left = panel_manager::get_manager().get_width_left();
-            const int sidebar_right = panel_manager::get_manager().get_width_right();
+            int sidebar_left = panel_manager::get_manager().get_width_left();
+            int sidebar_right = panel_manager::get_manager().get_width_right();
+            int sidebar_top = 0;
+#if defined(CDDA_GODOT)
+            // Dark Forest in portrait: the sidebar is a band across the top.
+            if( godot_host::sidebar_band() > 0 ) {
+                sidebar_left = 0;
+                sidebar_right = 0;
+                sidebar_top = std::min( godot_host::sidebar_band(), TERMY - 1 );
+            }
+#endif
 
-            TERRAIN_WINDOW_HEIGHT = TERMY;
+            TERRAIN_WINDOW_HEIGHT = TERMY - sidebar_top;
             TERRAIN_WINDOW_WIDTH = TERMX - ( sidebar_left + sidebar_right );
             TERRAIN_WINDOW_TERM_WIDTH = TERRAIN_WINDOW_WIDTH;
             TERRAIN_WINDOW_TERM_HEIGHT = TERRAIN_WINDOW_HEIGHT;
@@ -3221,7 +3231,7 @@ shared_ptr_fast<ui_adaptor> game::create_or_get_main_ui_adaptor()
             POSY = TERRAIN_WINDOW_HEIGHT / 2;
 
             w_terrain = w_terrain_ptr = catacurses::newwin( TERRAIN_WINDOW_HEIGHT, TERRAIN_WINDOW_WIDTH,
-                                        point( sidebar_left, 0 ) );
+                                        point( sidebar_left, sidebar_top ) );
 
             // minimap is always MINIMAP_WIDTH x MINIMAP_HEIGHT in size
             w_minimap = w_minimap_ptr = catacurses::newwin( MINIMAP_HEIGHT, MINIMAP_WIDTH, point::zero );
@@ -3429,6 +3439,12 @@ void game::draw_panels( bool force_draw )
     int y = 0;
     const bool sidebar_right = get_option<std::string>( "SIDEBAR_POSITION" ) == "right";
 #if defined(CDDA_GODOT)
+    if( godot_host::sidebar_band() > 0 ) {
+        godot_host::set_sidebar( 0, 0, TERMX, TERMY );
+        draw_panels_band( draw_this_turn );
+        previous_turn = current_turn;
+        return;
+    }
     // For the VR host's HUD window: where the sidebar (with the message
     // log) lies in the frame.
     godot_host::set_sidebar( mgr.get_width_left(), mgr.get_width_right(), TERMX, TERMY );
@@ -3500,6 +3516,69 @@ void game::draw_panels( bool force_draw )
     }
     previous_turn = current_turn;
 }
+
+#if defined(CDDA_GODOT)
+// The sidebar as a band across the top (godot_host::sidebar_band, Dark
+// Forest in portrait): the narrow layout's panels flowed top to bottom
+// into columns side by side, the message log taking what its column has
+// left. Panels that don't fit across are left out.
+void game::draw_panels_band( bool draw_this_turn )
+{
+    panel_manager &mgr = panel_manager::get_manager();
+    panel_layout *narrow = mgr.find_layout( "legacy_labels_narrow_sidebar" );
+    panel_layout &layout = narrow != nullptr ? *narrow : mgr.get_current_layout();
+    if( narrow != nullptr ) {
+        static bool finalized = false;
+        if( !finalized ) {
+            widget *sidebar = mgr.get_sidebar( narrow->name() );
+            if( sidebar != nullptr ) {
+                widget::finalize_inherited_fields_recursive( sidebar->getId(), sidebar->_separator,
+                        sidebar->_padding );
+            }
+            finalized = true;
+        }
+    }
+    const int band = std::min( godot_host::sidebar_band(), TERMY );
+    const int spacer = get_option<bool>( "SIDEBAR_SPACERS" ) ? 1 : 0;
+    int x = 0;
+    int y = 0;
+    for( const window_panel &panel : layout.panels() ) {
+        if( !panel.toggle || !panel.render() ) {
+            continue;
+        }
+        const int width = panel.get_width();
+        int h = panel.get_height();
+        // The message log (-2) fills the rest of a column, in a fresh one
+        // when too little is left.
+        if( h == -2 ) {
+            if( band - y < 3 && y > 0 ) {
+                x += width + 1;
+                y = 0;
+            }
+            h = band - y;
+        }
+        if( h <= 0 ) {
+            continue;
+        }
+        h += spacer;
+        if( y + h > band && y > 0 ) {
+            x += width + 1;
+            y = 0;
+        }
+        if( x + width > TERMX ) {
+            break;
+        }
+        h = std::min( h, band - y );
+        if( panel.always_draw || draw_this_turn ) {
+            catacurses::window w = catacurses::newwin( h, width, point( x, y ) );
+            const int tmp_h = panel.draw( { u, w, panel.get_widget() } );
+            // Lines skipped for rendering: reclaim the space.
+            h += tmp_h;
+        }
+        y += h;
+    }
+}
+#endif
 
 void game::draw_pixel_minimap( const catacurses::window &w )
 {

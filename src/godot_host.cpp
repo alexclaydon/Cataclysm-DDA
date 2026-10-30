@@ -327,6 +327,21 @@ void godot_host::request_terminal( int columns, int rows )
     push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
 }
 
+namespace
+{
+std::atomic<int> sidebar_band_rows{ 0 };
+} // namespace
+
+void godot_host::set_sidebar_band( int rows )
+{
+    sidebar_band_rows.store( rows );
+}
+
+int godot_host::sidebar_band()
+{
+    return sidebar_band_rows.load();
+}
+
 bool godot_host::take_terminal_request( int &columns, int &rows )
 {
     const uint32_t r = terminal_request.exchange( 0 );

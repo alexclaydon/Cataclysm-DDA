@@ -435,6 +435,12 @@ panel_layout &panel_manager::get_current_layout()
     return get_current_layout();
 }
 
+panel_layout *panel_manager::find_layout( const std::string &id )
+{
+    auto kv = layouts.find( id );
+    return kv == layouts.end() ? nullptr : &kv->second;
+}
+
 widget *panel_manager::get_current_sidebar()
 {
     panel_layout layout = get_current_layout();
