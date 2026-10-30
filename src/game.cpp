@@ -3540,6 +3540,11 @@ void game::draw_panels_band( bool draw_this_turn )
     }
     const int band = std::min( godot_host::sidebar_band(), TERMY );
     const int spacer = get_option<bool>( "SIDEBAR_SPACERS" ) ? 1 : 0;
+    // The whole band first, so the gaps between columns are blank, not
+    // whatever the map window under it last drew.
+    catacurses::window blank = catacurses::newwin( band, TERMX, point::zero );
+    werase( blank );
+    wnoutrefresh( blank );
     int x = 0;
     int y = 0;
     for( const window_panel &panel : layout.panels() ) {
