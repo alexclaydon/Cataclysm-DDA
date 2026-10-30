@@ -3,7 +3,7 @@
 #define CATA_SRC_GODOT_HOST_H
 
 // Hosting the engine inside another program (CDDA_GODOT builds only): the
-// Godot VR host in the cataclysm-dda-vr repo. The host calls run() on a
+// Godot host of Cataclysm: Dark Forest, the cataclysm-df repo. The host calls run() on a
 // thread it owns, in place of main(). The engine renders to SDL's offscreen
 // video driver and publishes every presented frame for the host to show;
 // the host feeds input by pushing ordinary SDL events at window_id(), so
