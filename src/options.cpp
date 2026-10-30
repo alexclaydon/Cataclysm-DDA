@@ -2417,15 +2417,8 @@ void options_manager::add_options_graphics()
     add_option_group( "graphics", Group( "term_opts", to_translation( "Terminal display options" ),
                                          to_translation( "Options regarding terminal display." ) ),
     [&]( const std::string & page_id ) {
-#if defined(CDDA_IOS)
-        // Tuned for phone screens; nothing resizes the window on iOS, so
-        // the default is what a fresh install actually plays at.
-        constexpr int default_terminal_x = 152;
-        constexpr int default_terminal_y = 39;
-#else
         constexpr int default_terminal_x = 80;
         constexpr int default_terminal_y = 24;
-#endif
         add( "TERMINAL_X", page_id, to_translation( "Terminal width" ),
              to_translation( "Set the size of the terminal along the X axis." ),
              80, 960, default_terminal_x, COPT_POSIX_CURSES_HIDE
@@ -2448,15 +2441,8 @@ void options_manager::add_options_graphics()
              false, COPT_CURSES_HIDE
            );
 
-#if defined(CDDA_IOS)
-        // Double every font dimension: at native phone resolution the
-        // stock sizes render tiny and blurry-looking (non-hidpi).
-        constexpr int font_w = 16, font_h = 32, font_s = 32;
-        constexpr int grid_font = 32;
-#else
         constexpr int font_w = 8, font_h = 16, font_s = 16;
         constexpr int grid_font = 16;
-#endif
         add( "FONT_WIDTH", page_id, to_translation( "Font width" ),
              to_translation( "Set the font width.  Requires restart." ),
              6, 100, font_w, COPT_CURSES_HIDE
@@ -2766,16 +2752,6 @@ void options_manager::add_options_graphics()
 #   if defined(_WIN32)
         for( const id_and_option &renderer : renderer_list ) {
             if( renderer.first == "direct3d11" ) {
-                default_renderer = renderer.first;
-                break;
-            }
-        }
-#   elif defined(CDDA_IOS)
-        // Measured 2026-08-30 on an iPhone 15 Pro Max: the software
-        // renderer spends 5-13ms of CPU per present at 2796x1290 where
-        // metal spends ~0.1ms, with no visual differences.
-        for( const id_and_option &renderer : renderer_list ) {
-            if( renderer.first == "metal" ) {
                 default_renderer = renderer.first;
                 break;
             }

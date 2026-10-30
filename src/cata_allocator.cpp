@@ -9,7 +9,7 @@
 // a dylib in Godot), its operator new and delete bind only inside the
 // library: libc++'s own out-of-line code keeps the system allocator, so a
 // string grown there frees snmalloc memory with the system's free.
-#if !defined(__SANITIZE_ADDRESS__) && !__has_feature(address_sanitizer) && !defined(CDDA_IOS) \
+#if !defined(__SANITIZE_ADDRESS__) && !__has_feature(address_sanitizer) \
     && !(defined(CDDA_GODOT) && defined(__APPLE__))
 #define CATA_USE_SNMALLOC
 #endif
