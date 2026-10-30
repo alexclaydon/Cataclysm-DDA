@@ -6297,6 +6297,9 @@ look_around_result game::look_around(
             ctxt.set_timeout( get_option<int>( "BLINK_SPEED" ) );
         }
 
+#if defined(CDDA_GODOT)
+        godot_host::set_look_cursor( true, lx - u.pos_bub().x(), ly - u.pos_bub().y() );
+#endif
         //Wait for input
         // only specify a timeout here if "EDGE_SCROLL" is enabled
         // otherwise use the previously set timeout
@@ -6424,8 +6427,27 @@ look_around_result game::look_around(
             mark_main_ui_adaptor_resize();
 #endif
         }
+#if defined(CDDA_GODOT)
+        // The host's touch drag: the cursor to its tile, the view centre with
+        // it, after whatever this pass's input did (its wake-up is a mouse
+        // move).
+        {
+            int cursor_dx = 0;
+            int cursor_dy = 0;
+            if( godot_host::take_look_cursor_request( cursor_dx, cursor_dy ) ) {
+                // Inside the map, as the cursor's own moves stay.
+                lx = std::clamp( u.pos_bub().x() + cursor_dx, 0, MAPSIZE_X - 1 );
+                ly = std::clamp( u.pos_bub().y() + cursor_dy, 0, MAPSIZE_Y - 1 );
+                center.x() = lx;
+                center.y() = ly;
+            }
+        }
+#endif
     } while( action != "QUIT" && action != "CONFIRM" && action != "SELECT" && action != "TRAVEL_TO" &&
              action != "throw_blind" && action != "throw_blind_wielded" );
+#if defined(CDDA_GODOT)
+    godot_host::set_look_cursor( false, 0, 0 );
+#endif
 
     if( center.z() != old_levz ) {
         here.invalidate_map_cache( old_levz );

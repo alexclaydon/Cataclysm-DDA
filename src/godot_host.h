@@ -279,6 +279,16 @@ bool take_look_request( int &dx, int &dy );
 // which in portrait is a row tall under the sidebar band.
 void request_click( int dx, int dy );
 bool take_click_request( int &dx, int &dy );
+// Look-around's cursor, for Dark Forest's touch drag (the map slides under
+// a cursor fixed at the centre). The engine thread reports each pass of
+// game::look_around whether it runs and where its cursor is, `dx`, `dy`
+// tiles from the avatar; the host reads it any time. The host moves the
+// cursor (and the view centre with it) by request, taken at the end of a
+// pass.
+void set_look_cursor( bool looking, int dx, int dy );
+bool look_cursor( int &dx, int &dy );
+void request_look_cursor( int dx, int dy );
+bool take_look_cursor_request( int &dx, int &dy );
 // The host wants the terminal at `columns` x `rows` cells (Dark Forest on a
 // phone turned between landscape and portrait, ADR 0012). Host thread
 // asks (waking the event pump); the engine thread takes it in

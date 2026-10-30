@@ -502,6 +502,56 @@ bool godot_host::take_goto_request( std::string &type )
     return true;
 }
 
+namespace
+{
+// Packed as looking << 32 | dx << 16 | dy, 16 bits each (two's complement).
+std::atomic<uint64_t> look_cursor_state{ 0 };
+std::atomic<uint64_t> look_cursor_request{ 0 };  // 1 << 32 | dx << 16 | dy, 0 for none
+
+uint64_t pack_cursor( int dx, int dy )
+{
+    return uint64_t( 1 ) << 32 | uint64_t( static_cast<uint16_t>( dx ) ) << 16
+           | uint64_t( static_cast<uint16_t>( dy ) );
+}
+
+void unpack_cursor( uint64_t v, int &dx, int &dy )
+{
+    dx = static_cast<int16_t>( static_cast<uint16_t>( v >> 16 ) );
+    dy = static_cast<int16_t>( static_cast<uint16_t>( v ) );
+}
+} // namespace
+
+void godot_host::set_look_cursor( bool looking, int dx, int dy )
+{
+    look_cursor_state.store( looking ? pack_cursor( dx, dy ) : 0 );
+}
+
+bool godot_host::look_cursor( int &dx, int &dy )
+{
+    const uint64_t v = look_cursor_state.load();
+    if( v == 0 ) {
+        return false;
+    }
+    unpack_cursor( v, dx, dy );
+    return true;
+}
+
+void godot_host::request_look_cursor( int dx, int dy )
+{
+    look_cursor_request.store( pack_cursor( dx, dy ) );
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_look_cursor_request( int &dx, int &dy )
+{
+    const uint64_t v = look_cursor_request.exchange( 0 );
+    if( v == 0 ) {
+        return false;
+    }
+    unpack_cursor( v, dx, dy );
+    return true;
+}
+
 void godot_host::request_click( int dx, int dy )
 {
     {
