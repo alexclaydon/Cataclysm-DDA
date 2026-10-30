@@ -342,6 +342,11 @@ int godot_host::sidebar_band()
     return sidebar_band_rows.load();
 }
 
+void godot_host::wake()
+{
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
 bool godot_host::take_terminal_request( int &columns, int &rows )
 {
     const uint32_t r = terminal_request.exchange( 0 );

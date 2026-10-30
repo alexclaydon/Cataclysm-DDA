@@ -5297,17 +5297,22 @@ static void CheckMessages()
     // for input would otherwise show the old frame until a key came.
     int request_columns = 0;
     int request_rows = 0;
-    const bool terminal_requested = godot_host::take_terminal_request( request_columns, request_rows );
-    if( terminal_requested ) {
+    // The redraw comes a pump after the resize: in the pump that rebuilt the
+    // buffer, nothing drawn reached the screen.
+    static bool redraw_after_resize = false;
+    const bool redraw_now = redraw_after_resize;
+    redraw_after_resize = false;
+    if( godot_host::take_terminal_request( request_columns, request_rows ) ) {
         resize_term( request_columns, request_rows );
+        // Pump so the resize event reaches the coordinator's watch, and the
+        // drain below applies it.
+        SDL_PumpEvents();
+        redraw_after_resize = true;
+        godot_host::wake();
     }
 #endif
     drain_renderer_recovery();
 #if defined(CDDA_GODOT)
-    if( terminal_requested ) {
-        ui_manager::redraw_invalidated();
-        needupdate = true;
-    }
     // The VR host's mouse (pointing at a window, or at a tile on the
     // 3D view), queued as events below.
     godot_host::apply_mouse( []( int dx, int dy, int &x, int &y ) {
@@ -6275,6 +6280,20 @@ static void CheckMessages()
             break;
         }
     }
+#if defined(CDDA_GODOT)
+    if( redraw_now ) {
+        // The resize left a new, blank buffer: redraw it all, the game's
+        // sidebar first, since a menu over the game (the inventory) stops the
+        // screens below it redrawing and the band would stay black, then
+        // every open screen on top of it.
+        if( godot_host::in_game() ) {
+            g->draw_panels( true );
+        }
+        ui_manager::invalidate_all_ui_adaptors();
+        ui_manager::redraw_invalidated();
+        needupdate = true;
+    }
+#endif
     if( needupdate ) {
         try_sdl_update();
     }

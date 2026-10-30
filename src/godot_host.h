@@ -278,6 +278,9 @@ bool take_look_request( int &dx, int &dy );
 // CheckMessages and resizes its window, as a desktop window resize does.
 void request_terminal( int columns, int rows );
 bool take_terminal_request( int &columns, int &rows );
+// Wake the engine's event pump (a mouse nudge), for work it does on its
+// next pass (the redraw after a resize).
+void wake();
 // The sidebar as a band of `rows` across the top of the terminal (Dark
 // Forest in portrait), 0 for the usual column: the map below it, the
 // panels flowed into columns of the narrow layout (game::draw_panels).
