@@ -3362,8 +3362,9 @@ bool game::handle_action()
         if( godot_host::take_look_request( dx, dy ) ) {
             tripoint_bub_ms center = player_character.pos_bub() + player_character.view_offset;
             const tripoint_bub_ms start = player_character.pos_bub() + tripoint_rel_ms( dx, dy, 0 );
+            // A keeps the pan, B puts the view back, as the game's own look.
             look_around( /*show_window=*/true, center, start, false, false, false, false,
-                         tripoint_bub_ms::zero, true, false );
+                         tripoint_bub_ms::zero, true, true );
             return false;
         }
     }
