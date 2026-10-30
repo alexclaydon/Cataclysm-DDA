@@ -138,10 +138,10 @@ static int repeat_delay = 400;
 // Held buttons, the d-pad and sticks in menus (50 scrolled a long list too
 // wildly).
 static int repeat_interval = 80;
-// RT-held walking: a step every 150 ms, quick but countable. At 33 the
-// repeats outran the game (each pushes a step whether or not the last has
-// been drawn), most of all on the phone, and the steps piled up.
-static int movement_repeat_interval = 150;
+// RT-held walking: a step every 100 ms (150 felt slow). At 33 the repeats
+// outran the game (each pushes a step whether or not the last has been
+// drawn), most of all on the phone, and the steps piled up.
+static int movement_repeat_interval = 100;
 
 // SDL related stuff
 static SDL_TimerID timer_id;
