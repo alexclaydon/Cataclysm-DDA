@@ -1615,12 +1615,18 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
         if( do_draw_async_anim ) {
             draw_async_anim();
         }
-    } else if( you.view_offset != tripoint_rel_ms::zero && !you.in_vehicle ) {
+    }
+#if !defined(CDDA_GODOT)
+    // (Hosted, the camera centres on the view and marks it; the marker,
+    // drawn only on frames without an animation, flashed there with each
+    // step, the step's mid-turn frame having none.)
+    else if( you.view_offset != tripoint_rel_ms::zero && !you.in_vehicle ) {
         // check to see if player is located at ter
         draw_from_id_string( "cursor", TILE_CATEGORY::NONE, empty_string,
                              tripoint_bub_ms( g->ter_view_p.xy(), center.z() ), 0, 0, lit_level::LIT,
                              false );
     }
+#endif
     if( you.controlling_vehicle ) {
         std::optional<tripoint_rel_ms> indicator_offset = g->get_veh_dir_indicator_location( true );
         if( indicator_offset ) {
