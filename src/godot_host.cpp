@@ -316,6 +316,28 @@ void godot_host::set_mouse_away()
     push_mouse( { mouse_command::away, 0, 0, 0, 0 } );
 }
 
+namespace
+{
+std::atomic<uint32_t> terminal_request{ 0 };  // columns << 16 | rows, 0 for none
+} // namespace
+
+void godot_host::request_terminal( int columns, int rows )
+{
+    terminal_request.store( static_cast<uint32_t>( columns ) << 16 | static_cast<uint32_t>( rows & 0xffff ) );
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_terminal_request( int &columns, int &rows )
+{
+    const uint32_t r = terminal_request.exchange( 0 );
+    if( r == 0 ) {
+        return false;
+    }
+    columns = static_cast<int>( r >> 16 );
+    rows = static_cast<int>( r & 0xffff );
+    return true;
+}
+
 void godot_host::request_look( int dx, int dy )
 {
     {

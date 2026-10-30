@@ -5291,8 +5291,23 @@ static void CheckMessages()
     bool text_refresh = false;
     bool is_repeat = false;
 
+#if defined(CDDA_GODOT)
+    // The host's terminal size (a phone turned), as a window resize, taken
+    // before the drain so it applies now, then redrawn: a screen waiting
+    // for input would otherwise show the old frame until a key came.
+    int request_columns = 0;
+    int request_rows = 0;
+    const bool terminal_requested = godot_host::take_terminal_request( request_columns, request_rows );
+    if( terminal_requested ) {
+        resize_term( request_columns, request_rows );
+    }
+#endif
     drain_renderer_recovery();
 #if defined(CDDA_GODOT)
+    if( terminal_requested ) {
+        ui_manager::redraw_invalidated();
+        needupdate = true;
+    }
     // The VR host's mouse (pointing at a window, or at a tile on the
     // 3D view), queued as events below.
     godot_host::apply_mouse( []( int dx, int dy, int &x, int &y ) {

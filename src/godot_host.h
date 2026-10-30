@@ -272,6 +272,12 @@ bool mouse_away();
 // thread takes it.
 void request_look( int dx, int dy );
 bool take_look_request( int &dx, int &dy );
+// The host wants the terminal at `columns` x `rows` cells (Dark Forest on a
+// phone turned between landscape and portrait, ADR 0012). Host thread
+// asks (waking the event pump); the engine thread takes it in
+// CheckMessages and resizes its window, as a desktop window resize does.
+void request_terminal( int columns, int rows );
+bool take_terminal_request( int &columns, int &rows );
 // A test hook (make vr-mouse "goto TYPE"): teleport the avatar to the
 // closest overmap terrain whose id starts with TYPE ("house"), as the
 // debug menu's teleport does; handled beside the look request.
