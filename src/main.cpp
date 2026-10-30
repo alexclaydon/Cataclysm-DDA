@@ -805,7 +805,15 @@ int main( int argc, const char *argv[] )
         if( cli.check_mods ) {
             init_colors();
             const std::vector<mod_id> mods( cli.opts.begin(), cli.opts.end() );
-            exit( g->check_mod_data( mods ) && !debug_has_error_been_observed() ? 0 : 1 );
+            const int verdict = g->check_mod_data( mods ) && !debug_has_error_been_observed() ? 0 : 1;
+#if defined(CDDA_GODOT)
+            // Hosted, run() returns the verdict to the host, which ends the
+            // process: exit() from the engine's thread tore it down under
+            // the host's feet (an abort, the verdict lost).
+            return verdict;
+#else
+            exit( verdict );
+#endif
         }
     } catch( const std::exception &err ) {
         debugmsg( "%s", err.what() );
