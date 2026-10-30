@@ -58,6 +58,8 @@
 #include "game_ui.h"
 #if defined(CDDA_GODOT)
 #include "godot_host.h"
+// From SDL_main.h, which would also redefine main() (see InitSDL).
+extern "C" SDL_DECLSPEC void SDLCALL SDL_SetMainReady( void );
 #endif
 #include "hash_utils.h"
 #include "horde_entity.h"
@@ -265,6 +267,10 @@ static void InitSDL()
 #endif
 
 #if SDL_MAJOR_VERSION >= 3
+#if defined(CDDA_GODOT)
+    // Hosted, SDL never ran main(): on iOS SDL_Init refuses until told so.
+    SDL_SetMainReady();
+#endif
     throwErrorIf( !SDL_Init( init_flags ), "SDL_Init failed" );
     throwErrorIf( !TTF_Init(), "TTF_Init failed" );
     // SDL3_image: IMG_Init removed; loading functions init on demand.
@@ -5745,7 +5751,7 @@ static void CheckMessages()
                         HideCursor();
                     }
                     keyboard_mode mode = keyboard_mode::keychar;
-#if !defined(__ANDROID__) && !(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1)
+#if !defined(__ANDROID__) && (!(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1) || defined(CDDA_GODOT))
                     if( !IsTextInputActive( ::window.get() ) ) {
                         mode = keyboard_mode::keycode;
                     }
@@ -5809,7 +5815,7 @@ static void CheckMessages()
                     }
 #endif
                     keyboard_mode mode = keyboard_mode::keychar;
-#if !defined(__ANDROID__) && !(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1)
+#if !defined(__ANDROID__) && (!(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1) || defined(CDDA_GODOT))
                     if( !IsTextInputActive( ::window.get() ) ) {
                         mode = keyboard_mode::keycode;
                     }
@@ -6609,7 +6615,7 @@ input_event input_manager::get_input_event( const keyboard_mode preferred_keyboa
     SDL_PumpEvents();
     drain_renderer_recovery();
 
-#if !defined(__ANDROID__) && !(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1)
+#if !defined(__ANDROID__) && (!(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1) || defined(CDDA_GODOT))
     if( actual_keyboard_mode( preferred_keyboard_mode ) == keyboard_mode::keychar ) {
         focus_aware_start_text_input();
     } else {
