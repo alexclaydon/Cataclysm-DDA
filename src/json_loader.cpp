@@ -9,11 +9,30 @@
 #include "flexbuffer_json.h"
 #include "path_info.h"
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 namespace
 {
+// Where the parsed JSON for files under a root is cached: beside them,
+// except hosted on iOS (Dark Forest, ADR 0012), where the base and data
+// dirs are in the read-only app bundle and nothing could be cached, so
+// every launch parsed everything again: there, in the user dir's.
+std::filesystem::path cache_dir_for( const cata_path &root, const char *name )
+{
+#if defined(CDDA_GODOT) && defined(__APPLE__) && TARGET_OS_IPHONE
+    ( void ) root;
+    return ( PATH_INFO::user_dir_path() / "cache" / name ).get_unrelative_path();
+#else
+    ( void ) name;
+    return ( root / "cache" ).get_unrelative_path();
+#endif
+}
+
 flexbuffer_cache &base_cache()
 {
-    static flexbuffer_cache cache{ ( PATH_INFO::base_path() / "cache" ).get_unrelative_path(), PATH_INFO::base_path().get_unrelative_path() };
+    static flexbuffer_cache cache{ cache_dir_for( PATH_INFO::base_path(), "base" ), PATH_INFO::base_path().get_unrelative_path() };
     return cache;
 }
 
@@ -25,7 +44,7 @@ flexbuffer_cache &config_cache()
 
 flexbuffer_cache &data_cache()
 {
-    static flexbuffer_cache cache{ ( PATH_INFO::datadir_path() / "cache" ).get_unrelative_path(), PATH_INFO::datadir_path().get_unrelative_path() };
+    static flexbuffer_cache cache{ cache_dir_for( PATH_INFO::datadir_path(), "data" ), PATH_INFO::datadir_path().get_unrelative_path() };
     return cache;
 }
 
