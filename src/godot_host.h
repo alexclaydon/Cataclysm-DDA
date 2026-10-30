@@ -272,6 +272,13 @@ bool mouse_away();
 // thread takes it.
 void request_look( int dx, int dy );
 bool take_look_request( int &dx, int &dy );
+// The host clicked a tile on its 3D board (tap-to-move, a mouse click on
+// the board), `dx`, `dy` tiles from the avatar: game::handle_action takes
+// it as a left click on that tile (a route preview, then its walk),
+// without the round trip through a mouse position in the map window,
+// which in portrait is a row tall under the sidebar band.
+void request_click( int dx, int dy );
+bool take_click_request( int &dx, int &dy );
 // The host wants the terminal at `columns` x `rows` cells (Dark Forest on a
 // phone turned between landscape and portrait, ADR 0012). Host thread
 // asks (waking the event pump); the engine thread takes it in

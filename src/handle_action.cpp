@@ -3321,6 +3321,16 @@ bool game::handle_action()
             }
         }
     }
+    // The host clicked a tile on its board (godot_host::request_click).
+    std::optional<tripoint_bub_ms> host_click;
+    {
+        int click_dx = 0;
+        int click_dy = 0;
+        if( godot_host::take_click_request( click_dx, click_dy ) ) {
+            action = "SELECT";
+            host_click = player_character.pos_bub() + tripoint_rel_ms( click_dx, click_dy, 0 );
+        }
+    }
     // VR: the player pointed at a tile and asked to look at it.
     {
         int dx = 0;
@@ -3512,9 +3522,14 @@ bool game::handle_action()
                 return false;
             }
 
-            const std::optional<tripoint_bub_ms> mouse_pos = ctxt.get_coordinates( w_terrain,
-                    ter_view_p.raw().xy(),
-                    true );
+            std::optional<tripoint_bub_ms> mouse_pos;
+#if defined(CDDA_GODOT)
+            mouse_pos = host_click;
+            if( !mouse_pos )
+#endif
+            {
+                mouse_pos = ctxt.get_coordinates( w_terrain, ter_view_p.raw().xy(), true );
+            }
             if( !mouse_pos ) {
                 return false;
             }

@@ -75,6 +75,9 @@ std::string goto_type;  // request_goto's, empty for none (under look_mutex)
 int time_hour = -1;     // request_time's, -1 for none (under look_mutex)
 int look_dx = 0;
 int look_dy = 0;
+bool click_requested = false;  // request_click's, with its tile
+int click_dx = 0;
+int click_dy = 0;
 // The wheels (ADR 0009): the events for the host, and its answers.
 std::atomic<bool> wheels_wanted{ false };
 std::mutex wheel_mutex;
@@ -372,7 +375,8 @@ void godot_host::request_look( int dx, int dy )
 bool godot_host::look_pending()
 {
     std::lock_guard<std::mutex> lock( look_mutex );
-    return look_requested || !goto_type.empty() || time_hour >= 0 || !action_requested.empty();
+    return look_requested || click_requested || !goto_type.empty() || time_hour >= 0
+           || !action_requested.empty();
 }
 
 void godot_host::enable_wheels()
@@ -495,6 +499,29 @@ bool godot_host::take_goto_request( std::string &type )
     }
     type = goto_type;
     goto_type.clear();
+    return true;
+}
+
+void godot_host::request_click( int dx, int dy )
+{
+    {
+        std::lock_guard<std::mutex> lock( look_mutex );
+        click_requested = true;
+        click_dx = dx;
+        click_dy = dy;
+    }
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_click_request( int &dx, int &dy )
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    if( !click_requested ) {
+        return false;
+    }
+    click_requested = false;
+    dx = click_dx;
+    dy = click_dy;
     return true;
 }
 
