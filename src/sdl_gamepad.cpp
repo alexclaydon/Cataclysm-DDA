@@ -135,10 +135,13 @@ static std::array<task_t, max_tasks> all_tasks;
 static std::array<int, max_sticks> stick_sent = { -1, -1 };
 
 static int repeat_delay = 400;
-static int repeat_interval = 50;
-// RT-held continuous movement repeats faster than the generic repeat —
-// walking cadence wants to be snappier than menu-scroll cadence.
-static int movement_repeat_interval = 33;
+// Held buttons, the d-pad and sticks in menus (50 scrolled a long list too
+// wildly).
+static int repeat_interval = 80;
+// RT-held walking: a step every 150 ms, quick but countable. At 33 the
+// repeats outran the game (each pushes a step whether or not the last has
+// been drawn), most of all on the phone, and the steps piled up.
+static int movement_repeat_interval = 150;
 
 // SDL related stuff
 static SDL_TimerID timer_id;
