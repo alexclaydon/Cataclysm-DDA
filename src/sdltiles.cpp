@@ -6259,6 +6259,16 @@ static void CheckMessages()
     }
     if( quit ) {
         catacurses::endwin();
+#if defined(CDDA_GODOT) && defined(__APPLE__)
+        // Hosted on macOS, a window close ends the process from here, as
+        // stock does, but quits SDL first on its own thread (macOS SDL's
+        // joystick and audio teardown crash from any other) and skips the
+        // exit handlers, which would tear down Godot under its running main
+        // thread.
+        deinitDebug();
+        SDL_Quit();
+        std::_Exit( 0 );
+#endif
         exit( 0 );
     }
 }
