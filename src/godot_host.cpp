@@ -50,6 +50,7 @@ std::atomic<bool> game_is_on{ false };
 // The snapshot radius levels the zoom steps through, and the current one.
 constexpr std::array<int, 5> radius_levels = { 15, 20, 30, 45, 60 };
 std::atomic<int> radius_level{ 2 };
+std::atomic<int> zoom_requested{ 0 };  // request_zoom_view's steps, not yet taken
 std::atomic<float> view_yaw_degrees{ 0.0f };
 
 // The open UIs as of the latest frame (publish_frame), and the host's mouse.
@@ -381,7 +382,7 @@ bool godot_host::look_pending()
 {
     std::lock_guard<std::mutex> lock( look_mutex );
     return look_requested || click_requested || !goto_type.empty() || time_hour >= 0
-           || !action_requested.empty() || catalogue_requested;
+           || !action_requested.empty() || catalogue_requested || zoom_requested.load() != 0;
 }
 
 void godot_host::enable_wheels()
@@ -675,6 +676,30 @@ int godot_host::snapshot_radius()
 void godot_host::zoom_view( int steps )
 {
     radius_level = std::clamp( radius_level.load() - steps, 0, static_cast<int>( radius_levels.size() ) - 1 );
+}
+
+int godot_host::snapshot_radius_level()
+{
+    return radius_level.load();
+}
+
+int godot_host::snapshot_radius_level_count()
+{
+    return static_cast<int>( radius_levels.size() );
+}
+
+void godot_host::request_zoom_view( int steps )
+{
+    if( steps == 0 ) {
+        return;
+    }
+    zoom_requested += steps;
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+int godot_host::take_zoom_view_request()
+{
+    return zoom_requested.exchange( 0 );
 }
 
 void godot_host::apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, int &y ) )

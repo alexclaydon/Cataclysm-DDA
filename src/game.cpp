@@ -6273,6 +6273,11 @@ look_around_result game::look_around(
                 center.x() = lx;
                 center.y() = ly;
             }
+            // The touch pad's view radius slider, as the zoom actions here.
+            if( const int steps = godot_host::take_zoom_view_request() ) {
+                godot_host::zoom_view( steps );
+                mark_main_ui_adaptor_resize();
+            }
         }
 #endif
         u.view_offset = center - u.pos_bub();

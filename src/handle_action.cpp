@@ -3307,6 +3307,11 @@ bool game::handle_action()
         ctxt = get_player_input( action );
     }
 #if defined(CDDA_GODOT)
+    // The touch pad's view radius slider, as the zoom actions.
+    if( const int steps = godot_host::take_zoom_view_request() ) {
+        godot_host::zoom_view( steps );
+        mark_main_ui_adaptor_resize();
+    }
     // The host's hotbar asked for the action catalogue (ADR 0013).
     if( godot_host::take_catalogue_request() ) {
         godot_host::publish_catalogue( godot_host::wheel_catalogue( 0, 0 ) );

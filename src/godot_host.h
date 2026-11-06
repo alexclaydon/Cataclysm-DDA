@@ -453,6 +453,17 @@ constexpr int snapshot_levels_above = 2;
 // Steps in (+, a smaller radius) or out (-) through the radius levels.
 // Engine thread (the zoom actions), which then redraws the map.
 void zoom_view( int steps );
+// The radius's level (0 the smallest) and how many levels there are, for
+// the host's view radius slider. Any thread.
+int snapshot_radius_level();
+int snapshot_radius_level_count();
+// The touch pad's view radius slider: `steps` in (+) or out (-), added up
+// until the engine takes them, in the play loop or in look-around (as the
+// zoom actions are), so a quick drag loses none. Host side, any thread;
+// counted by look_pending().
+void request_zoom_view( int steps );
+// Engine side: the steps waiting, taken (0 for none).
+int take_zoom_view_request();
 
 // Whether a map snapshot is being recorded (between begin and end).
 bool recording_map();
