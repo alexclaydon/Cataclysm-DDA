@@ -411,6 +411,14 @@ bool take_catalogue( std::vector<wheel_action> &out );
 // Engine side, the play loop: whether the host asked, and its answer.
 bool take_catalogue_request();
 void publish_catalogue( std::vector<wheel_action> catalogue );
+// The host's own action "stairs" (ADR 0013), in the catalogue beside go
+// up and go down: whichever of the two applies where the avatar stands.
+// Where both do (a ladder going both ways, deep water) or neither does by
+// the terrain (climbing, levitating, or nothing), a menu asks which. The
+// play loop calls it on the engine thread: "LEVEL_UP", "LEVEL_DOWN", or
+// "" if the menu was cancelled.
+extern const char *const stairs_action_id;
+std::string stairs_action();
 
 // If the map has been drawn since `sequence`, move the newest snapshot into
 // `out`, update `sequence` and return true.

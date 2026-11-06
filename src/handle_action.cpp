@@ -3320,6 +3320,12 @@ bool game::handle_action()
         int aim_dx = 0;
         int aim_dy = 0;
         if( godot_host::take_action_request( wheel_action, aim_dx, aim_dy ) ) {
+            if( wheel_action == godot_host::stairs_action_id ) {
+                wheel_action = godot_host::stairs_action();
+                if( wheel_action.empty() ) {
+                    return false;
+                }
+            }
             action = wheel_action;
             if( ( aim_dx != 0 || aim_dy != 0 ) && godot_host::wheel_action_at_tile( wheel_action ) ) {
                 wheel_aim = tripoint_rel_ms( aim_dx, aim_dy, 0 );

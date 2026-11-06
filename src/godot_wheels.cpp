@@ -16,6 +16,8 @@
 #include "input_context.h"
 #include "map.h"
 #include "point.h"
+#include "translations.h"
+#include "uilist.h"
 
 bool godot_host::wheel_action_at_tile( const std::string &id )
 {
@@ -74,6 +76,31 @@ static bool wheel_action_applies( action_id act, map &here, const tripoint_bub_m
     return false;
 }
 
+const char *const godot_host::stairs_action_id = "stairs";
+
+std::string godot_host::stairs_action()
+{
+    const map &here = get_map();
+    const tripoint_bub_ms pos = get_avatar().pos_bub();
+    const bool up = can_move_vertical_at( here, pos, 1 );
+    const bool down = can_move_vertical_at( here, pos, -1 );
+    if( up != down ) {
+        return up ? "LEVEL_UP" : "LEVEL_DOWN";
+    }
+    uilist menu;
+    menu.text = up ? _( "Go up or down?" ) : _( "No way up or down here by the terrain.  Try anyway?" );
+    menu.addentry( 0, true, '<', _( "Go up" ) );
+    menu.addentry( 1, true, '>', _( "Go down" ) );
+    menu.query();
+    if( menu.ret == 0 ) {
+        return "LEVEL_UP";
+    }
+    if( menu.ret == 1 ) {
+        return "LEVEL_DOWN";
+    }
+    return "";
+}
+
 std::vector<godot_host::wheel_action> godot_host::wheel_catalogue( int aim_dx, int aim_dy )
 {
     std::vector<wheel_action> out;
@@ -94,6 +121,17 @@ std::vector<godot_host::wheel_action> godot_host::wheel_catalogue( int aim_dx, i
             entry.applies = wheel_action_applies( act, here, pos, aim );
             entry.at_tile = wheel_action_at_tile( entry.id );
             out.push_back( std::move( entry ) );
+            if( act == ACTION_MOVE_UP ) {
+                // Up or down, whichever applies (stairs_action).
+                wheel_action stairs;
+                stairs.id = stairs_action_id;
+                stairs.name = _( "Go up or down" );
+                stairs.category = category.id;
+                stairs.category_name = category.name;
+                stairs.applies = can_move_vertical_at( here, pos, 1 ) || can_move_vertical_at( here, pos, -1 );
+                stairs.at_tile = false;
+                out.push_back( std::move( stairs ) );
+            }
         }
     }
     return out;
