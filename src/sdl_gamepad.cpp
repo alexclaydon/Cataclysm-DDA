@@ -182,6 +182,7 @@ static direction right_stick_dir = direction::NONE;
 static direction radial_left_last_dir = direction::NONE;
 static direction radial_right_last_dir = direction::NONE;
 static bool radial_left_open = false;
+static bool button_from_touch_pad = false;  // last_button_from_touch_pad
 static bool radial_right_open = false;
 static bool alt_modifier_held = false;
 // Layer 2: LT held, then RT pulled. RT can only mean this while LT is down —
@@ -1086,6 +1087,9 @@ static bool handle_button_event( SDL_Event &event )
 #if SDL_MAJOR_VERSION >= 3
     int button = event.gbutton.button;
     set_active_controller( event.gbutton.which );
+#if defined(CDDA_GODOT)
+    button_from_touch_pad = godot_host::touch_pad() && godot_host::is_virtual_pad( event.gbutton.which );
+#endif
 #else
     int button = event.cbutton.button;
     set_active_controller( event.cbutton.which );
@@ -1526,6 +1530,11 @@ void note_keyboard_input()
 bool last_input_was_pad()
 {
     return pad_input_last;
+}
+
+bool last_button_from_touch_pad()
+{
+    return button_from_touch_pad;
 }
 
 int number_step( const input_event &ev )

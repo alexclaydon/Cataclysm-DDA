@@ -201,6 +201,13 @@ void set_virtual_pad( uint32_t buttons, const int16_t axes[virtual_pad_axes] );
 bool take_virtual_rumble( uint16_t &low, uint16_t &high );
 // Engine side, from sdl_gamepad::init once SDL_INIT_GAMEPAD is up.
 void attach_virtual_pad();
+// Whether the virtual pad is the host's touch pad (iOS, --touchpad), not
+// the VR or desk host's Touch controllers (ADR 0014): its X then always
+// opens the action list. Host side, any thread.
+void set_touch_pad( bool on );
+bool touch_pad();
+// Engine side: whether the joystick `id` is the virtual pad.
+bool is_virtual_pad( uint32_t id );
 
 // Which way is "forward" for the player in VR (plan 0005): degrees
 // clockwise from map north of the direction from the player's head to the

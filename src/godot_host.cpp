@@ -47,6 +47,7 @@ std::atomic<uint32_t> virtual_rumble{ 0 };  // low << 16 | high
 std::atomic<bool> virtual_rumble_new{ false };
 std::atomic<bool> text_is_wanted{ false };
 std::atomic<bool> menu_is_open{ false };
+std::atomic<bool> touch_pad_on{ false };
 std::atomic<int> safe_mode_now{ 0 };
 std::atomic<bool> game_is_on{ false };
 // The snapshot radius levels the zoom steps through, and the current one.
@@ -838,6 +839,21 @@ bool godot_host::take_virtual_rumble( uint16_t &low, uint16_t &high )
     low = static_cast<uint16_t>( r >> 16 );
     high = static_cast<uint16_t>( r & 0xffff );
     return true;
+}
+
+void godot_host::set_touch_pad( bool on )
+{
+    touch_pad_on = on;
+}
+
+bool godot_host::touch_pad()
+{
+    return touch_pad_on;
+}
+
+bool godot_host::is_virtual_pad( uint32_t id )
+{
+    return virtual_pad_id != 0 && id == virtual_pad_id;
 }
 
 void godot_host::attach_virtual_pad()

@@ -63,6 +63,9 @@ void note_keyboard_input();
 // (in a menu, its synthesized keys too), cleared by the keyboard and mouse
 // clicks (note_keyboard_input).
 bool last_input_was_pad();
+// Whether the latest button came from the host's touch pad (ADR 0014;
+// godot_host::touch_pad), not a real pad: its X is always the action list.
+bool last_button_from_touch_pad();
 // The step a number prompt takes for `ev` (the d-pad spinner): the pad's
 // up or down +1 or -1 (in a menu they arrive as arrow keys, so only while
 // last_input_was_pad), with LT held +10 or -10 (JOY_ALT_UP/DOWN); 0 for

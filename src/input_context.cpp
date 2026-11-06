@@ -515,6 +515,19 @@ const std::string &input_context::handle_input( const int timeout )
 
         const std::string &action = input_to_action( next_action );
 
+#if defined(CDDA_GODOT)
+        // The touch pad's X is always the action list (ADR 0014: it is
+        // labelled Actions), the screen's own X action listed in it. A real
+        // pad's X keeps that action.
+        if( next_action.type == input_event_t::gamepad && !next_action.sequence.empty() &&
+            next_action.get_first_input() == JOY_X && gamepad::last_button_from_touch_pad() &&
+            ( !registered_any_input || action_palette_ok ) ) {
+            const std::string *picked = action_palette( action == CATA_ERROR ? std::string() : action );
+            result = picked != nullptr ? picked : &CATA_ERROR;
+            break;
+        }
+#endif
+
         //Special global key to toggle language to english and back
         if( action == "toggle_language_to_en" ) {
             g->toggle_language_to_en();
@@ -1317,7 +1330,7 @@ std::optional<point> input_context::get_coordinates_text( const catacurses::wind
 }
 
 #if defined(TILES)
-const std::string *input_context::action_palette()
+const std::string *input_context::action_palette( const std::string &also )
 {
     // Navigation and plumbing the pad already has (menus synthesize the
     // arrows, Enter and Escape) or that means nothing in a list.
@@ -1334,7 +1347,7 @@ const std::string *input_context::action_palette()
     };
     std::vector<entry> entries;
     for( const std::string &a : registered_actions ) {
-        if( skip.count( a ) > 0 ) {
+        if( skip.count( a ) > 0 || a == also ) {
             continue;
         }
         // Derived, never curated: a display name (nameless is plumbing), a
@@ -1356,12 +1369,19 @@ const std::string *input_context::action_palette()
         }
         entries.push_back( { name, a, keys.front() } );
     }
-    if( entries.empty() ) {
-        return nullptr;
-    }
     std::sort( entries.begin(), entries.end(), []( const entry & l, const entry & r ) {
         return localized_compare( l.name, r.name );
     } );
+    if( !also.empty() ) {
+        // First, under its keyboard key if it has one, else the pad's own
+        // press (which the screen reads as that action).
+        const std::vector<input_event> keys = keys_bound_to( also, -1, false, true );
+        entries.insert( entries.begin(), { get_action_name( also ), also,
+                                           keys.empty() ? next_action : keys.front() } );
+    }
+    if( entries.empty() ) {
+        return nullptr;
+    }
     uilist menu;
     menu.title = _( "Actions" );
     for( size_t i = 0; i < entries.size(); ++i ) {

@@ -542,9 +542,11 @@ class input_context
         bool action_palette_ok = false;  // allow_action_palette
         std::string palette_pick;  // the action list's pick, which handle_input returns
         // The pad's action list: this context's actions the pad can't reach
-        // otherwise, as a menu; the pick (with its key as the raw input), or
-        // null when there are none or it's cancelled.
-        const std::string *action_palette();
+        // otherwise, as a menu, with `also` (an action the pad does reach,
+        // listed anyway: the touch pad's X, ADR 0014) first if given; the
+        // pick (with its key as the raw input), or null when there are none
+        // or it's cancelled.
+        const std::string *action_palette( const std::string &also = std::string() );
         bool coordinate_input_received;
         bool handling_coordinate_input;
         bool iso_mode = false; // should this context follow the game's isometric settings?
