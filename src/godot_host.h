@@ -330,6 +330,11 @@ bool text_wanted();
 // engine thread sets it each event pump; the host reads it any time.
 void set_in_menu( bool menu );
 bool in_menu();
+// The game's safe mode (game::safe_mode: 0 off, 1 on, 2 stopped by a newly
+// spotted hostile), for the host's touch Safe mode control. The engine
+// thread sets it each event pump; the host reads it any time.
+void set_safe_mode( int mode );
+int safe_mode();
 // Whether a game is being played (main's do_turn loop), not the title
 // screen: the VR host hides the board and the HUD outside one, since the
 // last game's map and sidebar would otherwise stay up, stale.

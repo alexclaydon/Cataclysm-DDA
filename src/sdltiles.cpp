@@ -5339,6 +5339,7 @@ static void CheckMessages()
         godot_host::set_text_wanted( wanted );
     }
     godot_host::set_in_menu( gamepad::is_in_menu() );
+    godot_host::set_safe_mode( g ? static_cast<int>( g->safe_mode ) : 0 );
 #endif
 
 #if defined(__ANDROID__)
