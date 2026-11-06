@@ -3307,8 +3307,13 @@ bool game::handle_action()
         ctxt = get_player_input( action );
     }
 #if defined(CDDA_GODOT)
-    // The host's shoulder wheel chose an action (ADR 0009): taken as if its
-    // key had been pressed, aimed where the wheel opened.
+    // The host's hotbar asked for the action catalogue (ADR 0013).
+    if( godot_host::take_catalogue_request() ) {
+        godot_host::publish_catalogue( godot_host::wheel_catalogue( 0, 0 ) );
+    }
+    // The host's shoulder wheel chose an action (ADR 0009), or its hotbar
+    // did (no aim): taken as if its key had been pressed, aimed where the
+    // wheel opened.
     std::optional<tripoint_rel_ms> wheel_aim;
     {
         std::string wheel_action;

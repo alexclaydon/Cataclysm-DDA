@@ -90,6 +90,11 @@ int action_serial = 0;
 int aim_serial = 0;
 int aim_x = 0;
 int aim_y = 0;
+// The hotbar's catalogue (ADR 0013): asked for, and the play loop's answer.
+bool catalogue_requested = false;  // under look_mutex
+std::mutex catalogue_mutex;
+std::vector<godot_host::wheel_action> catalogue;
+bool catalogue_new = false;  // under catalogue_mutex
 std::mutex mouse_mutex;
 std::deque<mouse_command> mouse_queue;
 uint32_t mouse_buttons_applied = 0;  // engine thread only
@@ -376,7 +381,7 @@ bool godot_host::look_pending()
 {
     std::lock_guard<std::mutex> lock( look_mutex );
     return look_requested || click_requested || !goto_type.empty() || time_hour >= 0
-           || !action_requested.empty();
+           || !action_requested.empty() || catalogue_requested;
 }
 
 void godot_host::enable_wheels()
@@ -459,6 +464,56 @@ bool godot_host::take_action_request( std::string &action, int &aim_dx, int &aim
     const bool aimed = action_serial == aim_serial;
     aim_dx = aimed ? aim_x : 0;
     aim_dy = aimed ? aim_y : 0;
+    return true;
+}
+
+void godot_host::request_action( const std::string &id )
+{
+    if( id.empty() ) {
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock( look_mutex );
+        action_requested = id;
+        // No wheel's: never the aim's serial, so no aim.
+        action_serial = -1;
+    }
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+void godot_host::request_catalogue()
+{
+    {
+        std::lock_guard<std::mutex> lock( look_mutex );
+        catalogue_requested = true;
+    }
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_catalogue_request()
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    const bool asked = catalogue_requested;
+    catalogue_requested = false;
+    return asked;
+}
+
+void godot_host::publish_catalogue( std::vector<wheel_action> actions )
+{
+    std::lock_guard<std::mutex> lock( catalogue_mutex );
+    catalogue = std::move( actions );
+    catalogue_new = true;
+}
+
+bool godot_host::take_catalogue( std::vector<wheel_action> &out )
+{
+    std::lock_guard<std::mutex> lock( catalogue_mutex );
+    if( !catalogue_new ) {
+        return false;
+    }
+    out = std::move( catalogue );
+    catalogue.clear();
+    catalogue_new = false;
     return true;
 }
 

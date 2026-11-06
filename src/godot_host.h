@@ -398,6 +398,20 @@ bool take_wheel_done( int serial );
 // aim to use as the target. Counted by look_pending().
 bool take_action_request( std::string &action, int &aim_dx, int &aim_dy );
 
+// The hotbar (ADR 0013), drawn by the host. Host side, any thread: do
+// action `id` as if its key had been pressed, with no aim (a directional
+// verb asks), taken by the play loop as a wheel's pick is. Only sent in
+// play with no menu open; one sent otherwise waits for the play loop.
+void request_action( const std::string &id );
+// Host side, any thread: ask for the action catalogue (the wheels', aimed
+// nowhere), for the bar's labels and its picker; the play loop builds it
+// and the host takes it with take_catalogue. Counted by look_pending().
+void request_catalogue();
+bool take_catalogue( std::vector<wheel_action> &out );
+// Engine side, the play loop: whether the host asked, and its answer.
+bool take_catalogue_request();
+void publish_catalogue( std::vector<wheel_action> catalogue );
+
 // If the map has been drawn since `sequence`, move the newest snapshot into
 // `out`, update `sequence` and return true.
 bool take_map_snapshot( uint64_t &sequence, map_snapshot &out );
