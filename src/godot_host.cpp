@@ -46,6 +46,7 @@ std::array<std::atomic<int16_t>, godot_host::virtual_pad_axes> virtual_axes{};
 std::atomic<uint32_t> virtual_rumble{ 0 };  // low << 16 | high
 std::atomic<bool> virtual_rumble_new{ false };
 std::atomic<bool> text_is_wanted{ false };
+std::atomic<bool> menu_is_open{ false };
 std::atomic<bool> game_is_on{ false };
 // The snapshot radius levels the zoom steps through, and the current one.
 constexpr std::array<int, 5> radius_levels = { 15, 20, 30, 45, 60 };
@@ -656,6 +657,16 @@ void godot_host::set_text_wanted( bool wanted )
 bool godot_host::text_wanted()
 {
     return text_is_wanted;
+}
+
+void godot_host::set_in_menu( bool menu )
+{
+    menu_is_open = menu;
+}
+
+bool godot_host::in_menu()
+{
+    return menu_is_open;
 }
 
 void godot_host::set_in_game( bool playing )

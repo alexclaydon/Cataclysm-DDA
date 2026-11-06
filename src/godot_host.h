@@ -324,6 +324,12 @@ bool look_pending();
 // host reads it any time.
 void set_text_wanted( bool wanted );
 bool text_wanted();
+// Whether the game is in its menu plane (a menu, a prompt, look-around or
+// aiming on top of play: the pad layer's is_in_menu, the UI stack deeper
+// than the game), for the host's Confirm, Cancel and Actions buttons. The
+// engine thread sets it each event pump; the host reads it any time.
+void set_in_menu( bool menu );
+bool in_menu();
 // Whether a game is being played (main's do_turn loop), not the title
 // screen: the VR host hides the board and the HUD outside one, since the
 // last game's map and sidebar would otherwise stay up, stale.
