@@ -1738,6 +1738,14 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
             for( int y = std::max( 0, mid.y - r ); y <= std::min( MAPSIZE_Y - 1, mid.y + r ); ++y ) {
                 for( int x = std::max( 0, mid.x - r ); x <= std::min( MAPSIZE_X - 1, mid.x + r ); ++x ) {
                     const tripoint_bub_ms p( x, y, z );
+                    // Most of these storeys' tiles the avatar never saw: one
+                    // memory lookup, not four layer calls finding nothing
+                    // (each step paid them on every storey to the world's
+                    // bottom).
+                    const memorized_tile &mt = get_avatar().get_memorized_tile( here.get_abs( p ) );
+                    if( mt.get_ter_id().empty() && mt.get_dec_id().empty() ) {
+                        continue;
+                    }
                     int height_3d = 0;
                     draw_terrain( p, lit_level::MEMORIZED, height_3d, unseen, false );
                     draw_furniture( p, lit_level::MEMORIZED, height_3d, unseen, false );
