@@ -11,6 +11,8 @@
 #include "action.h"
 #include "avatar.h"
 #include "coordinates.h"
+#include "creature.h"
+#include "creature_tracker.h"
 #include "game.h"
 #include "godot_host.h"
 #include "input_context.h"
@@ -18,6 +20,8 @@
 #include "point.h"
 #include "translations.h"
 #include "uilist.h"
+#include "veh_type.h"
+#include "vpart_position.h"
 
 bool godot_host::wheel_action_at_tile( const std::string &id )
 {
@@ -99,6 +103,66 @@ std::string godot_host::stairs_action()
         return "LEVEL_DOWN";
     }
     return "";
+}
+
+std::vector<std::string> godot_host::context_actions_here()
+{
+    std::vector<std::string> out;
+    if( g == nullptr ) {
+        return out;
+    }
+    map &here = get_map();
+    const avatar &you = get_avatar();
+    const tripoint_bub_ms pos = you.pos_bub();
+    bool open = false;
+    bool close = false;
+    bool pickup = can_interact_at( ACTION_PICKUP, here, pos );
+    bool talk = false;
+    bool examine = false;
+    for( const tripoint_bub_ms &p : here.points_in_radius( pos, 1 ) ) {
+        if( p == pos ) {
+            continue;
+        }
+        open = open || can_interact_at( ACTION_OPEN, here, p );
+        close = close || can_interact_at( ACTION_CLOSE, here, p );
+        pickup = pickup || can_interact_at( ACTION_PICKUP, here, p );
+        examine = examine || can_interact_at( ACTION_EXAMINE, here, p );
+        if( !talk ) {
+            const Creature *c = get_creature_tracker().creature_at( p );
+            talk = c != nullptr && c->is_npc() && you.sees( here, p );
+        }
+    }
+    const optional_vpart_position vp = here.veh_at( pos );
+    const bool drive = vp && vp.part_with_feature( VPFLAG_CONTROLS, true );
+    // The fixed priority order: the same action keeps its place.
+    if( can_move_vertical_at( here, pos, 1 ) ) {
+        out.emplace_back( "LEVEL_UP" );
+    }
+    if( can_move_vertical_at( here, pos, -1 ) ) {
+        out.emplace_back( "LEVEL_DOWN" );
+    }
+    if( open ) {
+        out.emplace_back( "open" );
+    }
+    if( close ) {
+        out.emplace_back( "close" );
+    }
+    if( pickup ) {
+        out.emplace_back( "pickup_all" );
+    }
+    if( talk ) {
+        out.emplace_back( "chat" );
+    }
+    if( drive ) {
+        out.emplace_back( "control_vehicle" );
+    }
+    if( can_interact_at( ACTION_BUTCHER, here, pos ) ) {
+        out.emplace_back( "butcher" );
+    }
+    if( examine ) {
+        out.emplace_back( "examine" );
+    }
+    return out;
 }
 
 std::vector<godot_host::wheel_action> godot_host::wheel_catalogue( int aim_dx, int aim_dy )

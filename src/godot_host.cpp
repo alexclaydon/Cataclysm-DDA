@@ -99,6 +99,11 @@ bool catalogue_requested = false;  // under look_mutex
 std::mutex catalogue_mutex;
 std::vector<godot_host::wheel_action> catalogue;
 bool catalogue_new = false;  // under catalogue_mutex
+// The touch pad's context row: the actions that apply here, and whether
+// they changed since the host last took them.
+std::mutex context_mutex;
+std::vector<std::string> context_actions;
+bool context_new = false;  // under context_mutex
 std::mutex mouse_mutex;
 std::deque<mouse_command> mouse_queue;
 uint32_t mouse_buttons_applied = 0;  // engine thread only
@@ -518,6 +523,26 @@ bool godot_host::take_catalogue( std::vector<wheel_action> &out )
     out = std::move( catalogue );
     catalogue.clear();
     catalogue_new = false;
+    return true;
+}
+
+void godot_host::publish_context_actions( std::vector<std::string> actions )
+{
+    std::lock_guard<std::mutex> lock( context_mutex );
+    if( actions != context_actions ) {
+        context_actions = std::move( actions );
+        context_new = true;
+    }
+}
+
+bool godot_host::take_context_actions( std::vector<std::string> &out )
+{
+    std::lock_guard<std::mutex> lock( context_mutex );
+    if( !context_new ) {
+        return false;
+    }
+    out = context_actions;
+    context_new = false;
     return true;
 }
 

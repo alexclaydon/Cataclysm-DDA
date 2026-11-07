@@ -3303,6 +3303,10 @@ bool game::handle_action()
         open_menu_tmp.value()();
         return false;
     } else {
+#if defined(CDDA_GODOT)
+        // The touch pad's context row: what applies here, before waiting.
+        godot_host::publish_context_actions( godot_host::context_actions_here() );
+#endif
         // No auto-move, ask player for input
         ctxt = get_player_input( action );
     }

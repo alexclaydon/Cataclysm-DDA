@@ -438,6 +438,15 @@ void publish_catalogue( std::vector<wheel_action> catalogue );
 extern const char *const stairs_action_id;
 std::string stairs_action();
 
+// The touch pad's context row (ADR 0014): the actions that apply where the
+// avatar stands, in a fixed priority order (up, down, open, close, pick up,
+// talk, drive, butcher, examine). The play loop builds them before it waits
+// for input (context_actions_here, game code) and publishes them; the host
+// takes them when they change.
+std::vector<std::string> context_actions_here();
+void publish_context_actions( std::vector<std::string> actions );
+bool take_context_actions( std::vector<std::string> &out );
+
 // If the map has been drawn since `sequence`, move the newest snapshot into
 // `out`, update `sequence` and return true.
 bool take_map_snapshot( uint64_t &sequence, map_snapshot &out );
