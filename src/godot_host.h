@@ -624,6 +624,48 @@ void publish_tileset( tileset_info info );
 bool map_objects_changed( uint64_t key );
 void publish_map_objects( map_objects_info info );
 
+// Native menus (plan 0017): with the host's switch on, a uilist the engine
+// runs publishes its state and isn't drawn; the host draws it and sends
+// requests back, taken in the list's loop as the matching keys are. Text
+// is BBCode ([color=#rrggbb]), the engine's colour tags converted.
+struct menu_entry {
+    std::string text;
+    std::string column;   // the second column
+    std::string desc;
+    std::string hotkey;   // its key, as the engine names it ("" none)
+    bool enabled = true;
+};
+struct menu_state {
+    uint32_t serial = 0;  // bumped on each change
+    std::string title;
+    std::string header;
+    std::string footer;   // shown in place of the description when set
+    std::vector<menu_entry> entries;  // in the list's (filtered) order
+    int selected = 0;     // into entries
+    std::vector<std::string> tabs;
+    int tab = 0;
+    bool desc = false;    // the list shows descriptions
+    bool cancel = true;   // cancelling is allowed
+    bool filter = false;  // filtering is allowed
+    std::string filter_text;
+};
+enum class menu_request_kind : int { select, confirm, cancel, tab, filter };
+struct menu_request {
+    menu_request_kind kind = menu_request_kind::select;
+    int value = 0;        // an entry (select, confirm) or a tab
+    std::string text;     // the filter
+};
+// Host: the switch; the state (false when no bridged list is up); a
+// request (wakes the engine).
+void set_native_menus( bool on );
+bool native_menus();
+bool get_menu( menu_state &out );
+void request_menu( const menu_request &r );
+// Engine thread: a list's state, its owner the list; cleared by its owner.
+void publish_menu( const void *owner, menu_state state );
+void clear_menu( const void *owner );
+bool take_menu_request( menu_request &out );
+
 } // namespace godot_host
 
 #endif // CATA_SRC_GODOT_HOST_H

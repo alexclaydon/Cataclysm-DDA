@@ -878,11 +878,99 @@ int godot_host::snapshot_radius_level_count()
 
 namespace
 {
+std::atomic<bool> native_menus_on{ false };
+std::mutex menu_mutex;
+const void *menu_owner = nullptr;
+godot_host::menu_state menu_now;
+bool menu_up = false;
+uint32_t menu_serial = 0;
+std::deque<godot_host::menu_request> menu_requests;
 bool snapshot_owed_now = false;
 bool snapshot_flush = false;
 std::atomic<bool> flat_view_now{ false };
 std::atomic<bool> flat_view_changed{ false };
 } // namespace
+
+void godot_host::set_native_menus( bool on )
+{
+    native_menus_on = on;
+}
+
+bool godot_host::native_menus()
+{
+    return native_menus_on.load();
+}
+
+bool godot_host::get_menu( menu_state &out )
+{
+    std::lock_guard<std::mutex> lock( menu_mutex );
+    if( !menu_up ) {
+        return false;
+    }
+    if( out.serial != menu_now.serial ) {
+        out = menu_now;
+    }
+    return true;
+}
+
+void godot_host::request_menu( const menu_request &r )
+{
+    {
+        std::lock_guard<std::mutex> lock( menu_mutex );
+        menu_requests.push_back( r );
+    }
+    wake();
+}
+
+void godot_host::publish_menu( const void *owner, menu_state state )
+{
+    std::lock_guard<std::mutex> lock( menu_mutex );
+    state.serial = menu_now.serial;
+    const bool same = menu_up && owner == menu_owner && state.title == menu_now.title &&
+                      state.header == menu_now.header && state.footer == menu_now.footer &&
+                      state.selected == menu_now.selected && state.tab == menu_now.tab &&
+                      state.tabs == menu_now.tabs && state.desc == menu_now.desc &&
+                      state.cancel == menu_now.cancel && state.filter == menu_now.filter &&
+                      state.filter_text == menu_now.filter_text &&
+                      state.entries.size() == menu_now.entries.size() &&
+    std::equal( state.entries.begin(), state.entries.end(), menu_now.entries.begin(),
+    []( const menu_entry & a, const menu_entry & b ) {
+        return a.text == b.text && a.column == b.column && a.desc == b.desc &&
+               a.hotkey == b.hotkey && a.enabled == b.enabled;
+    } );
+    if( same ) {
+        return;
+    }
+    if( owner != menu_owner ) {
+        // A new list: the last one's requests were for it.
+        menu_requests.clear();
+    }
+    state.serial = ++menu_serial;
+    menu_now = std::move( state );
+    menu_owner = owner;
+    menu_up = true;
+}
+
+void godot_host::clear_menu( const void *owner )
+{
+    std::lock_guard<std::mutex> lock( menu_mutex );
+    if( owner == menu_owner ) {
+        menu_up = false;
+        menu_owner = nullptr;
+        menu_requests.clear();
+    }
+}
+
+bool godot_host::take_menu_request( menu_request &out )
+{
+    std::lock_guard<std::mutex> lock( menu_mutex );
+    if( menu_requests.empty() ) {
+        return false;
+    }
+    out = menu_requests.front();
+    menu_requests.pop_front();
+    return true;
+}
 
 void godot_host::set_flat_view( bool flat )
 {

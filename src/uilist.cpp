@@ -34,6 +34,12 @@
 #include "sdl_wrappers.h"
 #endif
 
+#if defined(CDDA_GODOT)
+#include "color.h"
+#include "godot_host.h"
+#include "sdl_utils.h"
+#endif
+
 void uilist_impl::draw_controls()
 {
 #if defined(TILES)
@@ -411,7 +417,12 @@ uilist::uilist( const std::string &msg, std::initializer_list<const char *const>
     query();
 }
 
-uilist::~uilist() = default;
+uilist::~uilist()
+{
+#if defined(CDDA_GODOT)
+    godot_host::clear_menu( this );
+#endif
+}
 
 void uilist::color_error( const bool report )
 {
@@ -902,9 +913,37 @@ shared_ptr_fast<uilist_impl> uilist::query( bool loop, int timeout, bool allow_u
     }
     shared_ptr_fast<uilist_impl> ui = create_or_get_ui();
     do {
+#if defined(CDDA_GODOT)
+        // The host draws it (plan 0017): published, not drawn.
+        const bool host = host_menu();
+        if( host != host_drawn ) {
+            host_drawn = host;
+            ui->hide_ui = host;
+        }
+        if( host ) {
+            publish_host_menu();
+        } else {
+            godot_host::clear_menu( this );
+        }
+#endif
         ui_manager::redraw();
         query_once( ctxt, timeout, allow_unfiltered_hotkeys );
+#if defined(CDDA_GODOT)
+        if( host_drawn && switch_to_category < categories.size() &&
+            switch_to_category != current_category ) {
+            // A tab changed from the pad: the hidden window's tab bar
+            // doesn't run, so apply it here.
+            current_category = switch_to_category;
+            switch_to_category = static_cast<size_t>( -1 );
+            filterlist();
+        }
+#endif
     } while( loop && ret == UILIST_WAIT_INPUT );
+#if defined(CDDA_GODOT)
+    if( ret != UILIST_WAIT_INPUT ) {
+        godot_host::clear_menu( this );
+    }
+#endif
     return ui;
 }
 
@@ -991,7 +1030,18 @@ bool uilist::query_setup()
 void uilist::query_once( input_context &ctxt, int timeout,
                          bool allow_unfiltered_hotkeys )
 {
+#if defined(CDDA_GODOT)
+    // The host's taps, before waiting and after (its wake is a mouse move).
+    if( host_drawn && take_host_requests() ) {
+        return;
+    }
+#endif
     ret_act = ctxt.handle_input( timeout );
+#if defined(CDDA_GODOT)
+    if( host_drawn && take_host_requests() ) {
+        return;
+    }
+#endif
     const input_event event = ctxt.get_raw_input();
     ret_evt = event;
     const auto iter = keymap.find( ret_evt );
@@ -1054,6 +1104,142 @@ void uilist::query_once( input_context &ctxt, int timeout,
         }
     }
 }
+
+#if defined(CDDA_GODOT)
+// The engine's colour tags as BBCode, for the host ([color=#rrggbb]),
+// brackets escaped.
+static std::string host_bbcode( const std::string &tagged )
+{
+    std::string out;
+    int open = 0;
+    const auto text = []( std::string & o, std::string_view t ) {
+        for( const char c : t ) {
+            if( c == '[' ) {
+                o += "[lb]";
+            } else {
+                o += c;
+            }
+        }
+    };
+    for( const std::string &seg : split_by_color( replace_colors( tagged ) ) ) {
+        if( seg.empty() ) {
+            continue;
+        }
+        if( seg[0] == '<' ) {
+            const size_t end = seg.find( '>' );
+            if( end != std::string::npos ) {
+                const color_tag_parse_result tag = get_color_from_tag( seg, report_color_error::no );
+                if( tag.type == color_tag_parse_result::open_color_tag ) {
+                    const SDL_Color c = curses_color_to_SDL( tag.color );
+                    out += string_format( "[color=#%02x%02x%02x]", c.r, c.g, c.b );
+                    ++open;
+                    text( out, std::string_view( seg ).substr( end + 1 ) );
+                    continue;
+                }
+                if( tag.type == color_tag_parse_result::close_color_tag ) {
+                    if( open > 0 ) {
+                        out += "[/color]";
+                        --open;
+                    }
+                    text( out, std::string_view( seg ).substr( end + 1 ) );
+                    continue;
+                }
+            }
+        }
+        text( out, seg );
+    }
+    for( ; open > 0; --open ) {
+        out += "[/color]";
+    }
+    return out;
+}
+
+// Whether the host draws this list: its switch on, and no callback (a
+// callback may draw beside the list, which the host can't show).
+bool uilist::host_menu()
+{
+    return godot_host::native_menus() && callback == nullptr && !entries.empty();
+}
+
+void uilist::publish_host_menu()
+{
+    godot_host::menu_state s;
+    s.title = host_bbcode( title );
+    s.header = host_bbcode( text );
+    s.footer = host_bbcode( footer_text );
+    s.entries.reserve( fentries.size() );
+    for( const int i : fentries ) {
+        const uilist_entry &e = entries[i];
+        godot_host::menu_entry m;
+        m.text = host_bbcode( e.txt );
+        m.column = host_bbcode( e.ctxt );
+        m.desc = host_bbcode( e.desc );
+        if( e.hotkey.has_value() && e.hotkey.value() != input_event() ) {
+            m.hotkey = e.hotkey.value().short_description();
+        }
+        m.enabled = e.enabled || e.force_color;
+        s.entries.push_back( std::move( m ) );
+    }
+    s.selected = fselected;
+    for( const std::pair<std::string, std::string> &cat : categories ) {
+        s.tabs.push_back( cat.second );
+    }
+    s.tab = static_cast<int>( current_category );
+    s.desc = desc_enabled;
+    s.cancel = allow_cancel;
+    s.filter = filtering;
+    s.filter_text = filter;
+    godot_host::publish_menu( this, std::move( s ) );
+}
+
+// The host's requests, applied as the matching keys are: true if one was.
+bool uilist::take_host_requests()
+{
+    bool any = false;
+    godot_host::menu_request r;
+    while( ret == UILIST_WAIT_INPUT && godot_host::take_menu_request( r ) ) {
+        any = true;
+        switch( r.kind ) {
+            case godot_host::menu_request_kind::select:
+            case godot_host::menu_request_kind::confirm:
+                if( r.value < 0 || r.value >= static_cast<int>( fentries.size() ) ) {
+                    break;
+                }
+                fselected = r.value;
+                selected = previewing = fentries[fselected];
+                need_to_scroll = true;
+                if( r.kind == godot_host::menu_request_kind::confirm && allow_confirm &&
+                    ( entries[selected].enabled || allow_disabled ) ) {
+                    ret = entries[selected].retval;
+                }
+                break;
+            case godot_host::menu_request_kind::cancel:
+                if( allow_cancel ) {
+                    ret = UILIST_CANCEL;
+                }
+                break;
+            case godot_host::menu_request_kind::tab:
+                if( r.value >= 0 && r.value < static_cast<int>( categories.size() ) ) {
+                    current_category = r.value;
+                    switch_to_category = static_cast<size_t>( -1 );
+                    filterlist();
+                }
+                break;
+            case godot_host::menu_request_kind::filter:
+                if( filtering ) {
+                    filter = r.text;
+                    filterlist();
+                }
+                break;
+        }
+    }
+    if( any ) {
+        ret_act.clear();
+        ret_evt = input_event();
+    }
+    return any;
+}
+#endif
 
 ///@}
 #if defined(TILES)
