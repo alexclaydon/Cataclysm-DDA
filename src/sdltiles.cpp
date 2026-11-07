@@ -5340,6 +5340,30 @@ static void CheckMessages()
     }
     godot_host::set_in_menu( gamepad::is_in_menu() );
     godot_host::set_safe_mode( g ? static_cast<int>( g->safe_mode ) : 0 );
+    // Which LT wheels the waiting context fills, for the touch pad.
+    {
+        input_context *ctxt = input_context::polling ? input_context::polling :
+                              input_context::input_context_stack.back();
+        int sides = 0;
+        if( ctxt != nullptr ) {
+            static const gamepad::direction dirs[] = {
+                gamepad::direction::N, gamepad::direction::NE, gamepad::direction::E,
+                gamepad::direction::SE, gamepad::direction::S, gamepad::direction::SW,
+                gamepad::direction::W, gamepad::direction::NW
+            };
+            for( int side = 0; side < 2; ++side ) {
+                for( gamepad::direction dir : dirs ) {
+                    const input_event event( gamepad::direction_to_radial_joy( dir, side ),
+                                             input_event_t::gamepad );
+                    if( ctxt->input_to_action( event ) != "ERROR" ) {
+                        sides |= 1 << side;
+                        break;
+                    }
+                }
+            }
+        }
+        godot_host::set_radial_sides( sides );
+    }
 #endif
 
 #if defined(__ANDROID__)

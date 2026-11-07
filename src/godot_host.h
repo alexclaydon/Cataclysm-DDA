@@ -342,6 +342,12 @@ bool in_menu();
 // thread sets it each event pump; the host reads it any time.
 void set_safe_mode( int mode );
 int safe_mode();
+// Which of the LT wheels have anything on the screen waiting for input
+// (bit 0 the left, bit 1 the right), for the touch pad: a finger on the
+// side of an empty wheel opens the other (ADR 0014, a stopgap until LT
+// leaves the touch layout). The engine thread sets it each event pump.
+void set_radial_sides( int sides );
+int radial_sides();
 // Whether a game is being played (main's do_turn loop), not the title
 // screen: the VR host hides the board and the HUD outside one, since the
 // last game's map and sidebar would otherwise stay up, stale.
