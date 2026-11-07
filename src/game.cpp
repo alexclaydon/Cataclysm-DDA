@@ -6422,7 +6422,15 @@ look_around_result game::look_around(
                 const std::optional<tripoint_bub_ms> mouse_pos = ctxt.get_coordinates( w_terrain,
                         ter_view_p.raw().xy(),
                         true );
+#if defined(CDDA_GODOT)
+                // On the host's touch pad there is no mouse: a MOUSE_MOVE is
+                // the nudge that wakes this pass for a request (Go here), and
+                // the stale mouse tile it carries would move the cursor the
+                // request acts on.
+                if( mouse_pos && !godot_host::touch_pad() ) {
+#else
                 if( mouse_pos ) {
+#endif
                     lx = mouse_pos->x();
                     ly = mouse_pos->y();
                 }
