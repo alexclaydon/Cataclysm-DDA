@@ -215,6 +215,15 @@ bool pad_captured();
 // Forest's settings panel. A tap is still the game's menu.
 void request_df_panel();
 bool take_df_panel_request();
+// The overmap, for the touch pad's map buttons: 0 closed, 1 open, 2 open
+// with a route plotted to the cursor (the Route button reads Travel).
+void set_overmap_state( int state );
+int overmap_state();
+// One of the open screen's own actions by id (the touch pad's map
+// buttons: CHOOSE_DESTINATION, CENTER), taken by that screen's loop in
+// place of its next input. The overmap takes it.
+void request_screen_action( const std::string &id );
+std::string take_screen_action();
 // Engine side: whether the joystick `id` is the virtual pad.
 bool is_virtual_pad( uint32_t id );
 

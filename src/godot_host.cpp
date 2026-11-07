@@ -715,6 +715,37 @@ std::atomic<bool> pad_captured_now{ false };
 std::atomic<bool> df_panel_requested{ false };
 } // namespace
 
+namespace
+{
+std::atomic<int> overmap_state_now{ 0 };
+std::mutex screen_action_mutex;
+std::string screen_action_requested;
+} // namespace
+
+void godot_host::set_overmap_state( int state )
+{
+    overmap_state_now = state;
+}
+
+int godot_host::overmap_state()
+{
+    return overmap_state_now;
+}
+
+void godot_host::request_screen_action( const std::string &id )
+{
+    std::lock_guard<std::mutex> lock( screen_action_mutex );
+    screen_action_requested = id;
+}
+
+std::string godot_host::take_screen_action()
+{
+    std::lock_guard<std::mutex> lock( screen_action_mutex );
+    std::string id;
+    id.swap( screen_action_requested );
+    return id;
+}
+
 void godot_host::set_pad_captured( bool on )
 {
     pad_captured_now = on;
