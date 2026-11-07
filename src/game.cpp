@@ -5909,6 +5909,14 @@ void game::peek( const tripoint_bub_ms &p )
     const bool is_same_pos = u.pos_bub() == prev;
     const bool is_standup_peek = is_same_pos && u.is_crouching();
     tripoint_bub_ms center = p;
+    // A view panned away and held (look-around confirmed, or Go here's)
+    // stays where it was, the cursor starting at its centre, so a peek sees
+    // what was being watched from the side; otherwise the peek tile.
+    if( u.view_offset.xy() != point_rel_ms::zero ) {
+        const tripoint_bub_ms watched = prev + u.view_offset;
+        center = tripoint_bub_ms( std::clamp( watched.x(), 0, MAPSIZE_X - 1 ),
+                                  std::clamp( watched.y(), 0, MAPSIZE_Y - 1 ), p.z() );
+    }
     here.build_map_cache( p.z() );
     here.update_visibility_cache( p.z() );
 
