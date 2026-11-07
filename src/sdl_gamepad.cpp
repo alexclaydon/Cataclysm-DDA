@@ -663,6 +663,27 @@ static bool pad_was_captured = false;
 // The host has the pad now: the triggers still keep their state (as under
 // a wheel), so a release while it had it can't leave LT's layer on.
 static bool host_has_pad = false;
+// R3 in play with the stick camera: a quick tap with the stick left alone
+// is its binding (look-around), sent on release; anything else is the
+// host's (held: the camera's zoom and reset).
+static constexpr uint32_t r3_tap_ms = 300;
+static bool r3_pending = false;
+static bool r3_stick_moved = false;
+static uint32_t r3_pressed_at = 0;
+
+static bool wheels_on();
+
+// The right stick is the host's camera: in play, no menu, no layer, no
+// radial (godot_host::set_stick_camera).
+static bool stick_camera_now()
+{
+#if defined(CDDA_GODOT)
+    return godot_host::stick_camera() && wheels_on() && !is_in_menu() && !alt_modifier_held &&
+           !any_radial_open();
+#else
+    return false;
+#endif
+}
 static bool test_wheels = false;  // test_enable_wheels
 static uint32_t test_ticks = 0;   // test_advance: added to GetTicks
 static std::vector<int> test_wheel_kinds;  // test_take_wheel_events
@@ -1014,6 +1035,13 @@ static bool handle_axis_event( SDL_Event &event )
                 // Cancel any existing repeat tasks when entering radial mode
                 cancel_task( stick_task );
                 stick_sent[i] = -1;
+            } else if( i == 1 && stick_camera_now() ) {
+                // The host's camera: no look-around from a tilt (R3 opens it).
+                if( dir != direction::NONE && r3_pending ) {
+                    r3_stick_moved = true;
+                }
+                cancel_task( stick_task );
+                stick_sent[i] = -1;
             } else if( stick_consumed[i] ) {
                 // Spent on a wheel slot and not yet re-centred. Emitting octants
                 // here would walk the player (or reopen look on the right stick)
@@ -1133,6 +1161,13 @@ static bool handle_button_event( SDL_Event &event )
         if( button < max_buttons ) {
             cancel_task( all_tasks[button] );
         }
+        if( button == CATA_BUTTON_RIGHTSTICK && r3_pending ) {
+            r3_pending = false;
+            if( !r3_stick_moved && now_ms() - r3_pressed_at < r3_tap_ms ) {
+                send_input( JOY_RS );
+            }
+            return false;
+        }
         if( button == CATA_BUTTON_START && ( start_pending || start_held ) ) {
             const bool tap = start_pending;
             start_pending = false;
@@ -1174,6 +1209,12 @@ static bool handle_button_event( SDL_Event &event )
         // Another button before the wheel opened: swallowed, as it would be
         // a moment later. (Sending the shoulder's tap and this button both
         // would lose one: a poll keeps only the last input.)
+        return false;
+    }
+    if( button == CATA_BUTTON_RIGHTSTICK && stick_camera_now() ) {
+        r3_pending = true;
+        r3_stick_moved = right_stick_dir != direction::NONE;
+        r3_pressed_at = now_ms();
         return false;
     }
     if( button == CATA_BUTTON_START && wheels_on() && !is_in_menu() && !alt_modifier_held &&

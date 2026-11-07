@@ -217,6 +217,11 @@ void request_df_panel();
 bool take_df_panel_request();
 // The overmap, for the touch pad's map buttons: 0 closed, 1 open, 2 open
 // with a route plotted to the cursor (the Route button reads Travel).
+// The right stick turns Dark Forest's camera in play (the user's call):
+// the pad layer sends none of its tilts to the game there, and R3 is a tap
+// (look-around) or a hold (the camera's zoom and reset, the host's).
+void set_stick_camera( bool on );
+bool stick_camera();
 void set_overmap_state( int state );
 int overmap_state();
 // One of the open screen's own actions by id (the touch pad's map

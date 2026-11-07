@@ -722,6 +722,21 @@ std::mutex screen_action_mutex;
 std::string screen_action_requested;
 } // namespace
 
+namespace
+{
+std::atomic<bool> stick_camera_on{ false };
+} // namespace
+
+void godot_host::set_stick_camera( bool on )
+{
+    stick_camera_on = on;
+}
+
+bool godot_host::stick_camera()
+{
+    return stick_camera_on;
+}
+
 void godot_host::set_overmap_state( int state )
 {
     overmap_state_now = state;

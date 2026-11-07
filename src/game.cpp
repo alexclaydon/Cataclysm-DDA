@@ -6388,6 +6388,18 @@ look_around_result game::look_around(
             // Fix player character not visible from above
             here.build_map_cache( u.posz() );
             here.invalidate_visibility_cache();
+#if defined(CDDA_GODOT)
+        } else if( action == "TRAVEL_TO" && !select_zone ) {
+            // Go there as the touch pad's Go here does (the user's call, RT
+            // on the pad): the route to the cursor's tile waits for a second
+            // RT or A, B dropping it, and the view stays here until then.
+            godot_host::request_click( lp.x() - u.pos_bub().x(), lp.y() - u.pos_bub().y() );
+            godot_host::hold_view( prev_offset.x(), prev_offset.y(), prev_offset.z() );
+            u.view_offset = center - u.pos_bub();
+            prev_offset = u.view_offset;
+            action = "QUIT";
+            break;
+#endif
         } else if( action == "TRAVEL_TO" ) {
             const std::optional<std::vector<tripoint_bub_ms>> try_route = safe_route_to( u, lp,
             0,  []( const std::string & msg ) {

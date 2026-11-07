@@ -3601,7 +3601,10 @@ bool game::handle_action()
         const input_event &&evt = ctxt.get_raw_input();
         if( !evt.sequence.empty() ) {
             const int ch = evt.get_first_input();
-            if( !get_option<bool>( "NO_UNKNOWN_COMMAND_MSG" ) ) {
+            // An unbound pad button does nothing, silently (a convention
+            // from the BN fork): d-pad down in play, Dark Forest's, printed
+            // "Unknown command" as it focused the hotbar.
+            if( !get_option<bool>( "NO_UNKNOWN_COMMAND_MSG" ) && evt.type != input_event_t::gamepad ) {
                 std::string msg = string_format( _( "Unknown command: \"%s\" (%ld)" ), evt.long_description(), ch );
                 if( const std::optional<std::string> hint =
                         press_x_if_bound( ACTION_KEYBINDINGS ) ) {
