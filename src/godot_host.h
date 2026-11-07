@@ -304,6 +304,14 @@ bool take_look_cursor_request( int &dx, int &dy );
 enum class look_exit : int { none = 0, go_here = 1, recenter = 2 };
 void request_look_exit( look_exit how );
 look_exit take_look_exit_request();
+// Go here leaves look-around with the view where it was looking (the
+// user's call): the view to go back to (the one before look-around) is
+// held, armed once Go here's click is taken, and given back by
+// take_settled_view once no route preview is pending (walked, cancelled,
+// or never made). Engine thread only.
+void hold_view( int dx, int dy, int dz );
+void arm_held_view();
+bool take_settled_view( bool preview_pending, int &dx, int &dy, int &dz );
 // The host wants the terminal at `columns` x `rows` cells (Dark Forest on a
 // phone turned between landscape and portrait, ADR 0012). Host thread
 // asks (waking the event pump); the engine thread takes it in

@@ -3282,6 +3282,17 @@ bool game::handle_action()
     action_id act = ACTION_NULL;
     user_turn current_turn;
     avatar &player_character = get_avatar();
+#if defined(CDDA_GODOT)
+    // Go here's held view, back once its route is walked or dropped.
+    {
+        int dx = 0;
+        int dy = 0;
+        int dz = 0;
+        if( godot_host::take_settled_view( !destination_preview.empty(), dx, dy, dz ) ) {
+            player_character.view_offset = tripoint_rel_ms( dx, dy, dz );
+        }
+    }
+#endif
     // Check if we have an auto-move destination
     if( player_character.has_destination() ) {
         act = player_character.get_next_auto_move_direction();
@@ -3348,6 +3359,7 @@ bool game::handle_action()
         int click_dx = 0;
         int click_dy = 0;
         if( godot_host::take_click_request( click_dx, click_dy ) ) {
+            godot_host::arm_held_view();
             action = "SELECT";
             host_click = player_character.pos_bub() + tripoint_rel_ms( click_dx, click_dy, 0 );
         }

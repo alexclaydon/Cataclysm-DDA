@@ -720,6 +720,40 @@ godot_host::look_exit godot_host::take_look_exit_request()
     return static_cast<look_exit>( look_exit_requested.exchange( 0 ) );
 }
 
+namespace
+{
+bool view_held = false;
+bool view_armed = false;
+int held_view[3] = { 0, 0, 0 };
+} // namespace
+
+void godot_host::hold_view( int dx, int dy, int dz )
+{
+    view_held = true;
+    view_armed = false;
+    held_view[0] = dx;
+    held_view[1] = dy;
+    held_view[2] = dz;
+}
+
+void godot_host::arm_held_view()
+{
+    view_armed = view_held;
+}
+
+bool godot_host::take_settled_view( bool preview_pending, int &dx, int &dy, int &dz )
+{
+    if( !view_held || !view_armed || preview_pending ) {
+        return false;
+    }
+    view_held = false;
+    view_armed = false;
+    dx = held_view[0];
+    dy = held_view[1];
+    dz = held_view[2];
+    return true;
+}
+
 void godot_host::set_route_preview( bool pending )
 {
     route_preview_now = pending;

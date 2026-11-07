@@ -6286,6 +6286,11 @@ look_around_result game::look_around(
             const godot_host::look_exit how = godot_host::take_look_exit_request();
             if( how == godot_host::look_exit::go_here ) {
                 godot_host::request_click( lp.x() - u.pos_bub().x(), lp.y() - u.pos_bub().y() );
+                // The view stays where it was looking until the route is
+                // settled; the one before look-around is held for then.
+                godot_host::hold_view( prev_offset.x(), prev_offset.y(), prev_offset.z() );
+                u.view_offset = center - u.pos_bub();
+                prev_offset = u.view_offset;
                 action = "QUIT";
                 break;
             }
