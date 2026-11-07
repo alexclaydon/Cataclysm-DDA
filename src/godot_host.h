@@ -348,6 +348,11 @@ int safe_mode();
 // leaves the touch layout). The engine thread sets it each event pump.
 void set_radial_sides( int sides );
 int radial_sides();
+// Whether a click-to-move route preview is pending (a tap on the board),
+// for the touch pad's Confirm (walk it: the pad's A) and Cancel (drop it:
+// the pad's B). The play loop sets it before it waits for input.
+void set_route_preview( bool pending );
+bool route_preview();
 // Whether a game is being played (main's do_turn loop), not the title
 // screen: the VR host hides the board and the HUD outside one, since the
 // last game's map and sidebar would otherwise stay up, stale.

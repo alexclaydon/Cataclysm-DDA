@@ -3306,6 +3306,7 @@ bool game::handle_action()
 #if defined(CDDA_GODOT)
         // The touch pad's context row: what applies here, before waiting.
         godot_host::publish_context_actions( godot_host::context_actions_here() );
+        godot_host::set_route_preview( !destination_preview.empty() );
 #endif
         // No auto-move, ask player for input
         ctxt = get_player_input( action );
