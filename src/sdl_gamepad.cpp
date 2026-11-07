@@ -651,6 +651,15 @@ static int wheel_serial = 0;
 // then it neither opens the wheel nor picks until it re-centres.
 static std::array<bool, max_sticks> wheel_stick_was_pushed = {{false, false}};
 static constexpr uint32_t wheel_hold_ms = 250;
+// Start in play is a tap or a hold too: a tap the game's menu (sent on
+// release), a hold Dark Forest's settings panel (the user's call).
+static constexpr uint32_t start_hold_ms = 500;
+static bool start_pending = false;
+static bool start_held = false;  // the hold went to the host: its release is spent
+static uint32_t start_pressed_at = 0;
+// Whether the host had the pad at the last event: letting go spends the
+// sticks, as a wheel closing does.
+static bool pad_was_captured = false;
 static bool test_wheels = false;  // test_enable_wheels
 static uint32_t test_ticks = 0;   // test_advance: added to GetTicks
 static std::vector<int> test_wheel_kinds;  // test_take_wheel_events
@@ -1101,6 +1110,16 @@ static bool handle_button_event( SDL_Event &event )
         if( button < max_buttons ) {
             cancel_task( all_tasks[button] );
         }
+        if( button == CATA_BUTTON_START && ( start_pending || start_held ) ) {
+            const bool tap = start_pending;
+            start_pending = false;
+            start_held = false;
+            if( tap ) {
+                // A tap: Start's own binding, on release.
+                send_input( JOY_START );
+            }
+            return false;
+        }
         if( wheel_state != wheel_phase::none && button == wheel_button ) {
             const wheel_phase was = wheel_state;
             if( was == wheel_phase::pending ) {
@@ -1132,6 +1151,13 @@ static bool handle_button_event( SDL_Event &event )
         // Another button before the wheel opened: swallowed, as it would be
         // a moment later. (Sending the shoulder's tap and this button both
         // would lose one: a poll keeps only the last input.)
+        return false;
+    }
+    if( button == CATA_BUTTON_START && wheels_on() && !is_in_menu() && !alt_modifier_held &&
+        !any_radial_open() ) {
+        start_pending = true;
+        start_held = false;
+        start_pressed_at = now_ms();
         return false;
     }
     if( ( button == CATA_BUTTON_LEFTSHOULDER || button == CATA_BUTTON_RIGHTSHOULDER ) &&
@@ -1384,6 +1410,13 @@ static void handle_scheduler_event( SDL_Event &/*event*/ )
 {
     if( wheel_state == wheel_phase::pending && now_ms() - wheel_pressed_at >= wheel_hold_ms ) {
         open_wheel();
+    }
+    if( start_pending && now_ms() - start_pressed_at >= start_hold_ms ) {
+        start_pending = false;
+        start_held = true;
+#if defined(CDDA_GODOT)
+        godot_host::request_df_panel();
+#endif
     }
     uint32_t now = GetTicks();
     for( size_t i = 0; i < all_tasks.size(); ++i ) {
@@ -1653,6 +1686,30 @@ void test_button( pad_button which, bool down )
 bool handle_event( SDL_Event &event )
 {
     check_wheel();
+#if defined(CDDA_GODOT)
+    // The host has the pad (godot_host::set_pad_captured): it reads the pad
+    // itself, and nothing reaches the game until it lets go.
+    {
+        const bool captured = godot_host::pad_captured();
+        const bool pad_input = event.type == CATA_CONTROLLERBUTTONDOWN ||
+                               event.type == CATA_CONTROLLERBUTTONUP || event.type == CATA_CONTROLLERAXISMOTION;
+        if( captured && !pad_was_captured ) {
+            for( task_t &task : all_tasks ) {
+                cancel_task( task );
+            }
+            start_pending = false;
+        }
+        if( !captured && pad_was_captured ) {
+            // Sticks still pushed as the host lets go are spent.
+            stick_consumed[0] = left_stick_dir != direction::NONE;
+            stick_consumed[1] = right_stick_dir != direction::NONE;
+        }
+        pad_was_captured = captured;
+        if( captured && pad_input ) {
+            return false;
+        }
+    }
+#endif
     switch( event.type ) {
         case CATA_CONTROLLERBUTTONDOWN:
         case CATA_CONTROLLERBUTTONUP:

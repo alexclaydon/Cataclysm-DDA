@@ -206,6 +206,15 @@ void attach_virtual_pad();
 // opens the action list. Host side, any thread.
 void set_touch_pad( bool on );
 bool touch_pad();
+// The pad is the host's (the hotbar focused from d-pad down, its picker,
+// Dark Forest's settings panel): the pad layer swallows every button and
+// stick until the host lets go, reading the pad itself meanwhile.
+void set_pad_captured( bool on );
+bool pad_captured();
+// Start held in play (the pad layer's start_hold_ms): the host opens Dark
+// Forest's settings panel. A tap is still the game's menu.
+void request_df_panel();
+bool take_df_panel_request();
 // Engine side: whether the joystick `id` is the virtual pad.
 bool is_virtual_pad( uint32_t id );
 

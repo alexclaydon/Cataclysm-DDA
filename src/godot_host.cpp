@@ -709,6 +709,32 @@ int godot_host::safe_mode()
     return safe_mode_now;
 }
 
+namespace
+{
+std::atomic<bool> pad_captured_now{ false };
+std::atomic<bool> df_panel_requested{ false };
+} // namespace
+
+void godot_host::set_pad_captured( bool on )
+{
+    pad_captured_now = on;
+}
+
+bool godot_host::pad_captured()
+{
+    return pad_captured_now;
+}
+
+void godot_host::request_df_panel()
+{
+    df_panel_requested = true;
+}
+
+bool godot_host::take_df_panel_request()
+{
+    return df_panel_requested.exchange( false );
+}
+
 void godot_host::request_look_exit( look_exit how )
 {
     look_exit_requested = static_cast<int>( how );
