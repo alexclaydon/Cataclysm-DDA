@@ -51,6 +51,7 @@ std::atomic<bool> touch_pad_on{ false };
 std::atomic<int> safe_mode_now{ 0 };
 std::atomic<int> radial_sides_now{ 3 };
 std::atomic<bool> route_preview_now{ false };
+std::atomic<int> look_exit_requested{ 0 };  // request_look_exit's, 0 for none
 std::atomic<bool> game_is_on{ false };
 // The snapshot radius levels the zoom steps through, and the current one.
 constexpr std::array<int, 5> radius_levels = { 15, 20, 30, 45, 60 };
@@ -706,6 +707,17 @@ void godot_host::set_safe_mode( int mode )
 int godot_host::safe_mode()
 {
     return safe_mode_now;
+}
+
+void godot_host::request_look_exit( look_exit how )
+{
+    look_exit_requested = static_cast<int>( how );
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+godot_host::look_exit godot_host::take_look_exit_request()
+{
+    return static_cast<look_exit>( look_exit_requested.exchange( 0 ) );
 }
 
 void godot_host::set_route_preview( bool pending )

@@ -6279,6 +6279,24 @@ look_around_result game::look_around(
                 mark_main_ui_adaptor_resize();
             }
         }
+        // The touch pad's Go here and Recenter: out of look-around, the
+        // view as it was (Go here: the route to the cursor's tile then waits
+        // for Confirm, as a tapped one does) or centred on the avatar.
+        if( !select_zone ) {
+            const godot_host::look_exit how = godot_host::take_look_exit_request();
+            if( how == godot_host::look_exit::go_here ) {
+                godot_host::request_click( lp.x() - u.pos_bub().x(), lp.y() - u.pos_bub().y() );
+                action = "QUIT";
+                break;
+            }
+            if( how == godot_host::look_exit::recenter ) {
+                center = u.pos_bub();
+                lp = u.pos_bub();
+                prev_offset = tripoint_rel_ms::zero;
+                action = "QUIT";
+                break;
+            }
+        }
 #endif
         u.view_offset = center - u.pos_bub();
         if( select_zone ) {

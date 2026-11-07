@@ -296,6 +296,14 @@ void set_look_cursor( bool looking, int dx, int dy );
 bool look_cursor( int &dx, int &dy );
 void request_look_cursor( int dx, int dy );
 bool take_look_cursor_request( int &dx, int &dy );
+// The touch pad's look-around buttons (ADR 0014): leave look-around and
+// plan a route to the cursor's tile (go_here: the route waits as a tapped
+// one does, for Confirm), or leave it centred on the avatar, the offset
+// cleared (recenter). Host side, any thread; look_around takes it at the
+// top of its next pass (engine side: none for no request).
+enum class look_exit : int { none = 0, go_here = 1, recenter = 2 };
+void request_look_exit( look_exit how );
+look_exit take_look_exit_request();
 // The host wants the terminal at `columns` x `rows` cells (Dark Forest on a
 // phone turned between landscape and portrait, ADR 0012). Host thread
 // asks (waking the event pump); the engine thread takes it in
