@@ -660,6 +660,9 @@ static uint32_t start_pressed_at = 0;
 // Whether the host had the pad at the last event: letting go spends the
 // sticks, as a wheel closing does.
 static bool pad_was_captured = false;
+// The host has the pad now: the triggers still keep their state (as under
+// a wheel), so a release while it had it can't leave LT's layer on.
+static bool host_has_pad = false;
 static bool test_wheels = false;  // test_enable_wheels
 static uint32_t test_ticks = 0;   // test_advance: added to GetTicks
 static std::vector<int> test_wheel_kinds;  // test_take_wheel_events
@@ -848,6 +851,26 @@ static bool handle_axis_event( SDL_Event &event )
             }
             if( state && trigger_released ) {
                 triggers_state[idx] = 0;
+            }
+            return false;
+        }
+        if( host_has_pad ) {
+            // The host has the pad: a trigger keeps its state and its layer,
+            // and does nothing else. LT let go meanwhile ends both layers
+            // (it stuck on: the stick opened LT's radial, the d-pad zoomed).
+            if( !state && trigger_pressed ) {
+                triggers_state[idx] = 1;
+                if( idx == 0 ) {
+                    alt_modifier_held = true;
+                }
+            }
+            if( state && trigger_released ) {
+                triggers_state[idx] = 0;
+                alt2_modifier_held = false;
+                if( idx == 0 ) {
+                    alt_modifier_held = false;
+                    close_radials();
+                }
             }
             return false;
         }
@@ -1705,8 +1728,18 @@ bool handle_event( SDL_Event &event )
             stick_consumed[1] = right_stick_dir != direction::NONE;
         }
         pad_was_captured = captured;
+        host_has_pad = captured;
         if( captured && pad_input ) {
-            return false;
+            // The triggers through, to keep their state (handle_axis_event).
+            const bool trigger = event.type == CATA_CONTROLLERAXISMOTION &&
+#if SDL_MAJOR_VERSION >= 3
+                                 one_of_two( triggers_axis, event.gaxis.axis ) >= 0;
+#else
+                                 one_of_two( triggers_axis, event.caxis.axis ) >= 0;
+#endif
+            if( !trigger ) {
+                return false;
+            }
         }
     }
 #endif
