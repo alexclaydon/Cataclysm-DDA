@@ -1556,6 +1556,14 @@ bool is_alt_held()
     return alt_modifier_held;
 }
 
+bool move_held()
+{
+    // RT held with a direction (walking: its repeat task sends no button,
+    // -1), the touch pad's move pad included; or the left stick's repeat.
+    const task_t &rt = all_tasks[triggers_task_index + 1];
+    return ( rt.counter > 0 && rt.button == -1 ) || all_tasks[sticks_task_index].counter > 0;
+}
+
 bool is_in_menu()
 {
     // If the UI stack has more than 1 element, it usually means a menu is open

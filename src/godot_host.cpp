@@ -876,6 +876,34 @@ int godot_host::snapshot_radius_level_count()
     return static_cast<int>( radius_levels.size() );
 }
 
+namespace
+{
+bool snapshot_owed_now = false;
+bool snapshot_flush = false;
+} // namespace
+
+void godot_host::set_snapshot_owed( bool owed )
+{
+    snapshot_owed_now = owed;
+}
+
+bool godot_host::snapshot_owed()
+{
+    return snapshot_owed_now;
+}
+
+void godot_host::request_snapshot_flush()
+{
+    snapshot_flush = true;
+}
+
+bool godot_host::take_snapshot_flush()
+{
+    const bool was = snapshot_flush;
+    snapshot_flush = false;
+    return was;
+}
+
 void godot_host::request_zoom_view( int steps )
 {
     if( steps == 0 ) {

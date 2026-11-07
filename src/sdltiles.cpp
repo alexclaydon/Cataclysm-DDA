@@ -176,6 +176,38 @@ static int TERMINAL_HEIGHT;
 static bool fullscreen;
 static int scaling_factor;
 
+#if defined(CDDA_GODOT)
+// A key held down (its repeats): Dark Forest's snapshot skip.
+static bool key_repeating = false;
+
+// Held walking at the widest view radii (the two largest; ADR 0016): the
+// 3D view's snapshot, recorded on every redraw, costs each step more as the
+// radius grows (the whole square, every storey) and a held move waits for
+// it. While a move is held, with nothing hostile in view, record only once
+// the avatar is two tiles from where it last recorded: every second step.
+// A skipped one is owed (godot_host::snapshot_owed), paid by the next step
+// or by the play loop's flush once input stops. A stopgap until the
+// recording itself gets cheaper.
+static bool skip_map_snapshot()
+{
+    static tripoint_abs_ms recorded_at;
+    static bool have_recorded = false;
+    const tripoint_abs_ms at = get_avatar().pos_abs();
+    const bool flush = godot_host::take_snapshot_flush();
+    const bool skip = !flush && have_recorded &&
+                      godot_host::snapshot_radius_level() >= godot_host::snapshot_radius_level_count() - 2 &&
+                      ( gamepad::move_held() || key_repeating ) &&
+                      g->mostseen == 0 && at.z() == recorded_at.z() &&
+                      square_dist( at, recorded_at ) == 1;
+    if( !skip ) {
+        recorded_at = at;
+        have_recorded = true;
+    }
+    godot_host::set_snapshot_owed( skip );
+    return skip;
+}
+#endif
+
 using cata_cursesport::cursecell;
 
 //***********************************
@@ -3703,7 +3735,8 @@ void cata_cursesport::curses_drawwindow( const catacurses::window &w )
         std::multimap<point, formatted_text> overlay_strings;
 
 #if defined(CDDA_GODOT)
-        {
+        const bool snapshot = !skip_map_snapshot();
+        if( snapshot ) {
             const tripoint_bub_ms you = get_avatar().pos_bub();
             const tripoint_abs_ms you_abs = get_avatar().pos_abs();
             godot_host::begin_map_snapshot( g->ter_view_p.x(), g->ter_view_p.y(), g->ter_view_p.z(),
@@ -3720,7 +3753,9 @@ void cata_cursesport::curses_drawwindow( const catacurses::window &w )
             overlay_strings,
             color_blocks );
 #if defined(CDDA_GODOT)
-        godot_host::end_map_snapshot();
+        if( snapshot ) {
+            godot_host::end_map_snapshot();
+        }
 #endif
 
         // color blocks overlay
@@ -5775,6 +5810,9 @@ static void CheckMessages()
                     }
 #endif
                     is_repeat = ev.key.repeat;
+#if defined(CDDA_GODOT)
+                    key_repeating = ev.key.repeat;
+#endif
                     //hide mouse cursor on keyboard input
                     if( get_option<std::string>( "HIDE_CURSOR" ) != "show" && IsCursorVisible() ) {
                         HideCursor();
@@ -5823,6 +5861,9 @@ static void CheckMessages()
                 }
                 break;
                 case CATA_KEYUP: {
+#if defined(CDDA_GODOT)
+                    key_repeating = false;
+#endif
 #if defined(__ANDROID__)
                     // Toggle virtual keyboard with Android back button
                     if( GetKeysym( ev ).sym == SDLK_AC_BACK ) {

@@ -539,6 +539,14 @@ void zoom_view( int steps );
 // the host's view radius slider. Any thread.
 int snapshot_radius_level();
 int snapshot_radius_level_count();
+// Held walking at the widest radii (ADR 0016): the 3D view's snapshot is
+// recorded every second step, a skipped one owed until the next step or,
+// with no input for a moment (the move let go), a flush. Engine thread.
+// owe: whether this redraw skipped. take_flush: once after a request.
+void set_snapshot_owed( bool owed );
+bool snapshot_owed();
+void request_snapshot_flush();
+bool take_snapshot_flush();
 // The touch pad's view radius slider: `steps` in (+) or out (-), added up
 // until the engine takes them, in the play loop or in look-around (as the
 // zoom actions are), so a quick drag loses none. Host side, any thread;

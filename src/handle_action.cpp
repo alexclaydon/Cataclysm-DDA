@@ -468,6 +468,14 @@ input_context game::get_player_input( std::string &action )
                 g->blink_active_phase = !g->blink_active_phase;
                 g->invalidate_main_ui_adaptor();
             }
+#if defined(CDDA_GODOT)
+            // A held walk's skipped snapshot, and the walk has stopped (no
+            // input for the timeout): draw where the avatar stands.
+            if( action == "TIMEOUT" && godot_host::snapshot_owed() ) {
+                godot_host::request_snapshot_flush();
+                g->invalidate_main_ui_adaptor();
+            }
+#endif
 
             ui_manager::redraw_invalidated();
         } while( handle_mouseview( ctxt, action ) && uquit != QUIT_WATCH
@@ -476,6 +484,13 @@ input_context game::get_player_input( std::string &action )
     } else {
         ctxt.set_timeout( 125 );
         while( handle_mouseview( ctxt, action ) ) {
+#if defined(CDDA_GODOT)
+            if( action == "TIMEOUT" && godot_host::snapshot_owed() ) {
+                godot_host::request_snapshot_flush();
+                g->invalidate_main_ui_adaptor();
+                ui_manager::redraw_invalidated();
+            }
+#endif
             if( action == "TIMEOUT" && current_turn.has_timeout_elapsed() ) {
                 break;
             }
