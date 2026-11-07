@@ -1726,6 +1726,9 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
         const auto storeys_start = std::chrono::steady_clock::now();
         godot_host::record_only_scope record_only;
         const std::array<bool, 5> unseen = { true, true, true, true, true };
+        // Every storey, the world's whole height (godot_host.h).
+        static_assert( godot_host::snapshot_levels_below >= OVERMAP_DEPTH + OVERMAP_HEIGHT &&
+                       godot_host::snapshot_levels_above >= OVERMAP_DEPTH + OVERMAP_HEIGHT );
         // Below the avatar: what it remembers there.
         for( int dz = 1; dz <= godot_host::snapshot_levels_below; ++dz ) {
             const int z = you_pos.z() - dz;

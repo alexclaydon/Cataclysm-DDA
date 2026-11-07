@@ -524,9 +524,14 @@ void apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, int &y ) );
 // the VR player's zoom: the game's zoom actions step it (zoom_view), so
 // zooming out shows more of the surroundings on the same table, as the 2D
 // zoom shows more on the same screen. 60 is the loaded map's reach.
+// Storeys: every one, down to the world's bottom and up to its top (the
+// user's call, 2026-11-07; it was 2 each way, which cut tall buildings
+// and deep basements off): from any storey the farthest is the world's
+// whole height away, and the passes stop at its ends (OVERMAP_DEPTH,
+// OVERMAP_HEIGHT in map_scale_constants.h, both 10).
 int snapshot_radius();
-constexpr int snapshot_levels_below = 2;
-constexpr int snapshot_levels_above = 2;
+constexpr int snapshot_levels_below = 20;  // OVERMAP_DEPTH + OVERMAP_HEIGHT
+constexpr int snapshot_levels_above = 20;
 // Steps in (+, a smaller radius) or out (-) through the radius levels.
 // Engine thread (the zoom actions), which then redraws the map.
 void zoom_view( int steps );
