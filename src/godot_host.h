@@ -552,6 +552,10 @@ bool take_snapshot_flush();
 // snapshot skips recording them. A change asks for a fresh snapshot (taken
 // by the play loop's idle timeout, as an owed one is). Set from the host;
 // read on the engine thread.
+// The glyph style for the host's own button glyphs (gamepad::
+// host_glyph_style), kept each frame by the engine.
+void set_glyph_style( int style );
+int glyph_style();
 void set_flat_view( bool flat );
 bool flat_view();
 bool take_flat_view_changed();

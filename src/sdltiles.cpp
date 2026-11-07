@@ -1137,6 +1137,7 @@ void refresh_display()
 #endif
     draw_gamepad_radial_menu();
 #if defined(CDDA_GODOT)
+    godot_host::set_glyph_style( gamepad::host_glyph_style() );
     godot_host::publish_frame( renderer.get() );
 #endif
     RenderPresent( renderer );

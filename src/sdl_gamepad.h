@@ -103,6 +103,12 @@ bool is_active();
 // shapes for a Sony pad, Xbox letters for the rest, the Deck's included).
 enum class glyph_style { xbox, playstation, text };
 glyph_style current_glyph_style();
+#if defined(CDDA_GODOT)
+// For the host's own glyphs (godot_host::glyph_style): 0 Xbox, 1
+// PlayStation, 2 text, 3 the option on auto with no real pad in use (the
+// touch pad's virtual one, or none). Engine thread.
+int host_glyph_style();
+#endif
 // The width draw_glyph takes for it, in pixels.
 float glyph_width( pad_button button );
 // Draws a button's glyph at the ImGui cursor as one item, a framed widget's

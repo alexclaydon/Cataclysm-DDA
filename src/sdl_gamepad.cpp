@@ -1850,6 +1850,22 @@ glyph_style current_glyph_style()
     return glyph_style::xbox;
 }
 
+#if defined(CDDA_GODOT)
+int host_glyph_style()
+{
+    const std::string style = get_option<std::string>( "GAMEPAD_GLYPHS" );
+    if( style != "auto" ) {
+        return style == "playstation" ? 1 : style == "text" ? 2 : 0;
+    }
+#if SDL_MAJOR_VERSION >= 3
+    if( controller == nullptr || godot_host::is_virtual_pad( SDL_GetGamepadID( controller ) ) ) {
+        return 3;
+    }
+#endif
+    return current_glyph_style() == glyph_style::playstation ? 1 : 0;
+}
+#endif
+
 static const char *glyph_name( pad_button button )
 {
     static const std::array<const char *, 14> names = {
