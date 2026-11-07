@@ -1764,7 +1764,9 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
             const lit_level above_ll = here.access_cache( you_pos.z() ).natural_light_level_cache >=
                                        LIGHT_AMBIENT_LIT ? lit_level::LIT : lit_level::LOW;
             const std::array<bool, 5> seen = { false, false, false, false, false };
-            for( int dz = 1; dz <= godot_host::snapshot_levels_above; ++dz ) {
+            // None in the host's 2D view, which doesn't draw them.
+            const int levels_above = godot_host::flat_view() ? 0 : godot_host::snapshot_levels_above;
+            for( int dz = 1; dz <= levels_above; ++dz ) {
                 const int z = you_pos.z() + dz;
                 if( z > OVERMAP_HEIGHT ) {
                     break;

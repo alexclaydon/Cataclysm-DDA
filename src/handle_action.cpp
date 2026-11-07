@@ -470,8 +470,9 @@ input_context game::get_player_input( std::string &action )
             }
 #if defined(CDDA_GODOT)
             // A held walk's skipped snapshot, and the walk has stopped (no
-            // input for the timeout): draw where the avatar stands.
-            if( action == "TIMEOUT" && godot_host::snapshot_owed() ) {
+            // input for the timeout): draw where the avatar stands. So too
+            // when the host's view turned 2D or 3D (the storeys above).
+            if( action == "TIMEOUT" && ( godot_host::snapshot_owed() || godot_host::take_flat_view_changed() ) ) {
                 godot_host::request_snapshot_flush();
                 g->invalidate_main_ui_adaptor();
             }
@@ -485,7 +486,7 @@ input_context game::get_player_input( std::string &action )
         ctxt.set_timeout( 125 );
         while( handle_mouseview( ctxt, action ) ) {
 #if defined(CDDA_GODOT)
-            if( action == "TIMEOUT" && godot_host::snapshot_owed() ) {
+            if( action == "TIMEOUT" && ( godot_host::snapshot_owed() || godot_host::take_flat_view_changed() ) ) {
                 godot_host::request_snapshot_flush();
                 g->invalidate_main_ui_adaptor();
                 ui_manager::redraw_invalidated();

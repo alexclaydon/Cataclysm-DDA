@@ -880,7 +880,26 @@ namespace
 {
 bool snapshot_owed_now = false;
 bool snapshot_flush = false;
+std::atomic<bool> flat_view_now{ false };
+std::atomic<bool> flat_view_changed{ false };
 } // namespace
+
+void godot_host::set_flat_view( bool flat )
+{
+    if( flat_view_now.exchange( flat ) != flat ) {
+        flat_view_changed = true;
+    }
+}
+
+bool godot_host::flat_view()
+{
+    return flat_view_now.load();
+}
+
+bool godot_host::take_flat_view_changed()
+{
+    return flat_view_changed.exchange( false );
+}
 
 void godot_host::set_snapshot_owed( bool owed )
 {

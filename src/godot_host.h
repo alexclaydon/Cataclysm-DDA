@@ -548,6 +548,13 @@ void set_snapshot_owed( bool owed );
 bool snapshot_owed();
 void request_snapshot_flush();
 bool take_snapshot_flush();
+// The host's 2D view: the storeys above aren't drawn there, so the
+// snapshot skips recording them. A change asks for a fresh snapshot (taken
+// by the play loop's idle timeout, as an owed one is). Set from the host;
+// read on the engine thread.
+void set_flat_view( bool flat );
+bool flat_view();
+bool take_flat_view_changed();
 // The touch pad's view radius slider: `steps` in (+) or out (-), added up
 // until the engine takes them, in the play loop or in look-around (as the
 // zoom actions are), so a quick drag loses none. Host side, any thread;
