@@ -665,6 +665,36 @@ void request_menu( const menu_request &r );
 void publish_menu( const void *owner, menu_state state );
 void clear_menu( const void *owner );
 bool take_menu_request( menu_request &out );
+// The engine's colour tags as BBCode ([color=#rrggbb]), brackets escaped.
+std::string bbcode( const std::string &tagged );
+
+// Native dialogs (plan 0018), the same way: a query popup (a message with
+// buttons, or "any key") or a text or number input, drawn by the host while
+// its switch (native_menus) is on. Requests: choose an option, cancel,
+// dismiss (any key), submit text.
+struct dialog_state {
+    uint32_t serial = 0;
+    int kind = 0;            // 0 a popup, 1 text input, 2 number input
+    std::string title;
+    std::string message;     // BBCode
+    std::string label;       // an input's label, BBCode
+    std::string value;       // an input's starting text
+    std::vector<std::string> options;  // a popup's buttons
+    bool cancel = false;     // may be cancelled
+    bool anykey = false;     // a popup any key dismisses
+    int max_length = 0;      // an input's, 0 none
+};
+enum class dialog_request_kind : int { choose, cancel, dismiss, submit };
+struct dialog_request {
+    dialog_request_kind kind = dialog_request_kind::cancel;
+    int value = 0;           // the option chosen
+    std::string text;        // the text submitted
+};
+bool get_dialog( dialog_state &out );
+void request_dialog( const dialog_request &r );
+void publish_dialog( const void *owner, dialog_state state );
+void clear_dialog( const void *owner );
+bool take_dialog_request( dialog_request &out );
 
 } // namespace godot_host
 

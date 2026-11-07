@@ -6,6 +6,13 @@
 
 #include "godot_host.h"
 
+#include <string_view>
+
+#include "color.h"
+#include "output.h"
+#include "sdl_utils.h"
+#include "string_formatter.h"
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -885,6 +892,12 @@ godot_host::menu_state menu_now;
 bool menu_up = false;
 uint32_t menu_serial = 0;
 std::deque<godot_host::menu_request> menu_requests;
+std::mutex dialog_mutex;
+const void *dialog_owner = nullptr;
+godot_host::dialog_state dialog_now;
+bool dialog_up = false;
+uint32_t dialog_serial = 0;
+std::deque<godot_host::dialog_request> dialog_requests;
 bool snapshot_owed_now = false;
 bool snapshot_flush = false;
 std::atomic<bool> flat_view_now{ false };
@@ -969,6 +982,116 @@ bool godot_host::take_menu_request( menu_request &out )
     }
     out = menu_requests.front();
     menu_requests.pop_front();
+    return true;
+}
+
+// The engine's colour tags as BBCode, for the host ([color=#rrggbb]),
+// brackets escaped.
+std::string godot_host::bbcode( const std::string &tagged )
+{
+    std::string out;
+    int open = 0;
+    const auto text = []( std::string & o, std::string_view t ) {
+        for( const char c : t ) {
+            if( c == '[' ) {
+                o += "[lb]";
+            } else {
+                o += c;
+            }
+        }
+    };
+    for( const std::string &seg : split_by_color( replace_colors( tagged ) ) ) {
+        if( seg.empty() ) {
+            continue;
+        }
+        if( seg[0] == '<' ) {
+            const size_t end = seg.find( '>' );
+            if( end != std::string::npos ) {
+                const color_tag_parse_result tag = get_color_from_tag( seg, report_color_error::no );
+                if( tag.type == color_tag_parse_result::open_color_tag ) {
+                    const SDL_Color c = curses_color_to_SDL( tag.color );
+                    out += string_format( "[color=#%02x%02x%02x]", c.r, c.g, c.b );
+                    ++open;
+                    text( out, std::string_view( seg ).substr( end + 1 ) );
+                    continue;
+                }
+                if( tag.type == color_tag_parse_result::close_color_tag ) {
+                    if( open > 0 ) {
+                        out += "[/color]";
+                        --open;
+                    }
+                    text( out, std::string_view( seg ).substr( end + 1 ) );
+                    continue;
+                }
+            }
+        }
+        text( out, seg );
+    }
+    for( ; open > 0; --open ) {
+        out += "[/color]";
+    }
+    return out;
+}
+
+bool godot_host::get_dialog( dialog_state &out )
+{
+    std::lock_guard<std::mutex> lock( dialog_mutex );
+    if( !dialog_up ) {
+        return false;
+    }
+    if( out.serial != dialog_now.serial ) {
+        out = dialog_now;
+    }
+    return true;
+}
+
+void godot_host::request_dialog( const dialog_request &r )
+{
+    {
+        std::lock_guard<std::mutex> lock( dialog_mutex );
+        dialog_requests.push_back( r );
+    }
+    wake();
+}
+
+void godot_host::publish_dialog( const void *owner, dialog_state state )
+{
+    std::lock_guard<std::mutex> lock( dialog_mutex );
+    const bool same = dialog_up && owner == dialog_owner && state.kind == dialog_now.kind &&
+                      state.title == dialog_now.title && state.message == dialog_now.message &&
+                      state.label == dialog_now.label && state.value == dialog_now.value &&
+                      state.options == dialog_now.options && state.cancel == dialog_now.cancel &&
+                      state.anykey == dialog_now.anykey && state.max_length == dialog_now.max_length;
+    if( same ) {
+        return;
+    }
+    if( owner != dialog_owner ) {
+        dialog_requests.clear();
+    }
+    state.serial = ++dialog_serial;
+    dialog_now = std::move( state );
+    dialog_owner = owner;
+    dialog_up = true;
+}
+
+void godot_host::clear_dialog( const void *owner )
+{
+    std::lock_guard<std::mutex> lock( dialog_mutex );
+    if( owner == dialog_owner ) {
+        dialog_up = false;
+        dialog_owner = nullptr;
+        dialog_requests.clear();
+    }
+}
+
+bool godot_host::take_dialog_request( dialog_request &out )
+{
+    std::lock_guard<std::mutex> lock( dialog_mutex );
+    if( dialog_requests.empty() ) {
+        return false;
+    }
+    out = dialog_requests.front();
+    dialog_requests.pop_front();
     return true;
 }
 

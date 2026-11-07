@@ -17,6 +17,9 @@
 #include "ui_manager.h"
 #if defined(TILES)
 #include "sdl_gamepad.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 #endif
 
 class query_popup_impl : public cataimgui::window
@@ -58,6 +61,12 @@ class query_popup_impl : public cataimgui::window
         int get_mouse_selected_option() const {
             return mouse_selected_option;
         }
+#if defined(CDDA_GODOT)
+        // Native dialogs (plan 0018): hidden while the host draws it.
+        void set_host_drawn( bool host ) {
+            hide_ui = host;
+        }
+#endif
         // The button clicked since the last call, or -1.
         int take_clicked_option() {
             const int clicked = clicked_option;
@@ -114,6 +123,9 @@ float query_popup_impl::glyphs_width( size_t ind ) const
 
 void query_popup_impl::draw_controls()
 {
+#if defined(CDDA_GODOT)
+    hide_if_hidden();
+#endif
 #if defined(TILES)
     // While the pad is in use its glyphs mark what A and B answer, and the
     // focus frame goes (the keyboard and the mouse bring it back).
@@ -251,6 +263,13 @@ query_popup::query_popup()
     : cur( 0 ), default_text_color( c_white ), anykey( false ), cancel( false ),
       ontop( false ), fullscr( false ), pref_kbd_mode( keyboard_mode::keycode )
 {
+}
+
+query_popup::~query_popup()
+{
+#if defined(CDDA_GODOT)
+    godot_host::clear_dialog( this );
+#endif
 }
 
 query_popup &query_popup::context( const std::string &cat )
@@ -444,10 +463,35 @@ query_popup::result query_popup::query_once()
     // Assign outside construction of `res` to ensure execution order
     res.wait_input = !anykey;
     bool by_mouse = false;
+#if defined(CDDA_GODOT)
+    // The host draws it (plan 0018): published, hidden, and its answers
+    // taken each pass (the wait polls every 50 ms).
+    host_drawn = godot_host::native_menus();
+    impl->set_host_drawn( host_drawn );
+    if( host_drawn ) {
+        godot_host::dialog_state s;
+        s.kind = 0;
+        s.message = godot_host::bbcode( text );
+        for( const button &b : buttons ) {
+            s.options.push_back( remove_color_tags( b.text ) );
+        }
+        s.cancel = cancel;
+        s.anykey = anykey;
+        godot_host::publish_dialog( this, std::move( s ) );
+    }
+#endif
     do {
         ui_manager::redraw();
         res.action = ctxt.handle_input( 50 );
         res.evt = ctxt.get_raw_input();
+#if defined(CDDA_GODOT)
+        if( host_drawn && take_host_dialog( res ) ) {
+            if( res.action == "CONFIRM" ) {
+                by_mouse = true;
+            }
+            break;
+        }
+#endif
 
         const int clicked = impl->take_clicked_option();
         if( !options.empty() && clicked != -1 ) {
@@ -545,8 +589,58 @@ query_popup::result query_popup::query_once()
         }
     }
 
+#if defined(CDDA_GODOT)
+    if( !res.wait_input ) {
+        godot_host::clear_dialog( this );
+    }
+#endif
     return res;
 }
+
+#if defined(CDDA_GODOT)
+// The host's answer, as the matching input: an option chosen (a click on
+// its button), a cancel (Escape, or the option the pad's B answers where
+// nothing cancels), any key. True if one came.
+bool query_popup::take_host_dialog( result &res )
+{
+    godot_host::dialog_request r;
+    if( !godot_host::take_dialog_request( r ) ) {
+        return false;
+    }
+    switch( r.kind ) {
+        case godot_host::dialog_request_kind::choose:
+            if( r.value >= 0 && r.value < static_cast<int>( options.size() ) ) {
+                cur = static_cast<size_t>( r.value );
+                res.action = "CONFIRM";
+                res.evt = input_event();
+                return true;
+            }
+            break;
+        case godot_host::dialog_request_kind::cancel:
+            if( cancel ) {
+                res.action = "QUIT";
+                res.evt = input_event( KEY_ESCAPE, input_event_t::keyboard_code );
+                return true;
+            }
+            if( pad_b_option >= 0 ) {
+                cur = static_cast<size_t>( pad_b_option );
+                res.action = "CONFIRM";
+                res.evt = input_event();
+                return true;
+            }
+            break;
+        case godot_host::dialog_request_kind::dismiss:
+        case godot_host::dialog_request_kind::submit:
+            if( anykey ) {
+                res.action = "ANY_INPUT";
+                res.evt = input_event( ' ', input_event_t::keyboard_char );
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+#endif
 
 std::shared_ptr<query_popup_impl> query_popup::create_or_get_impl()
 {

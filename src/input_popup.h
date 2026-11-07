@@ -44,6 +44,7 @@ class input_popup : public cataimgui::window
     public:
         explicit input_popup( int width, const std::string &title = "", const point &pos = point::min,
                               ImGuiWindowFlags flags = ImGuiWindowFlags_None );
+        ~input_popup() override;
 
         // todo: monofont is a hack for easy support of old descriptions and should be replaced by a more universal solution
         void set_description( const std::string &desc, const nc_color &default_color = c_green,
@@ -69,6 +70,13 @@ class input_popup : public cataimgui::window
         bool set_focus = true;
         bool is_cancelled = false;
         std::vector<std::pair<callback_input, std::function<bool()>>> callbacks;
+#if defined(CDDA_GODOT)
+        // Native dialogs (plan 0018): drawn by the host while its switch is
+        // on; published each pass with the text so far.
+        bool host_drawn = false;
+        std::string host_title;
+        void publish_host( int kind, const std::string &value );
+#endif
 
     private:
         std::string description;

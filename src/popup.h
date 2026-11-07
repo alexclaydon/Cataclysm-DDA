@@ -76,6 +76,7 @@ class query_popup
          * default construction will return { false, "ERROR", {} }.
          **/
         query_popup();
+        ~query_popup();
 
         /**
          * Specify the input context. In addition to being used to handle input
@@ -232,6 +233,11 @@ class query_popup
         };
 
         std::weak_ptr<query_popup_impl> p_impl;
+#if defined(CDDA_GODOT)
+        // Native dialogs (plan 0018): drawn by the host, which answers.
+        bool host_drawn = false;
+        bool take_host_dialog( result &res );
+#endif
 
         // UI caches
         mutable std::vector<std::string> folded_msg;

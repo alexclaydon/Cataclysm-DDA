@@ -35,9 +35,7 @@
 #endif
 
 #if defined(CDDA_GODOT)
-#include "color.h"
 #include "godot_host.h"
-#include "sdl_utils.h"
 #endif
 
 void uilist_impl::draw_controls()
@@ -1106,54 +1104,6 @@ void uilist::query_once( input_context &ctxt, int timeout,
 }
 
 #if defined(CDDA_GODOT)
-// The engine's colour tags as BBCode, for the host ([color=#rrggbb]),
-// brackets escaped.
-static std::string host_bbcode( const std::string &tagged )
-{
-    std::string out;
-    int open = 0;
-    const auto text = []( std::string & o, std::string_view t ) {
-        for( const char c : t ) {
-            if( c == '[' ) {
-                o += "[lb]";
-            } else {
-                o += c;
-            }
-        }
-    };
-    for( const std::string &seg : split_by_color( replace_colors( tagged ) ) ) {
-        if( seg.empty() ) {
-            continue;
-        }
-        if( seg[0] == '<' ) {
-            const size_t end = seg.find( '>' );
-            if( end != std::string::npos ) {
-                const color_tag_parse_result tag = get_color_from_tag( seg, report_color_error::no );
-                if( tag.type == color_tag_parse_result::open_color_tag ) {
-                    const SDL_Color c = curses_color_to_SDL( tag.color );
-                    out += string_format( "[color=#%02x%02x%02x]", c.r, c.g, c.b );
-                    ++open;
-                    text( out, std::string_view( seg ).substr( end + 1 ) );
-                    continue;
-                }
-                if( tag.type == color_tag_parse_result::close_color_tag ) {
-                    if( open > 0 ) {
-                        out += "[/color]";
-                        --open;
-                    }
-                    text( out, std::string_view( seg ).substr( end + 1 ) );
-                    continue;
-                }
-            }
-        }
-        text( out, seg );
-    }
-    for( ; open > 0; --open ) {
-        out += "[/color]";
-    }
-    return out;
-}
-
 // Whether the host draws this list: its switch on, and no callback (a
 // callback may draw beside the list, which the host can't show).
 bool uilist::host_menu()
@@ -1164,16 +1114,16 @@ bool uilist::host_menu()
 void uilist::publish_host_menu()
 {
     godot_host::menu_state s;
-    s.title = host_bbcode( title );
-    s.header = host_bbcode( text );
-    s.footer = host_bbcode( footer_text );
+    s.title = godot_host::bbcode( title );
+    s.header = godot_host::bbcode( text );
+    s.footer = godot_host::bbcode( footer_text );
     s.entries.reserve( fentries.size() );
     for( const int i : fentries ) {
         const uilist_entry &e = entries[i];
         godot_host::menu_entry m;
-        m.text = host_bbcode( e.txt );
-        m.column = host_bbcode( e.ctxt );
-        m.desc = host_bbcode( e.desc );
+        m.text = godot_host::bbcode( e.txt );
+        m.column = godot_host::bbcode( e.ctxt );
+        m.desc = godot_host::bbcode( e.desc );
         if( e.hotkey.has_value() && e.hotkey.value() != input_event() ) {
             m.hotkey = e.hotkey.value().short_description();
         }
