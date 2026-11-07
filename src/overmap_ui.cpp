@@ -2334,6 +2334,10 @@ static tripoint_abs_omt display()
                 player_character.omt_path.swap( path );
             }
             if( same_path_selected && !player_character.omt_path.empty() ) {
+#if defined(CDDA_GODOT)
+                // The game asks first: no map buttons over its question.
+                godot_host::set_overmap_state( 0 );
+#endif
                 if( try_travel_to_destination( player_character, curs, curs, driving ) ) {
                     action = "QUIT";
                     if( uistate.overmap_fast_travel ) {
