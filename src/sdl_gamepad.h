@@ -50,9 +50,9 @@ direction get_radial_right_direction();
 bool is_radial_left_open();
 bool is_radial_right_open();
 bool is_alt_held();
-// A move being held (Dark Forest's snapshot skip): RT walking, or the left
-// stick's repeat.
-bool move_held();
+// A held move's next step already due (Dark Forest's snapshot skip): RT
+// walking, or the left stick's repeat.
+bool move_due();
 
 // In a menu the pad's A arrives as Enter and B as Escape. Which pad button
 // sent the latest of those, or none once a key on the keyboard is pressed

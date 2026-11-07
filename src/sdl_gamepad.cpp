@@ -1556,12 +1556,16 @@ bool is_alt_held()
     return alt_modifier_held;
 }
 
-bool move_held()
+bool move_due()
 {
-    // RT held with a direction (walking: its repeat task sends no button,
-    // -1), the touch pad's move pad included; or the left stick's repeat.
+    // A held move's next step already due, the game behind it: RT walking
+    // (its repeat task sends no button, -1; the touch pad's move pad
+    // included) or the left stick's repeat, past its time.
+    const uint32_t now = GetTicks();
     const task_t &rt = all_tasks[triggers_task_index + 1];
-    return ( rt.counter > 0 && rt.button == -1 ) || all_tasks[sticks_task_index].counter > 0;
+    const task_t &stick = all_tasks[sticks_task_index];
+    return ( rt.counter > 0 && rt.button == -1 && stick_dir( 0 ) != direction::NONE && rt.when <= now ) ||
+           ( stick.counter > 0 && stick.when <= now );
 }
 
 bool is_in_menu()
