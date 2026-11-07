@@ -2451,8 +2451,11 @@ bool game::handle_mouseview( input_context &ctxt, std::string &action )
                     ter_view_p.raw().xy(),
                     true );
 #if defined(CDDA_GODOT)
-            if( godot_host::mouse_away() ) {
-                // The VR host stopped pointing at the 3D view.
+            if( godot_host::mouse_away() || godot_host::touch_pad() ) {
+                // The VR host stopped pointing at the 3D view; or the host's
+                // touch pad, with no mouse: a MOUSE_MOVE is only a nudge
+                // waking the loop (a request, the screen turning), and its
+                // stale mouse tile opened Mouse view.
                 mouse_pos.reset();
             }
 #endif
