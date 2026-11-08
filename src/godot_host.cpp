@@ -706,6 +706,26 @@ bool godot_host::in_menu()
     return menu_is_open;
 }
 
+namespace
+{
+std::mutex move_mode_mutex;
+std::string move_mode_now;
+} // namespace
+
+void godot_host::set_move_mode( const std::string &id )
+{
+    std::lock_guard<std::mutex> lock( move_mode_mutex );
+    if( move_mode_now != id ) {
+        move_mode_now = id;
+    }
+}
+
+std::string godot_host::move_mode()
+{
+    std::lock_guard<std::mutex> lock( move_mode_mutex );
+    return move_mode_now;
+}
+
 void godot_host::set_safe_mode( int mode )
 {
     safe_mode_now = mode;
