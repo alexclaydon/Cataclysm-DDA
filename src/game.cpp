@@ -3491,8 +3491,17 @@ void game::draw_panels( bool force_draw )
                 bool placed = false;
 #endif
                 if( panel.always_draw || draw_this_turn ) {
+#if defined(CDDA_GODOT)
+                    // The host's log box shows more than the column holds:
+                    // the log drawn the terminal's height (plan 0020).
+                    const bool tall_log = native && panel.get_id() == "Log";
+                    catacurses::window w = tall_log ?
+                                           catacurses::newwin( TERMY, panel.get_width(), point( px, 0 ) ) :
+                                           catacurses::newwin( h, panel.get_width(), point( px, y ) );
+#else
                     catacurses::window w = catacurses::newwin( h, panel.get_width(),
                                            point( sidebar_right ? TERMX - panel.get_width() : 0, y ) );
+#endif
                     int tmp_h = panel.draw( { u, w, panel.get_widget() } );
                     h += tmp_h;
 #if defined(CDDA_GODOT)
@@ -3610,7 +3619,11 @@ void game::draw_panels_band( bool draw_this_turn )
         }
         h = std::min( h, band - y );
         if( panel.always_draw || draw_this_turn ) {
-            catacurses::window w = catacurses::newwin( h, width, point( x, y ) );
+            // The host's log box shows more than the band's column holds:
+            // the log drawn the terminal's height (plan 0020).
+            const bool tall_log = godot_host::native_sidebar() && panel.get_id() == "Log";
+            catacurses::window w = tall_log ? catacurses::newwin( TERMY, width, point( x, 0 ) ) :
+                                   catacurses::newwin( h, width, point( x, y ) );
             const int tmp_h = panel.draw( { u, w, panel.get_widget() } );
             // Lines skipped for rendering: reclaim the space.
             h += tmp_h;
