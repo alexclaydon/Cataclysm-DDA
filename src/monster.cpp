@@ -3157,18 +3157,29 @@ void monster::die( map *here, Creature *nkiller )
             if( !grabbed ) {
                 you->add_msg_player_or_npc( m_good, _( "The last enemy holding you collapses!" ),
                                             _( "The last enemy holding <npcname> collapses!" ) );
-                // A loop for safety
+                // A loop for safety. The effects are references into the
+                // effects map: take their ids first, as removing one (on
+                // every body part) frees the entries the rest point at (a
+                // crash when grabbed on more than one part).
+                std::vector<efftype_id> grab_ids;
                 for( const effect &grab : you->get_effects_with_flag( json_flag_GRAB ) ) {
-                    you->remove_effect( grab.get_id() );
+                    grab_ids.push_back( grab.get_id() );
+                }
+                for( const efftype_id &id : grab_ids ) {
+                    you->remove_effect( id );
                 }
                 continue;
             }
             // Iterate through all your grabs to figure out which one this critter held
+            // (as above: what to remove first, then remove it).
+            std::vector<std::pair<efftype_id, bodypart_id>> held;
             for( const effect &grab : you->get_effects_with_flag( json_flag_GRAB ) ) {
                 if( is_grabbing( grab.get_bp().id() ) ) {
-                    const effect_type effid = *grab.get_effect_type();
-                    you->remove_effect( effid.id, grab.get_bp() );
+                    held.emplace_back( grab.get_effect_type()->id, grab.get_bp() );
                 }
+            }
+            for( const std::pair<efftype_id, bodypart_id> &grab : held ) {
+                you->remove_effect( grab.first, grab.second );
             }
         }
     }
