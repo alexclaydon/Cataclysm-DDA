@@ -1061,7 +1061,8 @@ void godot_host::publish_dialog( const void *owner, dialog_state state )
     const bool same = dialog_up && owner == dialog_owner && state.kind == dialog_now.kind &&
                       state.title == dialog_now.title && state.message == dialog_now.message &&
                       state.label == dialog_now.label && state.value == dialog_now.value &&
-                      state.options == dialog_now.options && state.cancel == dialog_now.cancel &&
+                      state.options == dialog_now.options && state.option_glyphs == dialog_now.option_glyphs &&
+                      state.cancel == dialog_now.cancel &&
                       state.anykey == dialog_now.anykey && state.max_length == dialog_now.max_length;
     if( same ) {
         return;

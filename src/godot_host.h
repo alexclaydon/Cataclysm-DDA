@@ -683,7 +683,8 @@ struct dialog_state {
     std::string message;     // BBCode
     std::string label;       // an input's label, BBCode
     std::string value;       // an input's starting text
-    std::vector<std::string> options;  // a popup's buttons
+    std::vector<std::string> options;  // a popup's buttons, their names
+    std::vector<std::string> option_glyphs;  // the pad button answering each ("A", "B", "")
     bool cancel = false;     // may be cancelled
     bool anykey = false;     // a popup any key dismisses
     int max_length = 0;      // an input's, 0 none

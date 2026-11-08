@@ -472,8 +472,13 @@ query_popup::result query_popup::query_once()
         godot_host::dialog_state s;
         s.kind = 0;
         s.message = godot_host::bbcode( text );
-        for( const button &b : buttons ) {
-            s.options.push_back( remove_color_tags( b.text ) );
+        // Each option by its name (no key in it: the host shows the pad
+        // button answering it as a glyph): A answers Yes, B the option
+        // pad_b_option says.
+        for( size_t i = 0; i < options.size(); ++i ) {
+            s.options.push_back( ctxt.get_action_name( options[i].action ) );
+            s.option_glyphs.emplace_back( options[i].action == "YES" ? "A" :
+                                          static_cast<int>( i ) == pad_b_option ? "B" : "" );
         }
         s.cancel = cancel;
         s.anykey = anykey;
