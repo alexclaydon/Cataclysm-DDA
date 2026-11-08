@@ -200,8 +200,16 @@ bool Character::try_remove_grab( bool attacking )
         // Use the same calc as monster::move_effect
         auto *mon = mounted_creature.get();
         if( mon->has_effect_with_flag( json_flag_GRAB ) ) {
+            // The ids first: removing one frees the entries the references
+            // from get_effects_with_flag point at (a crash on several parts).
+            std::vector<efftype_id> grab_ids;
             for( const effect &grab : mon->get_effects_with_flag( json_flag_GRAB ) ) {
-                const efftype_id effid = grab.get_effect_type()->id;
+                grab_ids.push_back( grab.get_effect_type()->id );
+            }
+            for( const efftype_id &effid : grab_ids ) {
+                if( !mon->has_effect( effid ) ) {
+                    continue;  // removed with an earlier part's
+                }
                 if( !x_in_y( mon->type->melee_skill + mon->type->melee_damage.total_damage(),
                              mon->get_effect_int( effid ) ) ) {
                     add_msg( m_bad, _( "Your %s tries to break free, but fails!" ), mon->get_name() );
@@ -368,8 +376,16 @@ void Character::try_remove_webs()
 
 void Character::try_remove_impeding_effect()
 {
+    // The ids first: removing one frees the entries the references from
+    // get_effects_with_flag point at (a crash on several parts).
+    std::vector<efftype_id> impeding;
     for( const effect &eff : get_effects_with_flag( flag_EFFECT_IMPEDING ) ) {
-        const efftype_id &eff_id = eff.get_id();
+        impeding.push_back( eff.get_id() );
+    }
+    for( const efftype_id &eff_id : impeding ) {
+        if( !has_effect( eff_id ) ) {
+            continue;  // removed with an earlier part's
+        }
         if( is_mounted() ) {
             auto *mon = mounted_creature.get();
             if( x_in_y( mon->type->melee_dice * mon->type->melee_sides,
