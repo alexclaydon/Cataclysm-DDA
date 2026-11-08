@@ -633,6 +633,12 @@ bool query_popup::take_host_dialog( result &res )
                 res.evt = input_event();
                 return true;
             }
+            if( anykey ) {
+                // A message any key dismisses: so does a cancel.
+                res.action = "ANY_INPUT";
+                res.evt = input_event( KEY_ESCAPE, input_event_t::keyboard_code );
+                return true;
+            }
             break;
         case godot_host::dialog_request_kind::dismiss:
         case godot_host::dialog_request_kind::submit:
