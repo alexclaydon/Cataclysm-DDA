@@ -105,7 +105,7 @@ enum class glyph_style { xbox, playstation, text };
 glyph_style current_glyph_style();
 #if defined(CDDA_GODOT)
 // For the host's own glyphs (godot_host::glyph_style): 0 Xbox, 1
-// PlayStation, 2 text, 3 the option on auto with no real pad in use (the
+// PlayStation, 2 text, 3 the option on auto with no real pad connected (the
 // touch pad's virtual one, or none). Engine thread.
 int host_glyph_style();
 #endif

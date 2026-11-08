@@ -1858,11 +1858,30 @@ int host_glyph_style()
         return style == "playstation" ? 1 : style == "text" ? 2 : 0;
     }
 #if SDL_MAJOR_VERSION >= 3
-    if( controller == nullptr || godot_host::is_virtual_pad( SDL_GetGamepadID( controller ) ) ) {
-        return 3;
+    // The real pads connected, not the one last used (the user's call,
+    // 2026-11-08: on the phone that is mostly the touch pad's virtual one,
+    // which would hide a DualSense's glyphs): the active pad if it's real,
+    // else the first real one; none (only the virtual pad) is 3.
+    const auto is_ps = []( SDL_GamepadType t ) {
+        return t == SDL_GAMEPAD_TYPE_PS3 || t == SDL_GAMEPAD_TYPE_PS4 || t == SDL_GAMEPAD_TYPE_PS5;
+    };
+    if( controller != nullptr && !godot_host::is_virtual_pad( SDL_GetGamepadID( controller ) ) ) {
+        return is_ps( SDL_GetGamepadType( controller ) ) ? 1 : 0;
     }
-#endif
+    int count = 0;
+    SDL_JoystickID *ids = SDL_GetGamepads( &count );
+    int found = 3;
+    for( int i = 0; ids != nullptr && i < count; ++i ) {
+        if( !godot_host::is_virtual_pad( ids[i] ) ) {
+            found = is_ps( SDL_GetGamepadTypeForID( ids[i] ) ) ? 1 : 0;
+            break;
+        }
+    }
+    SDL_free( ids );
+    return found;
+#else
     return current_glyph_style() == glyph_style::playstation ? 1 : 0;
+#endif
 }
 #endif
 
