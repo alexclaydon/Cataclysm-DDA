@@ -712,6 +712,9 @@ bool native_sidebar();
 // Whether the switch changed since last asked (the panels then redraw in
 // full, into the frame or to the host).
 bool take_sidebar_switched();
+// Whether the game owes a redraw for the switch (the play loop's idle
+// timeout takes it), so the panels show at once, not after a turn.
+bool take_sidebar_redraw();
 void sidebar_begin();
 void sidebar_place( const std::string &id, const std::string &name, int x, int y, int width,
                     int height );

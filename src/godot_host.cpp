@@ -745,13 +745,20 @@ int sidebar_serial = 0;
 } // namespace
 
 std::atomic<bool> sidebar_switched{ false };
+std::atomic<bool> sidebar_redraw{ false };
 
 void godot_host::set_native_sidebar( bool on )
 {
     if( native_sidebar_on.exchange( on ) != on ) {
         sidebar_switched = true;
+        sidebar_redraw = true;
         godot_host::wake();
     }
+}
+
+bool godot_host::take_sidebar_redraw()
+{
+    return sidebar_redraw.exchange( false );
 }
 
 bool godot_host::take_sidebar_switched()
