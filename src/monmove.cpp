@@ -1592,14 +1592,22 @@ void monster::nursebot_operate( Character *dragged_foe )
             get_player_character().uninstall_bionic( real_target, *this, *dragged_foe,
                     adjusted_skill );
 
-            // Remove target grab
-            for( const effect &eff :
-                 dragged_foe->get_effects_with_flag( json_flag_GRAB ) ) {
-                dragged_foe->remove_effect( eff.get_id() );
+            // Remove target grab, and our own grab filters: the ids first,
+            // as removing one frees the entries the references from
+            // get_effects_with_flag point at (a crash on several parts).
+            std::vector<efftype_id> grabs;
+            for( const effect &eff : dragged_foe->get_effects_with_flag( json_flag_GRAB ) ) {
+                grabs.push_back( eff.get_id() );
             }
-            // And our own grab filters
+            for( const efftype_id &id : grabs ) {
+                dragged_foe->remove_effect( id );
+            }
+            std::vector<efftype_id> filters;
             for( const effect &eff : get_effects_with_flag( json_flag_GRAB_FILTER ) ) {
-                remove_effect( eff.get_id() );
+                filters.push_back( eff.get_id() );
+            }
+            for( const efftype_id &id : filters ) {
+                remove_effect( id );
             }
             dragged_foe_id = character_id();
         }
