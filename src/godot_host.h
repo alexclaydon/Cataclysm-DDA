@@ -16,6 +16,11 @@
 #include <string>
 #include <vector>
 
+namespace catacurses
+{
+class window;
+} // namespace catacurses
+
 struct SDL_Renderer;
 
 namespace godot_host
@@ -683,6 +688,39 @@ void clear_menu( const void *owner );
 bool take_menu_request( menu_request &out );
 // The engine's colour tags as BBCode ([color=#rrggbb]), brackets escaped.
 std::string bbcode( const std::string &tagged );
+
+// The native sidebar (plan 0020): with its switch on, the engine's sidebar
+// panels (the portrait band, the landscape column) are not shown in the
+// frame but published for the host to draw: each panel's id, name, cell
+// rectangle in the terminal and rows as BBCode. game::draw_panels starts
+// a pass (sidebar_begin), records each shown panel's place
+// (sidebar_place), captures those drawn this pass from their windows
+// (sidebar_capture, in sdltiles.cpp beside the palette; the window is then
+// blanked), and publishes (sidebar_end). A panel not drawn this pass keeps
+// its last rows.
+struct sidebar_panel {
+    std::string id;
+    std::string name;
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+    std::vector<std::string> rows;
+};
+void set_native_sidebar( bool on );
+bool native_sidebar();
+// Whether the switch changed since last asked (the panels then redraw in
+// full, into the frame or to the host).
+bool take_sidebar_switched();
+void sidebar_begin();
+void sidebar_place( const std::string &id, const std::string &name, int x, int y, int width,
+                    int height );
+void sidebar_capture( const std::string &id, const catacurses::window &w );
+void sidebar_rows( const std::string &id, std::vector<std::string> rows );
+void sidebar_end( int columns, int rows );
+// The host: the panels in drawing order, the terminal's size; false when
+// nothing changed since `serial`, which it updates.
+bool get_sidebar_panels( std::vector<sidebar_panel> &out, int &columns, int &rows, int &serial );
 
 // Native dialogs (plan 0018), the same way: a query popup (a message with
 // buttons, or "any key") or a text or number input, drawn by the host while

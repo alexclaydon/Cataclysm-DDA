@@ -3433,14 +3433,26 @@ void game::draw_panels( bool force_draw )
 {
     static int previous_turn = -1;
     const int current_turn = to_turns<int>( calendar::turn - calendar::turn_zero );
+#if defined(CDDA_GODOT)
+    const bool draw_this_turn = current_turn > previous_turn || force_draw ||
+                                godot_host::take_sidebar_switched();
+#else
     const bool draw_this_turn = current_turn > previous_turn || force_draw;
+#endif
     panel_manager &mgr = panel_manager::get_manager();
     int y = 0;
     const bool sidebar_right = get_option<std::string>( "SIDEBAR_POSITION" ) == "right";
 #if defined(CDDA_GODOT)
+    const bool native = godot_host::native_sidebar();
+    if( native ) {
+        godot_host::sidebar_begin();
+    }
     if( godot_host::sidebar_band() > 0 ) {
         godot_host::set_sidebar( 0, 0, TERMX, TERMY );
         draw_panels_band( draw_this_turn );
+        if( native ) {
+            godot_host::sidebar_end( TERMX, TERMY );
+        }
         previous_turn = current_turn;
         return;
     }
@@ -3474,11 +3486,24 @@ void game::draw_panels( bool force_draw )
             }
             h += spacer;
             if( panel.toggle && panel.render() && h > 0 ) {
+#if defined(CDDA_GODOT)
+                const int px = sidebar_right ? TERMX - panel.get_width() : 0;
+                bool placed = false;
+#endif
                 if( panel.always_draw || draw_this_turn ) {
                     catacurses::window w = catacurses::newwin( h, panel.get_width(),
                                            point( sidebar_right ? TERMX - panel.get_width() : 0, y ) );
                     int tmp_h = panel.draw( { u, w, panel.get_widget() } );
                     h += tmp_h;
+#if defined(CDDA_GODOT)
+                    if( native ) {
+                        // The host draws it (plan 0020): captured, then blanked.
+                        godot_host::sidebar_place( panel.get_id(), panel.get_name(), px, y,
+                                                   panel.get_width(), h );
+                        godot_host::sidebar_capture( panel.get_id(), w );
+                        placed = true;
+                    }
+#endif
                     // lines skipped for rendering -> reclaim space in the sidebar
                     if( tmp_h < 0 ) {
                         y += h;
@@ -3486,6 +3511,12 @@ void game::draw_panels( bool force_draw )
                         continue;
                     }
                 }
+#if defined(CDDA_GODOT)
+                if( native && !placed ) {
+                    godot_host::sidebar_place( panel.get_id(), panel.get_name(), px, y,
+                                               panel.get_width(), h );
+                }
+#endif
                 if( show_panel_adm ) {
                     const std::string panel_name = panel.get_name();
                     const int panel_name_width = utf8_width( panel_name );
@@ -3513,6 +3544,11 @@ void game::draw_panels( bool force_draw )
             }
         }
     }
+#if defined(CDDA_GODOT)
+    if( native ) {
+        godot_host::sidebar_end( TERMX, TERMY );
+    }
+#endif
     previous_turn = current_turn;
 }
 
@@ -3578,6 +3614,13 @@ void game::draw_panels_band( bool draw_this_turn )
             const int tmp_h = panel.draw( { u, w, panel.get_widget() } );
             // Lines skipped for rendering: reclaim the space.
             h += tmp_h;
+            if( godot_host::native_sidebar() ) {
+                // The host draws it (plan 0020): captured, then blanked.
+                godot_host::sidebar_place( panel.get_id(), panel.get_name(), x, y, width, h );
+                godot_host::sidebar_capture( panel.get_id(), w );
+            }
+        } else if( godot_host::native_sidebar() ) {
+            godot_host::sidebar_place( panel.get_id(), panel.get_name(), x, y, width, h );
         }
         y += h;
     }

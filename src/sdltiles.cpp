@@ -916,6 +916,65 @@ static const SDL_Color &color_as_sdl( const unsigned char color )
     return windowsPalette[color];
 }
 
+#if defined(CDDA_GODOT)
+// A sidebar panel's window as BBCode rows, its cells' text in runs of one
+// colour (the palette's), then the window blanked so the frame shows
+// nothing there (plan 0020). Trailing blanks dropped; '[' escaped.
+void godot_host::sidebar_capture( const std::string &id, const catacurses::window &w )
+{
+    cata_cursesport::WINDOW *const win = w.get<cata_cursesport::WINDOW>();
+    if( win == nullptr ) {
+        return;
+    }
+    std::vector<std::string> rows;
+    for( const cata_cursesport::curseline &line : win->line ) {
+        std::string row;
+        int fg = -1;
+        int bg = -1;
+        size_t kept = 0;  // row's length up to its last non-blank cell
+        int kept_bg = 0;  // that cell's run's background
+        bool open = false;
+        for( const cata_cursesport::cursecell &cell : line.chars ) {
+            if( cell.ch.empty() ) {
+                continue;  // a wide character's second half
+            }
+            const int cf = static_cast<int>( cell.FG );
+            const int cb = static_cast<int>( cell.BG );
+            if( cf != fg || cb != bg ) {
+                if( open ) {
+                    row += bg > 0 ? "[/bgcolor][/color]" : "[/color]";
+                }
+                const SDL_Color &c = color_as_sdl( static_cast<unsigned char>( cf ) );
+                row += string_format( "[color=#%02x%02x%02x]", c.r, c.g, c.b );
+                if( cb > 0 ) {
+                    const SDL_Color &b = color_as_sdl( static_cast<unsigned char>( cb ) );
+                    row += string_format( "[bgcolor=#%02x%02x%02x]", b.r, b.g, b.b );
+                }
+                fg = cf;
+                bg = cb;
+                open = true;
+            }
+            row += cell.ch == "[" ? "[lb]" : cell.ch;
+            if( cell.ch != " " || cb > 0 ) {
+                kept = row.size();
+                kept_bg = cb;
+            }
+        }
+        row.resize( kept );
+        if( open && kept > 0 ) {
+            row += kept_bg > 0 ? "[/bgcolor][/color]" : "[/color]";
+        }
+        rows.push_back( std::move( row ) );
+    }
+    while( !rows.empty() && rows.back().empty() ) {
+        rows.pop_back();
+    }
+    godot_host::sidebar_rows( id, std::move( rows ) );
+    werase( w );
+    wnoutrefresh( w );
+}
+#endif
+
 #if defined(__ANDROID__)
 void draw_terminal_size_preview();
 void draw_quick_shortcuts();

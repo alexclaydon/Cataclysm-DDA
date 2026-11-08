@@ -733,6 +733,107 @@ std::string godot_host::move_mode()
     return move_mode_now;
 }
 
+namespace
+{
+std::atomic<bool> native_sidebar_on{ false };
+std::mutex sidebar_mutex;
+std::vector<godot_host::sidebar_panel> sidebar_building;  // this pass's places
+std::vector<godot_host::sidebar_panel> sidebar_shown;  // the last published
+int sidebar_columns = 0;
+int sidebar_rows_n = 0;
+int sidebar_serial = 0;
+} // namespace
+
+std::atomic<bool> sidebar_switched{ false };
+
+void godot_host::set_native_sidebar( bool on )
+{
+    if( native_sidebar_on.exchange( on ) != on ) {
+        sidebar_switched = true;
+        godot_host::wake();
+    }
+}
+
+bool godot_host::take_sidebar_switched()
+{
+    return sidebar_switched.exchange( false );
+}
+
+bool godot_host::native_sidebar()
+{
+    return native_sidebar_on;
+}
+
+void godot_host::sidebar_begin()
+{
+    sidebar_building.clear();
+}
+
+void godot_host::sidebar_place( const std::string &id, const std::string &name, int x, int y,
+                                int width, int height )
+{
+    sidebar_panel p;
+    p.id = id;
+    p.name = name;
+    p.x = x;
+    p.y = y;
+    p.width = width;
+    p.height = height;
+    // Its last rows until it is drawn again.
+    std::lock_guard<std::mutex> lock( sidebar_mutex );
+    for( const sidebar_panel &old : sidebar_shown ) {
+        if( old.id == id ) {
+            p.rows = old.rows;
+            break;
+        }
+    }
+    sidebar_building.push_back( std::move( p ) );
+}
+
+void godot_host::sidebar_rows( const std::string &id, std::vector<std::string> rows )
+{
+    for( sidebar_panel &p : sidebar_building ) {
+        if( p.id == id ) {
+            p.rows = std::move( rows );
+            return;
+        }
+    }
+}
+
+void godot_host::sidebar_end( int columns, int rows )
+{
+    std::lock_guard<std::mutex> lock( sidebar_mutex );
+    bool same = columns == sidebar_columns && rows == sidebar_rows_n &&
+                sidebar_building.size() == sidebar_shown.size();
+    for( size_t i = 0; same && i < sidebar_building.size(); i++ ) {
+        const sidebar_panel &a = sidebar_building[i];
+        const sidebar_panel &b = sidebar_shown[i];
+        same = a.id == b.id && a.x == b.x && a.y == b.y && a.width == b.width &&
+               a.height == b.height && a.rows == b.rows;
+    }
+    if( same ) {
+        return;
+    }
+    sidebar_shown = sidebar_building;
+    sidebar_columns = columns;
+    sidebar_rows_n = rows;
+    sidebar_serial++;
+}
+
+bool godot_host::get_sidebar_panels( std::vector<sidebar_panel> &out, int &columns, int &rows,
+                                     int &serial )
+{
+    std::lock_guard<std::mutex> lock( sidebar_mutex );
+    if( serial == sidebar_serial ) {
+        return false;
+    }
+    serial = sidebar_serial;
+    out = sidebar_shown;
+    columns = sidebar_columns;
+    rows = sidebar_rows_n;
+    return true;
+}
+
 void godot_host::set_safe_mode( int mode )
 {
     safe_mode_now = mode;
