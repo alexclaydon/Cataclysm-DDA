@@ -901,6 +901,7 @@ std::deque<godot_host::dialog_request> dialog_requests;
 bool snapshot_owed_now = false;
 bool snapshot_flush = false;
 std::atomic<bool> flat_view_now{ false };
+std::atomic<bool> aiming_now{ false };
 std::atomic<int> glyph_style_now{ 3 };
 std::atomic<bool> flat_view_changed{ false };
 } // namespace
@@ -1105,6 +1106,16 @@ void godot_host::set_glyph_style( int style )
 int godot_host::glyph_style()
 {
     return glyph_style_now.load();
+}
+
+void godot_host::set_aiming( bool aiming )
+{
+    aiming_now = aiming;
+}
+
+bool godot_host::aiming()
+{
+    return aiming_now.load();
 }
 
 void godot_host::set_flat_view( bool flat )

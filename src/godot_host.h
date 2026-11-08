@@ -376,6 +376,11 @@ bool text_wanted();
 // engine thread sets it each event pump; the host reads it any time.
 void set_in_menu( bool menu );
 bool in_menu();
+// Whether aiming (target_ui) is up: a map screen, where the host's taps
+// move the target cursor; other screens of the menu plane take a tap on
+// bare screen as Escape. The engine thread sets it; the host reads it.
+void set_aiming( bool aiming );
+bool aiming();
 // The game's safe mode (game::safe_mode: 0 off, 1 on, 2 stopped by a newly
 // spotted hostile), for the host's touch Safe mode control. The engine
 // thread sets it each event pump; the host reads it any time.
