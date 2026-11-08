@@ -385,8 +385,8 @@ bool aiming();
 // spotted hostile), for the host's touch Safe mode control. The engine
 // thread sets it each event pump; the host reads it any time.
 void set_safe_mode( int mode );
-// The avatar's movement mode id (walk, run, crouch, prone, or a mod's),
-// empty out of play, for the touch pad's figure on its centre. The engine
+// The avatar's chosen movement mode id (walk, run, crouch, prone, or a
+// mod's; the desired one, which the next step takes up), empty out of play, for the touch pad's figure on its centre. The engine
 // thread sets it each event pump; the host reads it any time.
 void set_move_mode( const std::string &id );
 std::string move_mode();
