@@ -710,14 +710,21 @@ namespace
 {
 std::mutex move_mode_mutex;
 std::string move_mode_now;
+std::atomic<bool> move_mode_pending_now{ false };
 } // namespace
 
-void godot_host::set_move_mode( const std::string &id )
+void godot_host::set_move_mode( const std::string &id, bool pending )
 {
+    move_mode_pending_now = pending;
     std::lock_guard<std::mutex> lock( move_mode_mutex );
     if( move_mode_now != id ) {
         move_mode_now = id;
     }
+}
+
+bool godot_host::move_mode_pending()
+{
+    return move_mode_pending_now;
 }
 
 std::string godot_host::move_mode()

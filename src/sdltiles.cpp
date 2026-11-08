@@ -5384,8 +5384,13 @@ static void CheckMessages()
     }
     godot_host::set_in_menu( gamepad::is_in_menu() );
     godot_host::set_safe_mode( g ? static_cast<int>( g->safe_mode ) : 0 );
-    godot_host::set_move_mode( g && g->is_core_data_loaded() ?
-                               get_avatar().get_desired_move_mode().str() : std::string() );
+    if( g && g->is_core_data_loaded() ) {
+        const avatar &you = get_avatar();
+        godot_host::set_move_mode( you.get_desired_move_mode().str(),
+                                   you.get_desired_move_mode() != you.current_movement_mode() );
+    } else {
+        godot_host::set_move_mode( std::string(), false );
+    }
     // Which LT wheels the waiting context fills, for the touch pad.
     {
         input_context *ctxt = input_context::polling ? input_context::polling :

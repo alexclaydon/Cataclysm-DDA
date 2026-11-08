@@ -388,8 +388,10 @@ void set_safe_mode( int mode );
 // The avatar's chosen movement mode id (walk, run, crouch, prone, or a
 // mod's; the desired one, which the next step takes up), empty out of play, for the touch pad's figure on its centre. The engine
 // thread sets it each event pump; the host reads it any time.
-void set_move_mode( const std::string &id );
+// `pending`: chosen but not yet taken up (the current mode differs).
+void set_move_mode( const std::string &id, bool pending );
 std::string move_mode();
+bool move_mode_pending();
 int safe_mode();
 // Which of the LT wheels have anything on the screen waiting for input
 // (bit 0 the left, bit 1 the right), for the touch pad: a finger on the
