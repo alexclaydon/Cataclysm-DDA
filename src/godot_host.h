@@ -715,6 +715,11 @@ bool take_sidebar_switched();
 // Whether the game owes a redraw for the switch (the play loop's idle
 // timeout takes it), so the panels show at once, not after a turn.
 bool take_sidebar_redraw();
+// The log's zoom for the host's log box, a percentage (100 as the panel):
+// the log drawn that much narrower, so the host's larger font fits the
+// box with the messages wrapped to it. A change redraws the panels.
+void set_log_zoom( int percent );
+int log_zoom();
 void sidebar_begin();
 void sidebar_place( const std::string &id, const std::string &name, int x, int y, int width,
                     int height );

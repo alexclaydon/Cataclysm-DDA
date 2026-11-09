@@ -761,6 +761,23 @@ bool godot_host::take_sidebar_redraw()
     return sidebar_redraw.exchange( false );
 }
 
+std::atomic<int> log_zoom_now{ 100 };
+
+void godot_host::set_log_zoom( int percent )
+{
+    percent = std::max( 50, std::min( percent, 300 ) );
+    if( log_zoom_now.exchange( percent ) != percent ) {
+        sidebar_switched = true;
+        sidebar_redraw = true;
+        godot_host::wake();
+    }
+}
+
+int godot_host::log_zoom()
+{
+    return log_zoom_now;
+}
+
 bool godot_host::take_sidebar_switched()
 {
     return sidebar_switched.exchange( false );

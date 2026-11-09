@@ -3494,9 +3494,12 @@ void game::draw_panels( bool force_draw )
 #if defined(CDDA_GODOT)
                     // The host's log box shows more than the column holds:
                     // the log drawn the terminal's height (plan 0020).
+                    // (Narrowed by the host's log zoom, its font that much larger.)
                     const bool tall_log = native && panel.get_id() == "Log";
+                    const int lw = tall_log ? std::max( 10, panel.get_width() * 100 / godot_host::log_zoom() ) :
+                                   panel.get_width();
                     catacurses::window w = tall_log ?
-                                           catacurses::newwin( TERMY, panel.get_width(), point( px, 0 ) ) :
+                                           catacurses::newwin( TERMY, lw, point( px, 0 ) ) :
                                            catacurses::newwin( h, panel.get_width(), point( px, y ) );
 #else
                     catacurses::window w = catacurses::newwin( h, panel.get_width(),
@@ -3507,8 +3510,7 @@ void game::draw_panels( bool force_draw )
 #if defined(CDDA_GODOT)
                     if( native ) {
                         // The host draws it (plan 0020): captured, then blanked.
-                        godot_host::sidebar_place( panel.get_id(), panel.get_name(), px, y,
-                                                   panel.get_width(), h );
+                        godot_host::sidebar_place( panel.get_id(), panel.get_name(), px, y, lw, h );
                         godot_host::sidebar_capture( panel.get_id(), w );
                         placed = true;
                     }
@@ -3523,6 +3525,7 @@ void game::draw_panels( bool force_draw )
 #if defined(CDDA_GODOT)
                 if( native && !placed ) {
                     godot_host::sidebar_place( panel.get_id(), panel.get_name(), px, y,
+                                               panel.get_id() == "Log" ? std::max( 10, panel.get_width() * 100 / godot_host::log_zoom() ) :
                                                panel.get_width(), h );
                 }
 #endif
@@ -3621,19 +3624,22 @@ void game::draw_panels_band( bool draw_this_turn )
         if( panel.always_draw || draw_this_turn ) {
             // The host's log box shows more than the band's column holds:
             // the log drawn the terminal's height (plan 0020).
+            // (Narrowed by the host's log zoom, its font that much larger.)
             const bool tall_log = godot_host::native_sidebar() && panel.get_id() == "Log";
-            catacurses::window w = tall_log ? catacurses::newwin( TERMY, width, point( x, 0 ) ) :
+            const int lw = tall_log ? std::max( 10, width * 100 / godot_host::log_zoom() ) : width;
+            catacurses::window w = tall_log ? catacurses::newwin( TERMY, lw, point( x, 0 ) ) :
                                    catacurses::newwin( h, width, point( x, y ) );
             const int tmp_h = panel.draw( { u, w, panel.get_widget() } );
             // Lines skipped for rendering: reclaim the space.
             h += tmp_h;
             if( godot_host::native_sidebar() ) {
                 // The host draws it (plan 0020): captured, then blanked.
-                godot_host::sidebar_place( panel.get_id(), panel.get_name(), x, y, width, h );
+                godot_host::sidebar_place( panel.get_id(), panel.get_name(), x, y, lw, h );
                 godot_host::sidebar_capture( panel.get_id(), w );
             }
         } else if( godot_host::native_sidebar() ) {
-            godot_host::sidebar_place( panel.get_id(), panel.get_name(), x, y, width, h );
+            godot_host::sidebar_place( panel.get_id(), panel.get_name(), x, y,
+                                       panel.get_id() == "Log" ? std::max( 10, width * 100 / godot_host::log_zoom() ) : width, h );
         }
         y += h;
     }
