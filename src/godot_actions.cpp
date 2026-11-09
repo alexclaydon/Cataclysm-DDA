@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "avatar.h"
@@ -37,7 +38,10 @@ void godot_actions::settle_view( game &g, avatar &you )
 void godot_actions::before_input( game &g )
 {
     // The touch pad's context row: what applies here, before waiting.
-    godot_host::publish_context_actions( godot_host::context_actions_here() );
+    std::vector<std::string> here = godot_host::context_actions_here();
+    // Dark Forest's context cues: how each of them is bound.
+    godot_host::publish_context_bindings( godot_host::context_bindings_here( here ) );
+    godot_host::publish_context_actions( std::move( here ) );
     godot_host::set_route_preview( !g.destination_preview.empty() );
 }
 

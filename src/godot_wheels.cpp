@@ -193,6 +193,35 @@ std::vector<std::string> godot_host::context_actions_here()
     return out;
 }
 
+godot_host::bindings_map godot_host::context_bindings_here( const std::vector<std::string> &actions )
+{
+    bindings_map out;
+    if( g == nullptr ) {
+        return out;
+    }
+    const input_context ctxt = get_default_mode_input_context();
+    std::vector<std::string> ids = actions;
+    for( const char *id : {
+             "ignore_enemy", "safemode", "whitelist_enemy"
+         } ) {
+        ids.emplace_back( id );
+    }
+    for( const std::string &id : ids ) {
+        action_bindings &b = out[id];
+        for( const input_event &e : ctxt.keys_bound_to( id, -1, false, false ) ) {
+            if( e.sequence.empty() ) {
+                continue;
+            }
+            if( e.type == input_event_t::gamepad ) {
+                b.pad.push_back( inp_mngr.get_keyname( e.sequence.front(), e.type, true ) );
+            } else if( e.type == input_event_t::keyboard_char || e.type == input_event_t::keyboard_code ) {
+                b.keys.push_back( e.short_description() );
+            }
+        }
+    }
+    return out;
+}
+
 std::vector<godot_host::wheel_action> godot_host::wheel_catalogue( int aim_dx, int aim_dy )
 {
     std::vector<wheel_action> out;

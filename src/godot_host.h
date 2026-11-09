@@ -14,6 +14,7 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -528,6 +529,23 @@ std::string stairs_action();
 std::vector<std::string> context_actions_here();
 void publish_context_actions( std::vector<std::string> actions );
 bool take_context_actions( std::vector<std::string> &out );
+// Dark Forest's context cues (desktop play): how each context action, and
+// safe mode's three for a stop (ignore_enemy, safemode, whitelist_enemy),
+// is bound in play (the default mode's context): its pad bindings by their
+// portable names ("A", "ALT_X", "L_RADIAL_SW"), its keys as the game shows
+// them. Built with the context actions (engine thread: the bindings live
+// there), published when they change.
+struct action_bindings {
+    std::vector<std::string> pad;
+    std::vector<std::string> keys;
+    bool operator==( const action_bindings &o ) const {
+        return pad == o.pad && keys == o.keys;
+    }
+};
+using bindings_map = std::map<std::string, action_bindings>;
+bindings_map context_bindings_here( const std::vector<std::string> &actions );
+void publish_context_bindings( bindings_map bindings );
+bool take_context_bindings( bindings_map &out );
 
 // If the map has been drawn since `sequence`, move the newest snapshot into
 // `out`, update `sequence` and return true.

@@ -114,6 +114,8 @@ bool catalogue_new = false;  // under catalogue_mutex
 std::mutex context_mutex;
 std::vector<std::string> context_actions;
 bool context_new = false;  // under context_mutex
+godot_host::bindings_map context_bindings;  // under context_mutex
+bool bindings_new = false;  // under context_mutex
 std::mutex mouse_mutex;
 std::deque<mouse_command> mouse_queue;
 uint32_t mouse_buttons_applied = 0;  // engine thread only
@@ -580,6 +582,26 @@ bool godot_host::take_context_actions( std::vector<std::string> &out )
     }
     out = context_actions;
     context_new = false;
+    return true;
+}
+
+void godot_host::publish_context_bindings( bindings_map bindings )
+{
+    std::lock_guard<std::mutex> lock( context_mutex );
+    if( bindings != context_bindings ) {
+        context_bindings = std::move( bindings );
+        bindings_new = true;
+    }
+}
+
+bool godot_host::take_context_bindings( bindings_map &out )
+{
+    std::lock_guard<std::mutex> lock( context_mutex );
+    if( !bindings_new ) {
+        return false;
+    }
+    out = context_bindings;
+    bindings_new = false;
     return true;
 }
 
