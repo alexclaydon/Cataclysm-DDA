@@ -3,6 +3,7 @@
 // The play loop's additions for Dark Forest (godot_actions.h). Moved here
 // from handle_action.cpp unchanged (2026-11-09, plan 0022).
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <vector>
@@ -11,6 +12,7 @@
 #include "calendar.h"
 #include "coordinates.h"
 #include "game.h"
+#include "map_scale_constants.h"
 #include "godot_actions.h"
 #include "godot_host.h"
 #include "messages.h"
@@ -131,6 +133,60 @@ bool godot_actions::flush_owed( const std::string &action )
         return true;
     }
     return false;
+}
+
+bool godot_actions::look_pass( avatar &u, tripoint_bub_ms &lp, tripoint_bub_ms &center,
+                               tripoint_rel_ms &prev_offset, bool select_zone, std::string &action )
+{
+    // The host's touch drag: the cursor to its tile, the view centre with
+    // it. Taken at the top of a pass, so a request made before the look
+    // opened (a slide that opens it) applies without waiting for input.
+    {
+        int cursor_dx = 0;
+        int cursor_dy = 0;
+        if( godot_host::take_look_cursor_request( cursor_dx, cursor_dy ) ) {
+            // Inside the map, as the cursor's own moves stay.
+            lp.x() = std::clamp( u.pos_bub().x() + cursor_dx, 0, MAPSIZE_X - 1 );
+            lp.y() = std::clamp( u.pos_bub().y() + cursor_dy, 0, MAPSIZE_Y - 1 );
+            center.x() = lp.x();
+            center.y() = lp.y();
+        }
+        // The touch pad's view radius slider, as the zoom actions here.
+        if( const int steps = godot_host::take_zoom_view_request() ) {
+            godot_host::zoom_view( steps );
+            g->mark_main_ui_adaptor_resize();
+        }
+    }
+    // The touch pad's Go here and Recenter: out of look-around, the
+    // view as it was (Go here: the route to the cursor's tile then waits
+    // for Confirm, as a tapped one does) or centred on the avatar.
+    if( !select_zone ) {
+        const godot_host::look_exit how = godot_host::take_look_exit_request();
+        if( how == godot_host::look_exit::go_here ) {
+            // The view stays where it was looking until the route is
+            // settled; the one before look-around is held for then.
+            look_go_here( u, lp, center, prev_offset );
+            action = "QUIT";
+            return true;
+        }
+        if( how == godot_host::look_exit::recenter ) {
+            center = u.pos_bub();
+            lp = u.pos_bub();
+            prev_offset = tripoint_rel_ms::zero;
+            action = "QUIT";
+            return true;
+        }
+    }
+    return false;
+}
+
+void godot_actions::look_go_here( avatar &u, const tripoint_bub_ms &lp,
+                                  const tripoint_bub_ms &center, tripoint_rel_ms &prev_offset )
+{
+    godot_host::request_click( lp.x() - u.pos_bub().x(), lp.y() - u.pos_bub().y() );
+    godot_host::hold_view( prev_offset.x(), prev_offset.y(), prev_offset.z() );
+    u.view_offset = center - u.pos_bub();
+    prev_offset = u.view_offset;
 }
 
 #endif // CDDA_GODOT

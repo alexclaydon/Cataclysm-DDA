@@ -35,6 +35,16 @@ struct godot_actions {
     // skipped one), the view turned 2D or 3D, or the native sidebar
     // switched: flush and invalidate the main UI. True if it did.
     static bool flush_owed( const std::string &action );
+    // At the top of each look-around pass (game::look_around): the host's
+    // touch drag (the cursor and the view centre to its tile), the touch
+    // pad's radius slider, and its Go here and Recenter, which leave the
+    // look (`action` QUIT). True when look-around should leave now.
+    static bool look_pass( avatar &u, tripoint_bub_ms &lp, tripoint_bub_ms &center,
+                           tripoint_rel_ms &prev_offset, bool select_zone, std::string &action );
+    // Go here from look-around: the route to the cursor's tile (`lp`) as a
+    // tapped one, the view held where it was looking until it is settled.
+    static void look_go_here( avatar &u, const tripoint_bub_ms &lp, const tripoint_bub_ms &center,
+                              tripoint_rel_ms &prev_offset );
 };
 
 #endif // CDDA_GODOT

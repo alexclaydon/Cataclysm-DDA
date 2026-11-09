@@ -116,6 +116,7 @@
 #include "gates.h"
 #include "get_version.h"
 #if defined(CDDA_GODOT)
+#include "godot_actions.h"
 #include "godot_host.h"
 #include "widget.h"
 #endif
@@ -6272,47 +6273,10 @@ look_around_result game::look_around(
 #endif
     do {
 #if defined(CDDA_GODOT)
-        // The host's touch drag: the cursor to its tile, the view centre with
-        // it. Taken at the top of a pass, so a request made before the look
-        // opened (a slide that opens it) applies without waiting for input.
-        {
-            int cursor_dx = 0;
-            int cursor_dy = 0;
-            if( godot_host::take_look_cursor_request( cursor_dx, cursor_dy ) ) {
-                // Inside the map, as the cursor's own moves stay.
-                lx = std::clamp( u.pos_bub().x() + cursor_dx, 0, MAPSIZE_X - 1 );
-                ly = std::clamp( u.pos_bub().y() + cursor_dy, 0, MAPSIZE_Y - 1 );
-                center.x() = lx;
-                center.y() = ly;
-            }
-            // The touch pad's view radius slider, as the zoom actions here.
-            if( const int steps = godot_host::take_zoom_view_request() ) {
-                godot_host::zoom_view( steps );
-                mark_main_ui_adaptor_resize();
-            }
-        }
-        // The touch pad's Go here and Recenter: out of look-around, the
-        // view as it was (Go here: the route to the cursor's tile then waits
-        // for Confirm, as a tapped one does) or centred on the avatar.
-        if( !select_zone ) {
-            const godot_host::look_exit how = godot_host::take_look_exit_request();
-            if( how == godot_host::look_exit::go_here ) {
-                godot_host::request_click( lp.x() - u.pos_bub().x(), lp.y() - u.pos_bub().y() );
-                // The view stays where it was looking until the route is
-                // settled; the one before look-around is held for then.
-                godot_host::hold_view( prev_offset.x(), prev_offset.y(), prev_offset.z() );
-                u.view_offset = center - u.pos_bub();
-                prev_offset = u.view_offset;
-                action = "QUIT";
-                break;
-            }
-            if( how == godot_host::look_exit::recenter ) {
-                center = u.pos_bub();
-                lp = u.pos_bub();
-                prev_offset = tripoint_rel_ms::zero;
-                action = "QUIT";
-                break;
-            }
+        // The host's touch drag, radius slider, Go here and Recenter
+        // (godot_actions.cpp).
+        if( godot_actions::look_pass( u, lp, center, prev_offset, select_zone, action ) ) {
+            break;
         }
 #endif
         u.view_offset = center - u.pos_bub();
@@ -6402,10 +6366,7 @@ look_around_result game::look_around(
             // Go there as the touch pad's Go here does (the user's call, RT
             // on the pad): the route to the cursor's tile waits for a second
             // RT or A, B dropping it, and the view stays here until then.
-            godot_host::request_click( lp.x() - u.pos_bub().x(), lp.y() - u.pos_bub().y() );
-            godot_host::hold_view( prev_offset.x(), prev_offset.y(), prev_offset.z() );
-            u.view_offset = center - u.pos_bub();
-            prev_offset = u.view_offset;
+            godot_actions::look_go_here( u, lp, center, prev_offset );
             action = "QUIT";
             break;
 #endif
