@@ -1337,7 +1337,6 @@ static bool handle_button_event( SDL_Event &event )
 // one polled). SDL3 takes the instance id, SDL2 the device index.
 static void add_controller( int which )
 {
-#if SDL_MAJOR_VERSION >= 3
     if( open_controllers.count( static_cast<SDL_JoystickID>( which ) ) ) {
         return;
     }
@@ -1348,19 +1347,6 @@ static void add_controller( int which )
     }
     const SDL_JoystickID id = SDL_GetGamepadID( opened );
     const char *name = SDL_GetGamepadName( opened );
-#else
-    const SDL_JoystickID device_id = SDL_JoystickGetDeviceInstanceID( which );
-    if( open_controllers.count( device_id ) ) {
-        return;
-    }
-    cata_controller_t *opened = SDL_GameControllerOpen( which );
-    if( !opened ) {
-        DebugLog( D_WARNING, DC_ALL ) << "Gamepad " << which << " couldn't be opened: " << SDL_GetError();
-        return;
-    }
-    const SDL_JoystickID id = SDL_JoystickInstanceID( SDL_GameControllerGetJoystick( opened ) );
-    const char *name = SDL_GameControllerName( opened );
-#endif
     DebugLog( D_INFO, DC_ALL ) << "Gamepad added: " << ( name ? name : "?" ) << " (id " << id << ")";
     open_controllers[id] = opened;
     if( controller == nullptr ) {
@@ -1374,21 +1360,13 @@ static void remove_controller( SDL_JoystickID gone )
     auto it = open_controllers.find( gone );
     if( it != open_controllers.end() ) {
         DebugLog( D_INFO, DC_ALL ) << "Gamepad removed: id " << gone;
-#if SDL_MAJOR_VERSION >= 3
         SDL_CloseGamepad( it->second );
-#else
-        SDL_GameControllerClose( it->second );
-#endif
         open_controllers.erase( it );
     }
     if( controller_id == gone ) {
         if( open_controllers.empty() ) {
             controller = nullptr;
-#if SDL_MAJOR_VERSION >= 3
             controller_id = 0;
-#else
-            controller_id = -1;
-#endif
         } else {
             controller = open_controllers.begin()->second;
             controller_id = open_controllers.begin()->first;
@@ -1403,20 +1381,12 @@ static void handle_device_event( SDL_Event &event )
     // the rootless distrobox SDL must not use udev, whose hotplug events
     // never arrive there: the launchers set SDL_JOYSTICK_DISABLE_UDEV.
     if( event.type == CATA_JOYDEVICEADDED || event.type == CATA_JOYDEVICEREMOVED ) {
-#if SDL_MAJOR_VERSION >= 3
         const int which = static_cast<int>( event.jdevice.which );
-#else
-        const int which = event.jdevice.which;
-#endif
         DebugLog( D_INFO, DC_ALL ) << "Joystick " << ( event.type == CATA_JOYDEVICEADDED ? "added" :
                                    "removed" ) << " event: " << which;
         return;
     }
-#if SDL_MAJOR_VERSION >= 3
     const int which = static_cast<int>( event.gdevice.which );
-#else
-    const int which = event.cdevice.which;
-#endif
     DebugLog( D_INFO, DC_ALL ) << "Gamepad " << ( event.type == CATA_CONTROLLERDEVICEADDED ? "added" :
                                "removed" ) << " event: " << which;
     if( event.type == CATA_CONTROLLERDEVICEADDED ) {
@@ -1686,13 +1656,8 @@ void test_axis( pad_axis which, int value )
     test_axes[axis] = static_cast<Sint16>( value );
     SDL_Event event{};
     event.type = CATA_CONTROLLERAXISMOTION;
-#if SDL_MAJOR_VERSION >= 3
     event.gaxis.axis = static_cast<Uint8>( axis );
     event.gaxis.value = static_cast<Sint16>( value );
-#else
-    event.caxis.axis = static_cast<Uint8>( axis );
-    event.caxis.value = static_cast<Sint16>( value );
-#endif
     handle_event( event );
 }
 
@@ -1705,13 +1670,8 @@ void test_button( pad_button which, bool down )
                                  };
     SDL_Event event{};
     event.type = down ? CATA_CONTROLLERBUTTONDOWN : CATA_CONTROLLERBUTTONUP;
-#if SDL_MAJOR_VERSION >= 3
     event.gbutton.button = static_cast<Uint8>( buttons[static_cast<int>( which )] );
     event.gbutton.down = down;
-#else
-    event.cbutton.button = static_cast<Uint8>( buttons[static_cast<int>( which )] );
-    event.cbutton.state = down ? SDL_PRESSED : SDL_RELEASED;
-#endif
     handle_event( event );
 }
 
@@ -1741,11 +1701,7 @@ bool handle_event( SDL_Event &event )
         if( captured && pad_input ) {
             // The triggers through, to keep their state (handle_axis_event).
             const bool trigger = event.type == CATA_CONTROLLERAXISMOTION &&
-#if SDL_MAJOR_VERSION >= 3
                                  one_of_two( triggers_axis, event.gaxis.axis ) >= 0;
-#else
-                                 one_of_two( triggers_axis, event.caxis.axis ) >= 0;
-#endif
             if( !trigger ) {
                 return false;
             }
@@ -1783,7 +1739,6 @@ glyph_style current_glyph_style()
         return glyph_style::text;
     }
     if( controller != nullptr ) {
-#if SDL_MAJOR_VERSION >= 3
         switch( SDL_GetGamepadType( controller ) ) {
             case SDL_GAMEPAD_TYPE_PS3:
             case SDL_GAMEPAD_TYPE_PS4:
@@ -1792,16 +1747,6 @@ glyph_style current_glyph_style()
             default:
                 break;
         }
-#elif SDL_VERSION_ATLEAST( 2, 0, 14 )
-        switch( SDL_GameControllerGetType( controller ) ) {
-            case SDL_CONTROLLER_TYPE_PS3:
-            case SDL_CONTROLLER_TYPE_PS4:
-            case SDL_CONTROLLER_TYPE_PS5:
-                return glyph_style::playstation;
-            default:
-                break;
-        }
-#endif
     }
     return glyph_style::xbox;
 }
@@ -1813,7 +1758,6 @@ int host_glyph_style()
     if( style != "auto" ) {
         return style == "playstation" ? 1 : style == "text" ? 2 : 0;
     }
-#if SDL_MAJOR_VERSION >= 3
     // The real pads connected, not the one last used (the user's call,
     // 2026-11-08: on the phone that is mostly the touch pad's virtual one,
     // which would hide a DualSense's glyphs): the active pad if it's real,
@@ -1835,9 +1779,6 @@ int host_glyph_style()
     }
     SDL_free( ids );
     return found;
-#else
-    return current_glyph_style() == glyph_style::playstation ? 1 : 0;
-#endif
 }
 #endif
 
