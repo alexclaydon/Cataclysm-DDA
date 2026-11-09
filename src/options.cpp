@@ -2417,16 +2417,14 @@ void options_manager::add_options_graphics()
     add_option_group( "graphics", Group( "term_opts", to_translation( "Terminal display options" ),
                                          to_translation( "Options regarding terminal display." ) ),
     [&]( const std::string & page_id ) {
-        constexpr int default_terminal_x = 80;
-        constexpr int default_terminal_y = 24;
         add( "TERMINAL_X", page_id, to_translation( "Terminal width" ),
              to_translation( "Set the size of the terminal along the X axis." ),
-             80, 960, default_terminal_x, COPT_POSIX_CURSES_HIDE
+             80, 960, 80, COPT_POSIX_CURSES_HIDE
            );
 
         add( "TERMINAL_Y", page_id, to_translation( "Terminal height" ),
              to_translation( "Set the size of the terminal along the Y axis." ),
-             24, 270, default_terminal_y, COPT_POSIX_CURSES_HIDE
+             24, 270, 24, COPT_POSIX_CURSES_HIDE
            );
     } );
 
@@ -2441,51 +2439,49 @@ void options_manager::add_options_graphics()
              false, COPT_CURSES_HIDE
            );
 
-        constexpr int font_w = 8, font_h = 16, font_s = 16;
-        constexpr int grid_font = 16;
         add( "FONT_WIDTH", page_id, to_translation( "Font width" ),
              to_translation( "Set the font width.  Requires restart." ),
-             6, 100, font_w, COPT_CURSES_HIDE
+             6, 100, 8, COPT_CURSES_HIDE
            );
 
         add( "FONT_HEIGHT", page_id, to_translation( "Font height" ),
              to_translation( "Set the font height.  Requires restart." ),
-             8, 100, font_h, COPT_CURSES_HIDE
+             8, 100, 16, COPT_CURSES_HIDE
            );
 
         add( "FONT_SIZE", page_id, to_translation( "Font size" ),
              to_translation( "Set the font size.  Requires restart." ),
-             8, 100, font_s, COPT_CURSES_HIDE
+             8, 100, 16, COPT_CURSES_HIDE
            );
 
         add( "MAP_FONT_WIDTH", page_id, to_translation( "Map font width" ),
              to_translation( "Set the map font width.  Requires restart." ),
-             6, 100, grid_font, COPT_CURSES_HIDE
+             6, 100, 16, COPT_CURSES_HIDE
            );
 
         add( "MAP_FONT_HEIGHT", page_id, to_translation( "Map font height" ),
              to_translation( "Set the map font height.  Requires restart." ),
-             8, 100, grid_font, COPT_CURSES_HIDE
+             8, 100, 16, COPT_CURSES_HIDE
            );
 
         add( "MAP_FONT_SIZE", page_id, to_translation( "Map font size" ),
              to_translation( "Set the map font size.  Requires restart." ),
-             8, 100, grid_font, COPT_CURSES_HIDE
+             8, 100, 16, COPT_CURSES_HIDE
            );
 
         add( "OVERMAP_FONT_WIDTH", page_id, to_translation( "Overmap font width" ),
              to_translation( "Set the overmap font width.  Requires restart." ),
-             6, 100, grid_font, COPT_CURSES_HIDE
+             6, 100, 16, COPT_CURSES_HIDE
            );
 
         add( "OVERMAP_FONT_HEIGHT", page_id, to_translation( "Overmap font height" ),
              to_translation( "Set the overmap font height.  Requires restart." ),
-             8, 100, grid_font, COPT_CURSES_HIDE
+             8, 100, 16, COPT_CURSES_HIDE
            );
 
         add( "OVERMAP_FONT_SIZE", page_id, to_translation( "Overmap font size" ),
              to_translation( "Set the overmap font size.  Requires restart." ),
-             8, 100, grid_font, COPT_CURSES_HIDE
+             8, 100, 16, COPT_CURSES_HIDE
            );
 
         add( "USE_DRAW_ASCII_LINES_ROUTINE", page_id, to_translation( "SDL ASCII lines" ),
