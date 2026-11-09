@@ -19,6 +19,7 @@
 #include "imgui/imgui.h"
 #include "options.h"
 #if defined(CDDA_GODOT)
+#include "godot_actions.h"
 #include "godot_host.h"
 #endif
 
@@ -1498,8 +1499,15 @@ bool move_due()
 bool is_in_menu()
 {
     // If the UI stack has more than 1 element, it usually means a menu is open
-    // on top of the main game UI.
-    return ui_adaptor::ui_stack_size() > 1;
+    // on top of the main game UI. The wait popup (sleeping, waiting, an
+    // activity) is one, but takes no input: not a menu.
+    size_t play = 1;
+#if defined(CDDA_GODOT)
+    if( godot_actions::wait_popup_shown() ) {
+        play = 2;
+    }
+#endif
+    return ui_adaptor::ui_stack_size() > play;
 }
 
 bool is_active()

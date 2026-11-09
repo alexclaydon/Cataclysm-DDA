@@ -45,6 +45,11 @@ struct godot_actions {
     // tapped one, the view held where it was looking until it is settled.
     static void look_go_here( avatar &u, const tripoint_bub_ms &lp, const tripoint_bub_ms &center,
                               tripoint_rel_ms &prev_offset );
+    // The game's wait popup ("Wait till you wake up…", an activity's
+    // progress) is up: on the UI stack, but taking no input, so not a menu
+    // (gamepad::is_in_menu; the right stick stays the camera while sleeping
+    // or waiting, the user's call 2026-11-10).
+    static bool wait_popup_shown();
 };
 
 #endif // CDDA_GODOT

@@ -124,6 +124,11 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
     return true;
 }
 
+bool godot_actions::wait_popup_shown()
+{
+    return g != nullptr && g->wait_popup != nullptr;
+}
+
 bool godot_actions::flush_owed( const std::string &action )
 {
     if( action == "TIMEOUT" && ( godot_host::snapshot_owed() || godot_host::take_flat_view_changed() ||
