@@ -12,6 +12,7 @@
 // Deliberately plain types only, so the host never includes engine headers
 // or depends on the engine's build defines.
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -709,7 +710,7 @@ std::string bbcode( const std::string &tagged );
 // rectangle in the terminal and rows as BBCode. game::draw_panels starts
 // a pass (sidebar_begin), records each shown panel's place
 // (sidebar_place), captures those drawn this pass from their windows
-// (sidebar_capture, in sdltiles.cpp beside the palette; the window is then
+// (sidebar_capture, in godot_sidebar.cpp, the palette through palette_rgb; the window is then
 // blanked), and publishes (sidebar_end). A panel not drawn this pass keeps
 // its last rows.
 struct sidebar_panel {
@@ -737,6 +738,9 @@ int log_zoom();
 void sidebar_begin();
 void sidebar_place( const std::string &id, const std::string &name, int x, int y, int width,
                     int height );
+// The palette's colour (r, g, b) for a curses colour index; sdltiles.cpp
+// (godot_sidebar.cpp's capture uses it).
+std::array<uint8_t, 3> palette_rgb( int color );
 void sidebar_capture( const std::string &id, const catacurses::window &w );
 void sidebar_rows( const std::string &id, std::vector<std::string> rows );
 void sidebar_end( int columns, int rows );
