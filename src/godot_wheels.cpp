@@ -199,7 +199,10 @@ godot_host::bindings_map godot_host::context_bindings_here( const std::vector<st
     if( g == nullptr ) {
         return out;
     }
-    const input_context ctxt = get_default_mode_input_context();
+    // The play loop's context's category, read from the input manager
+    // directly: that context's keys_bound_to drops pad events (it doesn't
+    // enable them).
+    const std::string category = get_default_mode_input_context().input_category();
     std::vector<std::string> ids = actions;
     for( const char *id : {
              "ignore_enemy", "safemode", "whitelist_enemy"
@@ -208,8 +211,8 @@ godot_host::bindings_map godot_host::context_bindings_here( const std::vector<st
     }
     for( const std::string &id : ids ) {
         action_bindings &b = out[id];
-        for( const input_event &e : ctxt.keys_bound_to( id, -1, false, false ) ) {
-            if( e.sequence.empty() ) {
+        for( const input_event &e : inp_mngr.get_input_for_action( id, category ) ) {
+            if( e.sequence.size() != 1 ) {
                 continue;
             }
             if( e.type == input_event_t::gamepad ) {
