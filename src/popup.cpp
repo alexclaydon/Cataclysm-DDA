@@ -602,57 +602,6 @@ query_popup::result query_popup::query_once()
     return res;
 }
 
-#if defined(CDDA_GODOT)
-// The host's answer, as the matching input: an option chosen (a click on
-// its button), a cancel (Escape, or the option the pad's B answers where
-// nothing cancels), any key. True if one came.
-bool query_popup::take_host_dialog( result &res )
-{
-    godot_host::dialog_request r;
-    if( !godot_host::take_dialog_request( r ) ) {
-        return false;
-    }
-    switch( r.kind ) {
-        case godot_host::dialog_request_kind::choose:
-            if( r.value >= 0 && r.value < static_cast<int>( options.size() ) ) {
-                cur = static_cast<size_t>( r.value );
-                res.action = "CONFIRM";
-                res.evt = input_event();
-                return true;
-            }
-            break;
-        case godot_host::dialog_request_kind::cancel:
-            if( cancel ) {
-                res.action = "QUIT";
-                res.evt = input_event( KEY_ESCAPE, input_event_t::keyboard_code );
-                return true;
-            }
-            if( pad_b_option >= 0 ) {
-                cur = static_cast<size_t>( pad_b_option );
-                res.action = "CONFIRM";
-                res.evt = input_event();
-                return true;
-            }
-            if( anykey ) {
-                // A message any key dismisses: so does a cancel.
-                res.action = "ANY_INPUT";
-                res.evt = input_event( KEY_ESCAPE, input_event_t::keyboard_code );
-                return true;
-            }
-            break;
-        case godot_host::dialog_request_kind::dismiss:
-        case godot_host::dialog_request_kind::submit:
-            if( anykey ) {
-                res.action = "ANY_INPUT";
-                res.evt = input_event( ' ', input_event_t::keyboard_char );
-                return true;
-            }
-            break;
-    }
-    return false;
-}
-#endif
-
 std::shared_ptr<query_popup_impl> query_popup::create_or_get_impl()
 {
     std::shared_ptr<query_popup_impl> impl = p_impl.lock();

@@ -51,27 +51,6 @@ input_popup::~input_popup()
 #endif
 }
 
-#if defined(CDDA_GODOT)
-void input_popup::publish_host( int kind, const std::string &value )
-{
-    host_drawn = godot_host::native_menus();
-    hide_ui = host_drawn;
-    if( !host_drawn ) {
-        godot_host::clear_dialog( this );
-        return;
-    }
-    godot_host::dialog_state s;
-    s.kind = kind;
-    s.title = host_title;
-    s.message = godot_host::bbcode( description );
-    s.label = godot_host::bbcode( label );
-    s.value = value;
-    s.cancel = true;
-    s.max_length = max_input_length;
-    godot_host::publish_dialog( this, std::move( s ) );
-}
-#endif
-
 void input_popup::set_description( const std::string &desc, const nc_color &default_color,
                                    bool monofont )
 {
