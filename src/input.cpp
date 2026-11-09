@@ -142,7 +142,12 @@ static std::string gamepad_label( const std::string &name )
     } else if( starts( "ALT_" ) ) {
         return "LT+" + gamepad_label( name.substr( 4 ) );
     } else if( starts( "L_RADIAL_" ) || starts( "R_RADIAL_" ) ) {
+#if defined(CDDA_GODOT)
+        // The game's wheels are LB's in Dark Forest (ADR 0017).
+        return std::string( name[0] == 'L' ? "LB+LS " : "LB+RS " ) + name.substr( 9 );
+#else
         return std::string( name[0] == 'L' ? "LT+LS " : "LT+RS " ) + name.substr( 9 );
+#endif
     } else if( ( starts( "LS_" ) || starts( "RS_" ) ) && stick_dirs.count( name.substr( 3 ) ) ) {
         return name.substr( 0, 2 ) + " " + stick_dirs.at( name.substr( 3 ) );
     }
