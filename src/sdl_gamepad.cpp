@@ -105,9 +105,9 @@ static std::array<task_t, max_tasks> all_tasks;
 static std::array<int, max_sticks> stick_sent = { -1, -1 };
 
 static int repeat_delay = 400;
-// Held buttons, the d-pad and sticks in menus (50 scrolled a long list too
-// wildly).
-static int repeat_interval = 80;
+// Held buttons, the d-pad and sticks in menus and look-around (50 scrolled a
+// long list too wildly; 80 felt slow moving the look cursor, 2026-11-10).
+static int repeat_interval = 65;
 // RT-held walking: a step every 100 ms (150 felt slow). At 33 the repeats
 // outran the game (each pushes a step whether or not the last has been
 // drawn), most of all on the phone, and the steps piled up.
