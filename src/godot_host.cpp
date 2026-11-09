@@ -437,8 +437,35 @@ void godot_host::take_wheel_events( std::vector<wheel_event> &out )
     wheel_events.clear();
 }
 
+namespace
+{
+std::atomic<int> wheel_radial{ -1 };  // side * 8 + index, -1 none
+} // namespace
+
+bool godot_host::take_wheel_radial( int &side, int &index )
+{
+    const int v = wheel_radial.exchange( -1 );
+    if( v < 0 ) {
+        return false;
+    }
+    side = v / 8;
+    index = v % 8;
+    return true;
+}
+
 void godot_host::wheel_done( int serial, const std::string &action )
 {
+    // The game's wheel answers with a radial slot: the pad layer fires its
+    // key (ADR 0017), in play or in a screen.
+    if( action.rfind( "radial:", 0 ) == 0 && action.size() == 10 ) {
+        const int side = action[7] == 'R' ? 1 : 0;
+        const int index = action[9] - '0';
+        if( index >= 0 && index < 8 ) {
+            wheel_radial = side * 8 + index;
+        }
+        wheel_done_serial = serial;
+        return;
+    }
     // The gamepad layer closes the wheel on its next event (its scheduler
     // ticks every 50 ms, so no wake is needed for that).
     wheel_done_serial = serial;

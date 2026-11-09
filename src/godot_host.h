@@ -449,7 +449,8 @@ struct wheel_event {
     };
     kind_t kind = opened;
     int serial = 0;  // which opening this belongs to, for wheel_done
-    int wheel = 0;   // 0 local (LB), 1 global (RB)
+    int wheel = 0;   // 0 the game's (LB, ADR 0017), 1 global (RB)
+    int stick_index = -1;  // stick events: which stick (0 left, 1 right)
     // The picking stick (whichever is pushed further and not spent): -1..1,
     // x to the right, y up, as on the pad (not turned by the view).
     float x = 0.0f;
@@ -463,6 +464,14 @@ struct wheel_event {
 
 // Host side, any thread: the events since the last call, oldest first.
 void take_wheel_events( std::vector<wheel_event> &out );
+// The game's wheel (LB, ADR 0017): the waiting input context's radial sets,
+// sixteen slots ("radial:L:0".."radial:L:7", then R; clockwise from north),
+// each its bound action's name, empty where unbound. Engine thread.
+std::vector<wheel_action> radial_catalogue();
+// The pad layer: the slot the host answered the game's wheel with (a
+// "radial:L:n" / "radial:R:n" answer to wheel_done keeps it here instead of
+// handing it to the play loop), as side 0/1 and index 0..7; false if none.
+bool take_wheel_radial( int &side, int &index );
 // Host side, any thread: the wheel opened as `serial` is done. `action` is
 // an id from its actions to perform (at the aim, for a tile verb), or empty
 // for none. Ignored if that wheel has already closed and another opened.

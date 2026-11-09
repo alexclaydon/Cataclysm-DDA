@@ -15,13 +15,41 @@
 #include "creature_tracker.h"
 #include "game.h"
 #include "godot_host.h"
+#include "input.h"
 #include "input_context.h"
 #include "map.h"
 #include "point.h"
+#include "string_formatter.h"
 #include "translations.h"
 #include "uilist.h"
 #include "veh_type.h"
 #include "vpart_position.h"
+
+std::vector<godot_host::wheel_action> godot_host::radial_catalogue()
+{
+    std::vector<wheel_action> out;
+    input_context *ctxt = input_context::polling ? input_context::polling :
+                          input_context::input_context_stack.back();
+    for( int side = 0; side < 2; ++side ) {
+        for( int index = 0; index < 8; ++index ) {
+            wheel_action a;
+            a.id = string_format( "radial:%c:%d", side == 0 ? 'L' : 'R', index );
+            a.applies = true;
+            a.at_tile = false;
+            if( ctxt != nullptr ) {
+                const input_event event( ( side == 0 ? JOY_L_RADIAL_N : JOY_R_RADIAL_N ) + index,
+                                         input_event_t::gamepad );
+                const std::string &action = ctxt->input_to_action( event );
+                if( action != "ERROR" ) {
+                    a.name = ctxt->get_action_name( action );
+                    a.category = action;
+                }
+            }
+            out.push_back( std::move( a ) );
+        }
+    }
+    return out;
+}
 
 bool godot_host::wheel_action_at_tile( const std::string &id )
 {

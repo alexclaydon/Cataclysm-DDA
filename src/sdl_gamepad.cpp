@@ -673,13 +673,24 @@ static uint32_t r3_pressed_at = 0;
 
 static bool wheels_on();
 
+// The host draws the wheels (ADR 0017): the game's radials are LB's, not
+// LT's.
+static bool host_wheels()
+{
+#if defined(CDDA_GODOT)
+    return godot_host::wheels_enabled();
+#else
+    return false;
+#endif
+}
+
 // The right stick is the host's camera: in play, no menu, no layer, no
-// radial (godot_host::set_stick_camera).
+// radial, no shoulder held (godot_host::set_stick_camera).
 static bool stick_camera_now()
 {
 #if defined(CDDA_GODOT)
     return godot_host::stick_camera() && wheels_on() && !is_in_menu() && !alt_modifier_held &&
-           !any_radial_open();
+           !any_radial_open() && wheel_state == wheel_phase::none;
 #else
     return false;
 #endif
@@ -710,7 +721,7 @@ static bool wheel_capturing()
     return wheel_state == wheel_phase::open;
 }
 
-static void send_wheel_event( int kind, float x = 0.0f, float y = 0.0f )
+static void send_wheel_event( int kind, float x = 0.0f, float y = 0.0f, int stick_index = -1 )
 {
     // Recorded as the host's queue keeps them: a stick replaces a stick.
     if( test_mode && !( kind == 1 && !test_wheel_kinds.empty() && test_wheel_kinds.back() == 1 ) ) {
@@ -723,10 +734,12 @@ static void send_wheel_event( int kind, float x = 0.0f, float y = 0.0f )
     event.wheel = wheel_button == CATA_BUTTON_LEFTSHOULDER ? 0 : 1;
     event.x = x;
     event.y = y;
+    event.stick_index = stick_index;
     godot_host::push_wheel_event( std::move( event ) );
 #else
     ( void )x;
     ( void )y;
+    ( void )stick_index;
 #endif
 }
 
@@ -771,7 +784,9 @@ static void open_wheel()
     event.aim_dx = aim.x;
     event.aim_dy = aim.y;
     if( !test_mode ) {
-        event.actions = godot_host::wheel_catalogue( aim.x, aim.y );
+        // LB: the game's own radial sets (ADR 0017); RB: the catalogue.
+        event.actions = wheel_button == CATA_BUTTON_LEFTSHOULDER ? godot_host::radial_catalogue() :
+                        godot_host::wheel_catalogue( aim.x, aim.y );
     }
     godot_host::set_wheel_aim( wheel_serial, aim.x, aim.y );
     godot_host::push_wheel_event( std::move( event ) );
@@ -792,6 +807,7 @@ static void send_wheel_stick()
     float best = -1.0f;
     float x = 0.0f;
     float y = 0.0f;
+    int which = -1;
     for( int i = 0; i < max_sticks; ++i ) {
         if( stick_consumed[i] ) {
             continue;
@@ -803,9 +819,12 @@ static void send_wheel_stick()
             best = m;
             x = sx;
             y = sy;
+            which = i;
         }
     }
-    send_wheel_event( 1, std::clamp( x, -1.0f, 1.0f ), std::clamp( y, -1.0f, 1.0f ) );
+    // (Which stick, for the game's wheel: the left its inner ring, the
+    // right its outer, ADR 0017.)
+    send_wheel_event( 1, std::clamp( x, -1.0f, 1.0f ), std::clamp( y, -1.0f, 1.0f ), which );
 }
 
 // Each pad event first: the host's answer closes the wheel, and so does
@@ -818,10 +837,18 @@ static void check_wheel()
 #if defined(CDDA_GODOT)
     if( godot_host::take_wheel_done( wheel_serial ) ) {
         end_wheel( wheel_phase::done );
+        // The game's wheel answered with a slot: its radial key, as LT's
+        // release fired it (ADR 0017).
+        int side = 0;
+        int index = 0;
+        if( godot_host::take_wheel_radial( side, index ) ) {
+            send_input( ( side == 0 ? JOY_L_RADIAL_N : JOY_R_RADIAL_N ) + index );
+        }
         return;
     }
 #endif
-    if( !wheels_on() || ( is_in_menu() && !test_mode ) ) {
+    // (The game's wheel, LB, works in screens too.)
+    if( !wheels_on() || ( is_in_menu() && !test_mode && wheel_button != CATA_BUTTON_LEFTSHOULDER ) ) {
         send_wheel_event( 5 );
         end_wheel( wheel_phase::done );
     }
@@ -1009,7 +1036,9 @@ static bool handle_axis_event( SDL_Event &event )
                 continue;
             }
 
-            if( alt_modifier_held && !alt2_modifier_held && !stick_consumed[i] ) {
+            // (Not while the host draws wheels: the game's radials are LB's
+            // there, ADR 0017; LT keeps its layer.)
+            if( alt_modifier_held && !alt2_modifier_held && !stick_consumed[i] && !host_wheels() ) {
                 // When LT is held, sticks control radial menu state
                 direction &radial_last = ( i == 0 ) ? radial_left_last_dir : radial_right_last_dir;
                 bool &radial_open = ( i == 0 ) ? radial_left_open : radial_right_open;
@@ -1224,8 +1253,10 @@ static bool handle_button_event( SDL_Event &event )
         start_pressed_at = now_ms();
         return false;
     }
+    // (LB, the game's wheel, in screens too: ADR 0017.)
     if( ( button == CATA_BUTTON_LEFTSHOULDER || button == CATA_BUTTON_RIGHTSHOULDER ) &&
-        wheel_state == wheel_phase::none && wheels_on() && !is_in_menu() && !alt_modifier_held &&
+        wheel_state == wheel_phase::none && wheels_on() &&
+        ( !is_in_menu() || button == CATA_BUTTON_LEFTSHOULDER ) && !alt_modifier_held &&
         !any_radial_open() ) {
         wheel_state = wheel_phase::pending;
         wheel_button = button;
