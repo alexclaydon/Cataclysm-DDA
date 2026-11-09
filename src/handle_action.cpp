@@ -74,11 +74,9 @@
 #include "move_mode.h"
 #include "mtype.h"
 #include "mutation.h"
-#include "omdata.h"
 #include "options.h"
 #include "output.h"
 #include "overmap_ui.h"
-#include "overmapbuffer.h"
 #include "panels.h"
 #include "pathfinding.h"
 #include "perf.h"
@@ -118,6 +116,7 @@ enum class direction : unsigned int;
 #endif
 
 #if defined(CDDA_GODOT)
+#include "godot_actions.h"
 #include "godot_host.h"
 #endif
 
@@ -471,15 +470,7 @@ input_context game::get_player_input( std::string &action )
                 g->invalidate_main_ui_adaptor();
             }
 #if defined(CDDA_GODOT)
-            // A held walk's skipped snapshot, and the walk has stopped (no
-            // input for the timeout): draw where the avatar stands. So too
-            // when the host's view turned 2D or 3D (the storeys above), and
-            // when its native sidebar was switched (the panels at once).
-            if( action == "TIMEOUT" && ( godot_host::snapshot_owed() || godot_host::take_flat_view_changed() ||
-                                         godot_host::take_sidebar_redraw() ) ) {
-                godot_host::request_snapshot_flush();
-                g->invalidate_main_ui_adaptor();
-            }
+            godot_actions::flush_owed( action );
 #endif
 
             ui_manager::redraw_invalidated();
@@ -490,10 +481,7 @@ input_context game::get_player_input( std::string &action )
         ctxt.set_timeout( 125 );
         while( handle_mouseview( ctxt, action ) ) {
 #if defined(CDDA_GODOT)
-            if( action == "TIMEOUT" && ( godot_host::snapshot_owed() || godot_host::take_flat_view_changed() ||
-                                         godot_host::take_sidebar_redraw() ) ) {
-                godot_host::request_snapshot_flush();
-                g->invalidate_main_ui_adaptor();
+            if( godot_actions::flush_owed( action ) ) {
                 ui_manager::redraw_invalidated();
             }
 #endif
@@ -3223,15 +3211,7 @@ bool game::handle_action()
     user_turn current_turn;
     avatar &player_character = get_avatar();
 #if defined(CDDA_GODOT)
-    // Go here's held view, back once its route is walked or dropped.
-    {
-        int dx = 0;
-        int dy = 0;
-        int dz = 0;
-        if( godot_host::take_settled_view( !destination_preview.empty(), dx, dy, dz ) ) {
-            player_character.view_offset = tripoint_rel_ms( dx, dy, dz );
-        }
-    }
+    godot_actions::settle_view( *this, player_character );
 #endif
     // Check if we have an auto-move destination
     if( player_character.has_destination() ) {
@@ -3255,91 +3235,18 @@ bool game::handle_action()
         return false;
     } else {
 #if defined(CDDA_GODOT)
-        // The touch pad's context row: what applies here, before waiting.
-        godot_host::publish_context_actions( godot_host::context_actions_here() );
-        godot_host::set_route_preview( !destination_preview.empty() );
+        godot_actions::before_input( *this );
 #endif
         // No auto-move, ask player for input
         ctxt = get_player_input( action );
     }
 #if defined(CDDA_GODOT)
-    // The touch pad's view radius slider, as the zoom actions.
-    if( const int steps = godot_host::take_zoom_view_request() ) {
-        godot_host::zoom_view( steps );
-        mark_main_ui_adaptor_resize();
-    }
-    // The host's hotbar asked for the action catalogue (ADR 0013).
-    if( godot_host::take_catalogue_request() ) {
-        godot_host::publish_catalogue( godot_host::wheel_catalogue( 0, 0 ) );
-    }
-    // The host's shoulder wheel chose an action (ADR 0009), or its hotbar
-    // did (no aim): taken as if its key had been pressed, aimed where the
-    // wheel opened.
+    // The host's requests: the view radius, the catalogue, a wheel's or the
+    // hotbar's action, a tile clicked, the test hooks (godot_actions.cpp).
     std::optional<tripoint_rel_ms> wheel_aim;
-    {
-        std::string wheel_action;
-        int aim_dx = 0;
-        int aim_dy = 0;
-        if( godot_host::take_action_request( wheel_action, aim_dx, aim_dy ) ) {
-            if( wheel_action == godot_host::stairs_action_id ) {
-                wheel_action = godot_host::stairs_action();
-                if( wheel_action.empty() ) {
-                    return false;
-                }
-            }
-            action = wheel_action;
-            if( ( aim_dx != 0 || aim_dy != 0 ) && godot_host::wheel_action_at_tile( wheel_action ) ) {
-                wheel_aim = tripoint_rel_ms( aim_dx, aim_dy, 0 );
-            }
-        }
-    }
-    // The host clicked a tile on its board (godot_host::request_click).
     std::optional<tripoint_bub_ms> host_click;
-    {
-        int click_dx = 0;
-        int click_dy = 0;
-        if( godot_host::take_click_request( click_dx, click_dy ) ) {
-            godot_host::arm_held_view();
-            action = "SELECT";
-            host_click = player_character.pos_bub() + tripoint_rel_ms( click_dx, click_dy, 0 );
-        }
-    }
-    // VR: the player pointed at a tile and asked to look at it.
-    {
-        int dx = 0;
-        int dy = 0;
-        int hour = 0;
-        if( godot_host::take_time_request( hour ) ) {
-            // On to the next HH:00 (never back: the world has moved on).
-            const time_point now = calendar::turn;
-            time_point target = now - time_past_midnight( now ) + time_duration::from_hours( hour % 24 );
-            if( target <= now ) {
-                target += 1_days;
-            }
-            calendar::turn = target;
-            add_msg( m_info, "VR time: %s.", to_string_time_of_day( target ) );
-            return false;
-        }
-        std::string goto_type;
-        if( godot_host::take_goto_request( goto_type ) ) {
-            const tripoint_abs_omt dest = overmap_buffer.find_closest( player_character.pos_abs_omt(),
-                                          goto_type, 200, false, ot_match_type::prefix );
-            if( dest.is_invalid() ) {
-                add_msg( m_info, "VR goto: no %s within 200.", goto_type );
-            } else {
-                g->place_player_overmap( dest );
-                add_msg( m_info, "VR goto: %s.", overmap_buffer.ter( dest ).id().str() );
-            }
-            return false;
-        }
-        if( godot_host::take_look_request( dx, dy ) ) {
-            tripoint_bub_ms center = player_character.pos_bub() + player_character.view_offset;
-            const tripoint_bub_ms start = player_character.pos_bub() + tripoint_rel_ms( dx, dy, 0 );
-            // A keeps the pan, B puts the view back, as the game's own look.
-            look_around( /*show_window=*/true, center, start, false, false, false, false,
-                         tripoint_bub_ms::zero, true, true );
-            return false;
-        }
+    if( !godot_actions::take_requests( *this, player_character, action, wheel_aim, host_click ) ) {
+        return false;
     }
 #endif
 

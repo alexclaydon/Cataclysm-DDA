@@ -338,6 +338,8 @@ class game
         void draw_panels( bool force_draw = false );
 #if defined(CDDA_GODOT)
         void draw_panels_band( bool draw_this_turn );
+        // Dark Forest's play-loop additions (godot_actions.cpp).
+        friend struct godot_actions;
 #endif
         /**
          * Returns the location where the indicator should go relative to the reality bubble,
