@@ -831,19 +831,24 @@ static void send_wheel_stick()
 // leaving play (a menu the game opened itself, the game ending).
 static void check_wheel()
 {
+#if defined(CDDA_GODOT)
+    // The game's wheel answered with a slot: its radial key, as LT's
+    // release fired it (ADR 0017). Taken whatever the wheel's state: its
+    // shoulder's release closes the wheel here before the host answers.
+    {
+        int side = 0;
+        int index = 0;
+        if( godot_host::take_wheel_radial( side, index ) ) {
+            send_input( ( side == 0 ? JOY_L_RADIAL_N : JOY_R_RADIAL_N ) + index );
+        }
+    }
+#endif
     if( wheel_state != wheel_phase::open ) {
         return;
     }
 #if defined(CDDA_GODOT)
     if( godot_host::take_wheel_done( wheel_serial ) ) {
         end_wheel( wheel_phase::done );
-        // The game's wheel answered with a slot: its radial key, as LT's
-        // release fired it (ADR 0017).
-        int side = 0;
-        int index = 0;
-        if( godot_host::take_wheel_radial( side, index ) ) {
-            send_input( ( side == 0 ? JOY_L_RADIAL_N : JOY_R_RADIAL_N ) + index );
-        }
         return;
     }
 #endif
