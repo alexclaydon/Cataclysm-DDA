@@ -255,4 +255,35 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
     }
 }
 
+void godot_tiles::record_blit( const cata_tiles &ct, const texture &sprite_tex, int sprite_index,
+                               double render_angle, CataFlipMode render_flip, const point &blit_at,
+                               int width, int height, float pixelscale,
+                               const weighted_int_list<std::vector<int>> &svlist, int rota,
+                               unsigned int loc_rand )
+{
+    const SDL_Rect opaque = sprite_tex.get_opaque_rect();
+    godot_host::record_map_blit( sprite_index, static_cast<int>( render_angle ),
+                                 ( render_flip & SDL_FLIP_HORIZONTAL ) != 0, ( render_flip & SDL_FLIP_VERTICAL ) != 0,
+                                 blit_at.x, blit_at.y, width, height, pixelscale,
+                                 opaque.x, opaque.y, opaque.w, opaque.h );
+    // An animated tile's list cycles by the clock: every frame (its
+    // sprite, picked for this rotation as above, and how many 17 ms
+    // steps it shows), and where the cycle stood at this draw, so the
+    // host can run it on without a redraw.
+    const int total = svlist.get_weight();
+    if( ct.godot_anim_counter_ >= 0 && total > 1 ) {
+        std::vector<godot_host::map_anim_frame> frames;
+        for( const std::pair<std::vector<int>, int> &f : svlist ) {
+            if( f.first.empty() || f.second <= 0 ) {
+                continue;
+            }
+            const int n = f.first.size() == 1 ? 0 : rota % static_cast<int>( f.first.size() );
+            frames.push_back( { f.first[n], f.second } );
+        }
+        const int at = static_cast<int>( loc_rand % total );
+        const int base = static_cast<int>( ( ( at - ct.godot_anim_counter_ ) % total + total ) % total );
+        godot_host::record_map_blit_animation( frames, base, total );
+    }
+}
+
 #endif // CDDA_GODOT
