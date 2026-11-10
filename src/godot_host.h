@@ -398,6 +398,20 @@ bool in_menu();
 // touch pad's PAGE strip (2026-11-11). Set each event pump.
 void set_menu_pages( bool pages );
 bool menu_pages();
+// The input category of the screen waiting for input ("INVENTORY",
+// "BODY_STATUS_UI", "YESNO"...), set each event pump: the hotbar decides
+// from it whether it can switch away from the open screen (2026-11-11).
+void set_waiting_category( const std::string &category );
+std::string waiting_category();
+// A conversation is open (avatar::talk_to, trade included: its panes are
+// inventory screens), for the same decision.
+struct talk_scope {
+    talk_scope();
+    ~talk_scope();
+    talk_scope( const talk_scope & ) = delete;
+    talk_scope &operator=( const talk_scope & ) = delete;
+};
+bool talking();
 // Whether aiming (target_ui) is up: a map screen, where the host's taps
 // move the target cursor; other screens of the menu plane take a tap on
 // bare screen as Escape. The engine thread sets it; the host reads it.

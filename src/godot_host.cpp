@@ -787,7 +787,37 @@ bool godot_host::in_menu()
 namespace
 {
 std::atomic<bool> menu_pages_now{ false };
+std::mutex waiting_category_mutex;
+std::string waiting_category_now;
+std::atomic<int> talk_depth{ 0 };
 } // namespace
+
+void godot_host::set_waiting_category( const std::string &category )
+{
+    std::lock_guard<std::mutex> lock( waiting_category_mutex );
+    waiting_category_now = category;
+}
+
+std::string godot_host::waiting_category()
+{
+    std::lock_guard<std::mutex> lock( waiting_category_mutex );
+    return waiting_category_now;
+}
+
+godot_host::talk_scope::talk_scope()
+{
+    ++talk_depth;
+}
+
+godot_host::talk_scope::~talk_scope()
+{
+    --talk_depth;
+}
+
+bool godot_host::talking()
+{
+    return talk_depth > 0;
+}
 
 void godot_host::set_menu_pages( bool pages )
 {
@@ -966,7 +996,10 @@ bool godot_host::get_sidebar_panels( std::vector<sidebar_panel> &out, int &colum
     return true;
 }
 
+namespace
+{
 std::atomic<int> safe_refused_turn{ -1 };
+} // namespace
 
 void godot_host::note_safe_refusal()
 {
@@ -1040,9 +1073,12 @@ std::string godot_host::take_screen_action()
     return id;
 }
 
+namespace
+{
 std::mutex map_drag_mutex;
 float map_drag_x = 0.0f;
 float map_drag_y = 0.0f;
+} // namespace
 
 void godot_host::request_map_drag( float dx, float dy )
 {

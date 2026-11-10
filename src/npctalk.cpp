@@ -69,6 +69,9 @@
 #include "flexbuffer_json.h"
 #include "fungal_effects.h"
 #include "game.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 #include "game_inventory.h"
 #include "generic_factory.h"
 #include "global_vars.h"
@@ -1655,6 +1658,9 @@ void avatar::talk_to( std::unique_ptr<talker> talk_with, bool radio_contact,
                       bool is_computer, bool is_not_conversation, const std::string &debug_topic,
                       const std::string &remote_name )
 {
+#if defined(CDDA_GODOT)
+    const godot_host::talk_scope talking;  // the hotbar stays out of a conversation
+#endif
     const bool has_mind_control = has_trait( trait_DEBUG_MIND_CONTROL );
     const bool force_topic = !debug_topic.empty();
     if( !talk_with->will_talk_to_u( *this, has_mind_control || force_topic ) ) {

@@ -56,6 +56,7 @@ void godot_host::pump_engine_state()
         input_context *waiting = input_context::polling ? input_context::polling :
                                  input_context::input_context_stack.back();
         godot_host::set_menu_pages( waiting != nullptr && waiting->is_registered_action( "PAGE_UP" ) );
+        godot_host::set_waiting_category( waiting != nullptr ? waiting->input_category() : std::string() );
     }
     {
         // 3: on, and it just refused to attack a neutral creature.
