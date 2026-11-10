@@ -129,6 +129,14 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
     return true;
 }
 
+std::pair<size_t, tripoint_bub_ms> godot_actions::route_preview()
+{
+    if( g == nullptr || g->destination_preview.empty() ) {
+        return { 0, tripoint_bub_ms() };
+    }
+    return { g->destination_preview.size(), g->destination_preview.back() };
+}
+
 bool godot_actions::wait_popup_shown()
 {
     return g != nullptr && g->wait_popup != nullptr;

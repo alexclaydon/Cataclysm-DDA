@@ -10,6 +10,7 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "coords_fwd.h"
 
@@ -50,6 +51,9 @@ struct godot_actions {
     // (gamepad::is_in_menu; the right stick stays the camera while sleeping
     // or waiting, the user's call 2026-11-10).
     static bool wait_popup_shown();
+    // The route preview's length and end (sdltiles.cpp's unchanged-map
+    // signature): {0, origin} with none.
+    static std::pair<size_t, tripoint_bub_ms> route_preview();
 };
 
 #endif // CDDA_GODOT

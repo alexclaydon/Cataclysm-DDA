@@ -50,6 +50,7 @@
 #include "game_constants.h"
 #include "game_ui.h"
 #if defined(CDDA_GODOT)
+#include "godot_actions.h"
 #include "godot_host.h"
 // From SDL_main.h, which would also redefine main() (see InitSDL).
 extern "C" SDL_DECLSPEC void SDLCALL SDL_SetMainReady( void );
@@ -236,15 +237,14 @@ static constexpr uint32_t UNCHANGED_MAX_MS = 1000;
 static bool map_unchanged( bool flush )
 {
     using signature = std::tuple<int, int, tripoint_abs_ms, tripoint_bub_ms, tripoint_rel_ms, int, bool,
-          int, int, size_t, tripoint_bub_ms, int>;
+          int, int, std::pair<size_t, tripoint_bub_ms>, int>;
     static signature last;
     static bool have_last = false;
     static uint32_t last_ms = 0;
     const avatar &you = get_avatar();
     const signature now_sig( to_turns<int>( calendar::turn - calendar::turn_zero ), you.get_moves(),
                              you.pos_abs(), g->ter_view_p, you.view_offset, godot_host::snapshot_radius(),
-                             godot_host::flat_view(), TERMX, TERMY, g->destination_preview.size(),
-                             g->destination_preview.empty() ? tripoint_bub_ms() : g->destination_preview.back(),
+                             godot_host::flat_view(), TERMX, TERMY, godot_actions::route_preview(),
                              static_cast<int>( gamepad::get_left_stick_direction() ) );
     const uint32_t now = GetTicks();
     const bool unchanged = !flush && have_last && godot_host::board_shown() && !godot_host::aiming() &&
