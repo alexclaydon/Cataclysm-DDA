@@ -2860,9 +2860,16 @@ void options_manager::add_options_graphics()
              to_translation( "Set which renderer to use.  Requires restart." ), renderer_list,
              default_renderer, COPT_ALWAYS_HIDE );
 
+#if defined(CDDA_GODOT)
+        // Dark Forest: the hosted engine always renders in software
+        // (sdltiles.cpp), so no GPU renderer uses this: hidden.
+        constexpr copt_hide_t gpu_backend_hide = COPT_ALWAYS_HIDE;
+#else
+        constexpr copt_hide_t gpu_backend_hide = COPT_CURSES_HIDE;
+#endif
         add( "GPU_BACKEND", page_id, to_translation( "GPU backend" ),
              to_translation( "Sets which graphics API the GPU renderer uses.  Try another one if the game crashes or draws wrongly.  An SDL_GPU_DRIVER environment variable overrides this.  Requires restart." ),
-             cata_tiles::build_gpu_backend_list(), "auto", COPT_CURSES_HIDE );
+             cata_tiles::build_gpu_backend_list(), "auto", gpu_backend_hide );
 #   endif
 
 #else
