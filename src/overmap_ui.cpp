@@ -2232,7 +2232,9 @@ static tripoint_abs_omt display()
         // The touch pad's map buttons: this screen's own action, in place of
         // the input (the loop wakes on its own timeout to take it).
         if( std::string asked = godot_host::take_screen_action(); !asked.empty() ) {
-            action = godot_actions::overmap_screen_action( asked );
+            action = asked;
+        } else {
+            action = godot_actions::overmap_cancel( action );  // B: a planned route first
         }
         godot_actions::overmap_drag( curs );  // a slide on the map
 #endif

@@ -225,9 +225,8 @@ bool pad_captured();
 void request_df_panel();
 bool take_df_panel_request();
 // The overmap, for the touch pad's map buttons: 0 closed, 1 open, 2 open
-// with a route plotted to the cursor (the Route button reads Travel), 3
-// open with a route plotted elsewhere (godot_actions::
-// publish_overmap_state; 2 and 3 show Clear).
+// with a route plotted to the cursor (the Route button reads Travel;
+// godot_actions::publish_overmap_state).
 // The right stick turns Dark Forest's camera in play (the user's call):
 // the pad layer sends none of its tilts to the game there, and R3 is a tap
 // (look-around) or a hold (the camera's zoom and reset, the host's).

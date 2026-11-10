@@ -21,6 +21,7 @@
 #include "omdata.h"
 #include "overmapbuffer.h"
 #include "point.h"
+#include "sdl_gamepad.h"
 #include "sdltiles.h"
 #include "type_id.h"
 
@@ -240,19 +241,20 @@ void godot_actions::overmap_drag( tripoint_abs_omt &curs )
 }
 
 
-std::string godot_actions::overmap_screen_action( const std::string &asked )
+std::string godot_actions::overmap_cancel( const std::string &action )
 {
-    if( asked == "DF_CLEAR_ROUTE" ) {
+    if( action == "QUIT" && gamepad::last_input_was_pad() &&
+        gamepad::last_menu_press() == gamepad::menu_press::b && !get_avatar().omt_path.empty() ) {
         get_avatar().omt_path.clear();
         return std::string();
     }
-    return asked;
+    return action;
 }
 
 void godot_actions::publish_overmap_state( const tripoint_abs_omt &curs )
 {
     const std::vector<tripoint_abs_omt> &route = get_avatar().omt_path;
-    godot_host::set_overmap_state( route.empty() ? 1 : route.front().xy() == curs.xy() ? 2 : 3 );
+    godot_host::set_overmap_state( !route.empty() && route.front().xy() == curs.xy() ? 2 : 1 );
 }
 
 #endif // CDDA_GODOT

@@ -1261,6 +1261,9 @@ static bool handle_button_event( SDL_Event &event )
             if( is_in_menu() ) {
                 joy_code = KEY_ESCAPE;
                 input_type = input_event_t::keyboard_code;
+                // An Escape, but not B's (the map: B drops a planned route
+                // first, Back and Start close it).
+                menu_press_seen = menu_press::none;
             } else {
                 joy_code = JOY_START;
             }
@@ -1269,6 +1272,7 @@ static bool handle_button_event( SDL_Event &event )
             if( is_in_menu() ) {
                 joy_code = KEY_ESCAPE;
                 input_type = input_event_t::keyboard_code;
+                menu_press_seen = menu_press::none;  // (as Start)
             } else {
                 joy_code = JOY_BACK;
             }
