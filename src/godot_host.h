@@ -393,6 +393,11 @@ bool text_wanted();
 // engine thread sets it each event pump; the host reads it any time.
 void set_in_menu( bool menu );
 bool in_menu();
+// Whether the screen waiting for input pages (its input context has
+// PAGE_UP: the menus, the inventory, crafting, the log, help...), for the
+// touch pad's PAGE strip (2026-11-11). Set each event pump.
+void set_menu_pages( bool pages );
+bool menu_pages();
 // Whether aiming (target_ui) is up: a map screen, where the host's taps
 // move the target cursor; other screens of the menu plane take a tap on
 // bare screen as Escape. The engine thread sets it; the host reads it.

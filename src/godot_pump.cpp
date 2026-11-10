@@ -49,6 +49,9 @@ void godot_host::pump_engine_state()
         godot_host::set_text_wanted( wanted );
     }
     godot_host::set_in_menu( gamepad::is_in_menu() );
+    godot_host::set_menu_pages( !input_context::input_context_stack.empty() &&
+                                input_context::input_context_stack.back() != nullptr &&
+                                input_context::input_context_stack.back()->is_registered_action( "PAGE_UP" ) );
     {
         // 3: on, and it just refused to attack a neutral creature.
         int safe = g ? static_cast<int>( g->safe_mode ) : 0;

@@ -786,6 +786,21 @@ bool godot_host::in_menu()
 
 namespace
 {
+std::atomic<bool> menu_pages_now{ false };
+} // namespace
+
+void godot_host::set_menu_pages( bool pages )
+{
+    menu_pages_now = pages;
+}
+
+bool godot_host::menu_pages()
+{
+    return menu_pages_now;
+}
+
+namespace
+{
 std::mutex move_mode_mutex;
 std::string move_mode_now;
 std::atomic<bool> move_mode_pending_now{ false };
