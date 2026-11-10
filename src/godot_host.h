@@ -243,6 +243,9 @@ std::string take_screen_action();
 // (godot_actions::overmap_drag): the map follows the finger.
 void request_map_drag( float dx, float dy );
 std::pair<float, float> take_map_drag();
+// The map's zoom (uistate's overmap tileset zoom: 4 farthest, doubling to
+// 64 closest), for the touch pad's RADIUS notches on the map.
+int overmap_zoom();
 // Engine side: whether the joystick `id` is the virtual pad.
 bool is_virtual_pad( uint32_t id );
 

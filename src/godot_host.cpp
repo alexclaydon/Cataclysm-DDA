@@ -26,6 +26,7 @@
 #include <SDL3/SDL.h>
 
 #include "ui_manager.h"
+#include "uistate.h"
 
 namespace
 {
@@ -1029,6 +1030,11 @@ std::pair<float, float> godot_host::take_map_drag()
     map_drag_x = 0.0f;
     map_drag_y = 0.0f;
     return d;
+}
+
+int godot_host::overmap_zoom()
+{
+    return uistate.overmap_tileset_zoom;
 }
 
 void godot_host::set_pad_captured( bool on )
