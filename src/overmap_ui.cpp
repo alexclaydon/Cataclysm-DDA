@@ -39,6 +39,7 @@
 #include "enum_conversions.h"
 #include "game.h"
 #if defined(CDDA_GODOT)
+#include "godot_actions.h"
 #include "godot_host.h"
 #endif
 #include "game_constants.h"
@@ -2233,6 +2234,7 @@ static tripoint_abs_omt display()
         if( std::string asked = godot_host::take_screen_action(); !asked.empty() ) {
             action = asked;
         }
+        godot_actions::overmap_drag( curs );  // a slide on the map
 #endif
         if( !display_path.empty() ) {
             std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();

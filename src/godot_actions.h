@@ -54,6 +54,11 @@ struct godot_actions {
     // The route preview's length and end (sdltiles.cpp's unchanged-map
     // signature): {0, origin} with none.
     static std::pair<size_t, tripoint_bub_ms> route_preview();
+    // The overmap's loop: a slide on the map the touch pad sent
+    // (godot_host::request_map_drag) moves the cursor the other way, a
+    // map cell for each cell's width the finger crossed, so the map
+    // follows it; the part of a cell left over waits for the next.
+    static void overmap_drag( tripoint_abs_omt &curs );
 };
 
 #endif // CDDA_GODOT

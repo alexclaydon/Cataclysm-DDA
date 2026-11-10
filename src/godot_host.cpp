@@ -1011,6 +1011,26 @@ std::string godot_host::take_screen_action()
     return id;
 }
 
+std::mutex map_drag_mutex;
+float map_drag_x = 0.0f;
+float map_drag_y = 0.0f;
+
+void godot_host::request_map_drag( float dx, float dy )
+{
+    std::lock_guard<std::mutex> lock( map_drag_mutex );
+    map_drag_x += dx;
+    map_drag_y += dy;
+}
+
+std::pair<float, float> godot_host::take_map_drag()
+{
+    std::lock_guard<std::mutex> lock( map_drag_mutex );
+    const std::pair<float, float> d( map_drag_x, map_drag_y );
+    map_drag_x = 0.0f;
+    map_drag_y = 0.0f;
+    return d;
+}
+
 void godot_host::set_pad_captured( bool on )
 {
     pad_captured_now = on;

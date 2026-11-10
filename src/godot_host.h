@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace catacurses
@@ -237,6 +238,11 @@ int overmap_state();
 // place of its next input. The overmap takes it.
 void request_screen_action( const std::string &id );
 std::string take_screen_action();
+// A slide on the open map (the touch pad, 2026-11-11), in the engine's
+// frame pixels, added up until the map's loop takes it
+// (godot_actions::overmap_drag): the map follows the finger.
+void request_map_drag( float dx, float dy );
+std::pair<float, float> take_map_drag();
 // Engine side: whether the joystick `id` is the virtual pad.
 bool is_virtual_pad( uint32_t id );
 

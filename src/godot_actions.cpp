@@ -4,6 +4,7 @@
 // from handle_action.cpp unchanged (2026-11-09, plan 0022).
 
 #include <algorithm>
+#include <chrono>
 #include <optional>
 #include <string>
 #include <utility>
@@ -20,6 +21,7 @@
 #include "omdata.h"
 #include "overmapbuffer.h"
 #include "point.h"
+#include "sdltiles.h"
 #include "type_id.h"
 
 void godot_actions::settle_view( game &g, avatar &you )
@@ -205,6 +207,36 @@ void godot_actions::look_go_here( avatar &u, const tripoint_bub_ms &lp,
     godot_host::hold_view( prev_offset.x(), prev_offset.y(), prev_offset.z() );
     u.view_offset = center - u.pos_bub();
     prev_offset = u.view_offset;
+}
+
+
+void godot_actions::overmap_drag( tripoint_abs_omt &curs )
+{
+    static float rest_x = 0.0f;
+    static float rest_y = 0.0f;
+    static std::chrono::steady_clock::time_point last;
+    const std::pair<float, float> d = godot_host::take_map_drag();
+    if( d.first == 0.0f && d.second == 0.0f ) {
+        return;
+    }
+    // A new slide (none for a while) starts with nothing left over.
+    const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    if( now - last > std::chrono::milliseconds( 300 ) ) {
+        rest_x = 0.0f;
+        rest_y = 0.0f;
+    }
+    last = now;
+    const point cell = get_window_dimensions( g->w_overmap ).scaled_font_size;
+    if( cell.x <= 0 || cell.y <= 0 ) {
+        return;
+    }
+    rest_x += d.first;
+    rest_y += d.second;
+    const int cx = static_cast<int>( rest_x / cell.x );
+    const int cy = static_cast<int>( rest_y / cell.y );
+    rest_x -= static_cast<float>( cx * cell.x );
+    rest_y -= static_cast<float>( cy * cell.y );
+    curs += point( -cx, -cy );
 }
 
 #endif // CDDA_GODOT
