@@ -642,6 +642,16 @@ bool record_only();
 // sprite into a frame nobody saw, seconds a turn on the Deck in open grass
 // (2026-11-10). The host's windows and sidebar are drawn as ever.
 bool map_unseen();
+// The host shows its board (its play, desk or VR views), never the engine's
+// 2D map: set by the host. The map is then recorded, never drawn, even
+// when a redraw skips its snapshot (held walking), and an unchanged map may
+// skip its pass (sdltiles.cpp's map_unchanged).
+void set_board_shown( bool shown );
+bool board_shown();
+// This redraw's map pass is skipped (the map is unchanged since the last
+// full one): cata_tiles::draw returns at once. Engine thread.
+void set_map_draw_skipped( bool skipped );
+bool map_draw_skipped();
 
 // What the engine's redraws cost, for the host's perf line (2026-11-10):
 // each timer adds a scope's time on the engine thread; the host takes and

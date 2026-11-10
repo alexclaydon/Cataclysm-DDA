@@ -614,6 +614,11 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
 #if defined(CDDA_GODOT)
     // The tileset's sheets and the map objects' properties (godot_tiles.cpp).
     godot_tiles::publish_tileset_and_objects( *this );
+    // An unchanged map: nothing to record or draw (godot_host::
+    // map_draw_skipped), before any renderer state is set.
+    if( godot_host::map_draw_skipped() ) {
+        return;
+    }
 #endif
 
     {

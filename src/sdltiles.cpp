@@ -28,6 +28,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
+#include <tuple>
 #include <vector>
 
 #include "atlas_bake_plan.h"
@@ -198,14 +199,13 @@ static bool key_repeating = false;
 // cheaper.
 static constexpr uint32_t SNAPSHOT_GAP_MS = 250;
 
-static bool skip_map_snapshot()
+static bool skip_map_snapshot( bool flush )
 {
     static tripoint_abs_ms recorded_at;
     static uint32_t recorded_ms = 0;
     static bool have_recorded = false;
     const tripoint_abs_ms at = get_avatar().pos_abs();
     const uint32_t now = GetTicks();
-    const bool flush = godot_host::take_snapshot_flush();
     const bool key_due = key_repeating &&
                          SDL_PeepEvents( nullptr, 0, SDL_PEEKEVENT, CATA_KEYDOWN, CATA_KEYDOWN ) > 0;
     const bool skip = !flush && have_recorded && ( gamepad::move_due() || key_due ) &&
@@ -218,6 +218,43 @@ static bool skip_map_snapshot()
     }
     godot_host::set_snapshot_owed( skip );
     return skip;
+}
+
+// A redraw with nothing on the map changed (2026-11-10: menus and look-ups
+// in open grass redrew the whole map, 55-60 ms each on the Deck, with no
+// turn passing): while the host shows the board and the last full pass is
+// under UNCHANGED_MAX_MS old, a redraw whose map signature matches it skips
+// the map pass (cata_tiles::draw, godot_host::map_draw_skipped) and the
+// snapshot, and the board keeps the last one. The signature: the turn and
+// the avatar's moves left (any action spends them), where it is, the view
+// (centre, look-around's offset, the zoom radius, 2D or 3D), the terminal's
+// size, the route preview and the stick's direction cursor. Aiming always
+// draws (its line is the map pass's); the age limit catches what the
+// signature can't see (a debug edit of the map).
+static constexpr uint32_t UNCHANGED_MAX_MS = 1000;
+
+static bool map_unchanged( bool flush )
+{
+    using signature = std::tuple<int, int, tripoint_abs_ms, tripoint_bub_ms, tripoint_rel_ms, int, bool,
+          int, int, size_t, tripoint_bub_ms, int>;
+    static signature last;
+    static bool have_last = false;
+    static uint32_t last_ms = 0;
+    const avatar &you = get_avatar();
+    const signature now_sig( to_turns<int>( calendar::turn - calendar::turn_zero ), you.get_moves(),
+                             you.pos_abs(), g->ter_view_p, you.view_offset, godot_host::snapshot_radius(),
+                             godot_host::flat_view(), TERMX, TERMY, g->destination_preview.size(),
+                             g->destination_preview.empty() ? tripoint_bub_ms() : g->destination_preview.back(),
+                             static_cast<int>( gamepad::get_left_stick_direction() ) );
+    const uint32_t now = GetTicks();
+    const bool unchanged = !flush && have_last && godot_host::board_shown() && !godot_host::aiming() &&
+                           now_sig == last && now - last_ms < UNCHANGED_MAX_MS;
+    if( !unchanged ) {
+        last = now_sig;
+        last_ms = now;
+        have_last = true;
+    }
+    return unchanged;
 }
 #endif
 
@@ -4199,7 +4236,10 @@ void cata_cursesport::curses_drawwindow( const catacurses::window &w )
         std::multimap<point, formatted_text> overlay_strings;
 
 #if defined(CDDA_GODOT)
-        const bool snapshot = !skip_map_snapshot();
+        const bool flush = godot_host::take_snapshot_flush();
+        const bool unchanged = map_unchanged( flush );
+        godot_host::set_map_draw_skipped( unchanged );
+        const bool snapshot = !unchanged && !skip_map_snapshot( flush );
         if( snapshot ) {
             const tripoint_bub_ms you = get_avatar().pos_bub();
             const tripoint_abs_ms you_abs = get_avatar().pos_abs();
@@ -4220,6 +4260,7 @@ void cata_cursesport::curses_drawwindow( const catacurses::window &w )
         if( snapshot ) {
             godot_host::end_map_snapshot();
         }
+        godot_host::set_map_draw_skipped( false );
 #endif
 
         // color blocks overlay

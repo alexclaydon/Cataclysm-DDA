@@ -1671,9 +1671,35 @@ godot_host::record_only_scope::~record_only_scope()
     recording_without_drawing = was;
 }
 
+namespace
+{
+std::atomic<bool> board_is_shown{ false };
+bool map_draw_skip = false;  // engine thread
+} // namespace
+
+void godot_host::set_board_shown( bool shown )
+{
+    board_is_shown.store( shown );
+}
+
+bool godot_host::board_shown()
+{
+    return board_is_shown.load();
+}
+
+void godot_host::set_map_draw_skipped( bool skipped )
+{
+    map_draw_skip = skipped;
+}
+
+bool godot_host::map_draw_skipped()
+{
+    return map_draw_skip;
+}
+
 bool godot_host::map_unseen()
 {
-    return recording_map();
+    return recording_map() || board_shown();
 }
 
 bool godot_host::record_only()
