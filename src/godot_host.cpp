@@ -1631,7 +1631,7 @@ godot_host::record_only_scope::~record_only_scope()
 
 bool godot_host::map_unseen()
 {
-    return recording_map() && !flat_view();
+    return recording_map();
 }
 
 bool godot_host::record_only()

@@ -635,7 +635,8 @@ class record_only_scope
 };
 bool record_only();
 // Whether the engine's 2D map goes unseen: a snapshot is being recorded for
-// the 3D view and the host isn't in its 2D view. Then cata_tiles::draw
+// the host's board, which both its views draw (its 2D view is the board
+// seen straight down, not this frame). Then cata_tiles::draw
 // records the map without drawing it: the software renderer scaled every
 // sprite into a frame nobody saw, seconds a turn on the Deck in open grass
 // (2026-11-10). The host's windows and sidebar are drawn as ever.
