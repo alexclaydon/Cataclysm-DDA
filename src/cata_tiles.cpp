@@ -670,6 +670,8 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
         min_row = std::min( min_row, POSY - r );
         max_row = std::max( max_row, POSY + r + 1 );
     }
+    // The 3D view: the map recorded, not drawn (godot_host::map_unseen).
+    const godot_host::record_only_scope godot_unseen( godot_host::map_unseen() );
 #endif
 
     avatar &you = get_avatar();

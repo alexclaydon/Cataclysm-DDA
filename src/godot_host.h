@@ -620,17 +620,26 @@ int take_zoom_view_request();
 // Whether a map snapshot is being recorded (between begin and end).
 bool recording_map();
 
-// While one of these exists, cata_tiles records sprites without drawing
-// them: for the storeys below, which the 2D view never shows.
+// While one of these exists (`on`), cata_tiles records sprites without
+// drawing them: for the storeys below, which the 2D view never shows, and
+// the whole map while the 3D view shows it (map_unseen). They nest.
 class record_only_scope
 {
     public:
-        record_only_scope();
+        explicit record_only_scope( bool on = true );
         ~record_only_scope();
         record_only_scope( const record_only_scope & ) = delete;
         record_only_scope &operator=( const record_only_scope & ) = delete;
+    private:
+        bool was;
 };
 bool record_only();
+// Whether the engine's 2D map goes unseen: a snapshot is being recorded for
+// the 3D view and the host isn't in its 2D view. Then cata_tiles::draw
+// records the map without drawing it: the software renderer scaled every
+// sprite into a frame nobody saw, seconds a turn on the Deck in open grass
+// (2026-11-10). The host's windows and sidebar are drawn as ever.
+bool map_unseen();
 void note_storeys_usec( int usec );
 // The light grid for the snapshot being recorded: sized size x size, zeroed,
 // for cata_tiles::draw to fill.

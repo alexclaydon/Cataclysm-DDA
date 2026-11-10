@@ -1619,14 +1619,19 @@ bool godot_host::recording_map()
     return map_recording;
 }
 
-godot_host::record_only_scope::record_only_scope()
+godot_host::record_only_scope::record_only_scope( bool on ) : was( recording_without_drawing )
 {
-    recording_without_drawing = true;
+    recording_without_drawing = was || on;
 }
 
 godot_host::record_only_scope::~record_only_scope()
 {
-    recording_without_drawing = false;
+    recording_without_drawing = was;
+}
+
+bool godot_host::map_unseen()
+{
+    return recording_map() && !flat_view();
 }
 
 bool godot_host::record_only()
