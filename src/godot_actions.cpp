@@ -239,4 +239,20 @@ void godot_actions::overmap_drag( tripoint_abs_omt &curs )
     curs += point( -cx, -cy );
 }
 
+
+std::string godot_actions::overmap_screen_action( const std::string &asked )
+{
+    if( asked == "DF_CLEAR_ROUTE" ) {
+        get_avatar().omt_path.clear();
+        return std::string();
+    }
+    return asked;
+}
+
+void godot_actions::publish_overmap_state( const tripoint_abs_omt &curs )
+{
+    const std::vector<tripoint_abs_omt> &route = get_avatar().omt_path;
+    godot_host::set_overmap_state( route.empty() ? 1 : route.front().xy() == curs.xy() ? 2 : 3 );
+}
+
 #endif // CDDA_GODOT

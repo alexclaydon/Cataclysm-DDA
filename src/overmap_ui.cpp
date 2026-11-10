@@ -2232,7 +2232,7 @@ static tripoint_abs_omt display()
         // The touch pad's map buttons: this screen's own action, in place of
         // the input (the loop wakes on its own timeout to take it).
         if( std::string asked = godot_host::take_screen_action(); !asked.empty() ) {
-            action = asked;
+            action = godot_actions::overmap_screen_action( asked );
         }
         godot_actions::overmap_drag( curs );  // a slide on the map
 #endif
@@ -2451,11 +2451,7 @@ static tripoint_abs_omt display()
                                        map_view_state{ curs, uistate.overmap_show_overlays },
                                        overmap_tiles_animated() );
 #if defined(CDDA_GODOT)
-        {
-            // For the touch pad's Route/Travel: a route plotted to here.
-            const std::vector<tripoint_abs_omt> &route = get_avatar().omt_path;
-            godot_host::set_overmap_state( !route.empty() && route.front().xy() == curs.xy() ? 2 : 1 );
-        }
+        godot_actions::publish_overmap_state( curs );  // the touch pad's map buttons
 #endif
     } while( action != "QUIT" && action != "CONFIRM" );
 #if defined(CDDA_GODOT)

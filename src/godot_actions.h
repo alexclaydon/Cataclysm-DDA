@@ -59,6 +59,14 @@ struct godot_actions {
     // map cell for each cell's width the finger crossed, so the map
     // follows it; the part of a cell left over waits for the next.
     static void overmap_drag( tripoint_abs_omt &curs );
+    // A screen action the touch pad sent the overmap: Dark Forest's own
+    // (DF_CLEAR_ROUTE: the planned route dropped, the map has no action for
+    // it) done here, returning "" (nothing else to do); the map's own
+    // returned for its loop.
+    static std::string overmap_screen_action( const std::string &asked );
+    // The overmap's state for the touch pad (godot_host::set_overmap_state),
+    // after each pass of its loop.
+    static void publish_overmap_state( const tripoint_abs_omt &curs );
 };
 
 #endif // CDDA_GODOT
