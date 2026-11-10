@@ -804,14 +804,15 @@ std::string godot_host::waiting_category()
     return waiting_category_now;
 }
 
+// fetch_add, not ++: enum_traits' operators take ++ on an atomic.
 godot_host::talk_scope::talk_scope()
 {
-    ++talk_depth;
+    talk_depth.fetch_add( 1 );
 }
 
 godot_host::talk_scope::~talk_scope()
 {
-    --talk_depth;
+    talk_depth.fetch_sub( 1 );
 }
 
 bool godot_host::talking()
