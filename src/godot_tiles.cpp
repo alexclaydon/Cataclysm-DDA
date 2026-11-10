@@ -180,6 +180,7 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
             }
         }
         const auto storeys_start = std::chrono::steady_clock::now();
+        const godot_host::timed_scope storeys_timed( godot_host::timer::storeys );
         godot_host::record_only_scope record_only;
         const std::array<bool, 5> unseen = { true, true, true, true, true };
         // Every storey, the world's whole height (godot_host.h).

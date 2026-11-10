@@ -13,6 +13,7 @@
 // or depends on the engine's build defines.
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -641,6 +642,35 @@ bool record_only();
 // sprite into a frame nobody saw, seconds a turn on the Deck in open grass
 // (2026-11-10). The host's windows and sidebar are drawn as ever.
 bool map_unseen();
+
+// What the engine's redraws cost, for the host's perf line (2026-11-10):
+// each timer adds a scope's time on the engine thread; the host takes and
+// resets the totals (take_redraw_stats). draw is the whole of game::draw
+// (the map pass, the other storeys and the sidebar are inside it); map is
+// cata_tiles::draw, storeys the other storeys' recording within it; panels
+// the sidebar, minimap the pixel minimap within it; frame publish_frame's
+// read-back for the host.
+enum class timer : int { draw, map, storeys, panels, minimap, frame, count };
+class timed_scope
+{
+    public:
+        explicit timed_scope( timer which );
+        ~timed_scope();
+        timed_scope( const timed_scope & ) = delete;
+        timed_scope &operator=( const timed_scope & ) = delete;
+    private:
+        timer which;
+        std::chrono::steady_clock::time_point start;
+};
+// The game turn the play loop waits at (engine thread), for turns passed.
+void note_turn( int turn );
+struct redraw_stats {
+    int draws = 0;  // game::draw calls
+    int draw_max_usec = 0;
+    std::array<int64_t, static_cast<int>( timer::count )> usec = {};
+    int turns = 0;  // game turns passed
+};
+redraw_stats take_redraw_stats();
 void note_storeys_usec( int usec );
 // The light grid for the snapshot being recorded: sized size x size, zeroed,
 // for cata_tiles::draw to fill.

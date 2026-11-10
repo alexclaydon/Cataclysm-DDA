@@ -38,6 +38,7 @@ void godot_actions::settle_view( game &g, avatar &you )
 void godot_actions::before_input( game &g )
 {
     // The touch pad's context row: what applies here, before waiting.
+    godot_host::note_turn( to_turns<int>( calendar::turn - calendar::turn_zero ) );
     std::vector<std::string> here = godot_host::context_actions_here();
     // Dark Forest's context cues: how each of them is bound.
     godot_host::publish_context_bindings( godot_host::context_bindings_here( here ) );

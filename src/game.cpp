@@ -3406,6 +3406,9 @@ bool game::has_blink_curses()
 
 void game::draw( ui_adaptor &ui )
 {
+#if defined(CDDA_GODOT)
+    const godot_host::timed_scope godot_timed( godot_host::timer::draw );
+#endif
     map &here = get_map();
 
     if( test_mode ) {
@@ -3469,6 +3472,7 @@ void game::draw_panels( bool force_draw )
     int y = 0;
     const bool sidebar_right = get_option<std::string>( "SIDEBAR_POSITION" ) == "right";
 #if defined(CDDA_GODOT)
+    const godot_host::timed_scope godot_timed( godot_host::timer::panels );
     const bool native = godot_host::native_sidebar();
     if( native ) {
         godot_host::sidebar_begin();

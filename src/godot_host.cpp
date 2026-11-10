@@ -227,6 +227,7 @@ godot_host::tileset_info tileset_published;
 
 void godot_host::publish_frame( SDL_Renderer *renderer )
 {
+    const timed_scope frame_timed( timer::frame );
     ++frames_published;
     {
         // The open UIs, for the host's floating windows: kept with the
@@ -1642,6 +1643,52 @@ bool godot_host::record_only()
 void godot_host::note_storeys_usec( int usec )
 {
     map_building.storeys_usec = usec;
+}
+
+namespace
+{
+std::array<std::atomic<int64_t>, static_cast<int>( godot_host::timer::count )> timer_usec{};
+std::atomic<int> timed_draws{ 0 };
+std::atomic<int> timed_draw_max{ 0 };
+std::atomic<int> turn_now{ -1 };
+int turn_taken = -1;  // host side
+} // namespace
+
+godot_host::timed_scope::timed_scope( timer which ) : which( which ),
+    start( std::chrono::steady_clock::now() )
+{
+}
+
+godot_host::timed_scope::~timed_scope()
+{
+    const int usec = static_cast<int>( std::chrono::duration_cast<std::chrono::microseconds>
+                                       ( std::chrono::steady_clock::now() - start ).count() );
+    timer_usec[static_cast<int>( which )] += usec;
+    if( which == timer::draw ) {
+        ++timed_draws;
+        int seen = timed_draw_max.load();
+        while( usec > seen && !timed_draw_max.compare_exchange_weak( seen, usec ) ) {
+        }
+    }
+}
+
+void godot_host::note_turn( int turn )
+{
+    turn_now = turn;
+}
+
+godot_host::redraw_stats godot_host::take_redraw_stats()
+{
+    redraw_stats s;
+    s.draws = timed_draws.exchange( 0 );
+    s.draw_max_usec = timed_draw_max.exchange( 0 );
+    for( size_t i = 0; i < s.usec.size(); ++i ) {
+        s.usec[i] = timer_usec[i].exchange( 0 );
+    }
+    const int now = turn_now;
+    s.turns = turn_taken >= 0 && now >= turn_taken ? now - turn_taken : 0;
+    turn_taken = now;
+    return s;
 }
 
 std::vector<godot_host::map_light> &godot_host::record_map_lights( float natural_light, int x,

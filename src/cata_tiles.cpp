@@ -672,6 +672,7 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     }
     // The 3D view: the map recorded, not drawn (godot_host::map_unseen).
     const godot_host::record_only_scope godot_unseen( godot_host::map_unseen() );
+    const godot_host::timed_scope godot_timed( godot_host::timer::map );
 #endif
 
     avatar &you = get_avatar();
@@ -1697,6 +1698,9 @@ void cata_tiles::set_draw_cache_dirty()
 void cata_tiles::draw_minimap( const point &dest, const tripoint_bub_ms &center, int width,
                                int height )
 {
+#if defined(CDDA_GODOT)
+    const godot_host::timed_scope godot_timed( godot_host::timer::minimap );
+#endif
     minimap->set_type( is_isometric() ? pixel_minimap_type::iso : pixel_minimap_type::ortho );
     minimap->draw( SDL_Rect{ dest.x, dest.y, width, height }, center );
 }
