@@ -26,6 +26,9 @@
 #include "flag.h"
 #include "game.h"
 #include "game_constants.h"
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 #include "game_inventory.h"
 #include "gun_mode.h"
 #include "input_context.h"
@@ -408,6 +411,9 @@ bool avatar_action::move( avatar &you, map &m, const tripoint_rel_ms &d )
                 add_msg( m_warning,
                          _( "Not attacking the %1$s -- safe mode is on!  (%2$s to turn it off)" ), critter.name(),
                          msg_safe_mode );
+#if defined(CDDA_GODOT)
+                godot_host::note_safe_refusal();  // the touch pad's Safe off
+#endif
                 return false;
             }
             you.melee_attack( critter, true );

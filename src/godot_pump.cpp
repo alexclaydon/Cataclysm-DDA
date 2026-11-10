@@ -9,6 +9,7 @@
 #include <string>
 
 #include "avatar.h"
+#include "calendar.h"
 #include "cata_imgui.h"
 #include "cata_tiles.h"
 #include "coordinates.h"
@@ -48,7 +49,15 @@ void godot_host::pump_engine_state()
         godot_host::set_text_wanted( wanted );
     }
     godot_host::set_in_menu( gamepad::is_in_menu() );
-    godot_host::set_safe_mode( g ? static_cast<int>( g->safe_mode ) : 0 );
+    {
+        // 3: on, and it just refused to attack a neutral creature.
+        int safe = g ? static_cast<int>( g->safe_mode ) : 0;
+        if( safe == SAFE_MODE_ON && godot_host::safe_refusal_turn() ==
+            to_turns<int>( calendar::turn - calendar::turn_zero ) ) {
+            safe = 3;
+        }
+        godot_host::set_safe_mode( safe );
+    }
     if( g && g->is_core_data_loaded() ) {
         const avatar &you = get_avatar();
         godot_host::set_move_mode( you.get_desired_move_mode().str(),

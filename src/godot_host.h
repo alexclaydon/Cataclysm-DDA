@@ -399,9 +399,15 @@ bool in_menu();
 void set_aiming( bool aiming );
 bool aiming();
 // The game's safe mode (game::safe_mode: 0 off, 1 on, 2 stopped by a newly
-// spotted hostile), for the host's touch Safe mode control. The engine
+// spotted hostile; and ours, 3: on, having just refused to attack a neutral
+// creature, note_safe_refusal), for the host's touch Safe mode control. The engine
 // thread sets it each event pump; the host reads it any time.
 void set_safe_mode( int mode );
+// Safe mode refused to attack a neutral creature (avatar_action.cpp): until
+// the next turn, with safe mode still on, safe_mode() reads 3, and the
+// touch pad and the context cues offer Safe off (2026-11-11).
+void note_safe_refusal();
+int safe_refusal_turn();
 // The avatar's chosen movement mode id (walk, run, crouch, prone, or a
 // mod's; the desired one, which the next step takes up), empty out of play, for the touch pad's figure on its centre. The engine
 // thread sets it each event pump; the host reads it any time.

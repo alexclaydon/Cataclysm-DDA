@@ -8,6 +8,7 @@
 
 #include <string_view>
 
+#include "calendar.h"
 #include "color.h"
 #include "output.h"
 #include "sdl_utils.h"
@@ -948,6 +949,18 @@ bool godot_host::get_sidebar_panels( std::vector<sidebar_panel> &out, int &colum
     columns = sidebar_columns;
     rows = sidebar_rows_n;
     return true;
+}
+
+std::atomic<int> safe_refused_turn{ -1 };
+
+void godot_host::note_safe_refusal()
+{
+    safe_refused_turn = to_turns<int>( calendar::turn - calendar::turn_zero );
+}
+
+int godot_host::safe_refusal_turn()
+{
+    return safe_refused_turn;
 }
 
 void godot_host::set_safe_mode( int mode )
