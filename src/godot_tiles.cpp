@@ -31,6 +31,7 @@
 #include "mapdata.h"
 #include "point.h"
 #include "string_id.h"
+#include "submap.h"
 #include "type_id.h"
 #include "units.h"
 #include "weather.h"
@@ -186,14 +187,38 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
         // Every storey, the world's whole height (godot_host.h).
         static_assert( godot_host::snapshot_levels_below >= OVERMAP_DEPTH + OVERMAP_HEIGHT &&
                        godot_host::snapshot_levels_above >= OVERMAP_DEPTH + OVERMAP_HEIGHT );
+        // The square around the view's centre, a submap at a time: most
+        // of the other storeys' submaps hold nothing to record (unexplored
+        // below, open air above), told by one look at each (2026-11-10:
+        // every tile of 20 storeys each way was 5-7 ms a redraw on the
+        // Deck).
+        const int x0 = std::max( 0, mid.x - r );
+        const int x1 = std::min( MAPSIZE_X - 1, mid.x + r );
+        const int y0 = std::max( 0, mid.y - r );
+        const int y1 = std::min( MAPSIZE_Y - 1, mid.y + r );
+        const auto blocks = [&]( const auto & visit ) {
+            for( int by = y0 - y0 % SEEY; by <= y1; by += SEEY ) {
+                for( int bx = x0 - x0 % SEEX; bx <= x1; bx += SEEX ) {
+                    visit( std::max( bx, x0 ), std::min( bx + SEEX - 1, x1 ), std::max( by, y0 ),
+                           std::min( by + SEEY - 1, y1 ), bx, by );
+                }
+            }
+        };
         // Below the avatar: what it remembers there.
         for( int dz = 1; dz <= godot_host::snapshot_levels_below; ++dz ) {
             const int z = you_pos.z() - dz;
             if( z < -OVERMAP_DEPTH ) {
                 break;
             }
-            for( int y = std::max( 0, mid.y - r ); y <= std::min( MAPSIZE_Y - 1, mid.y + r ); ++y ) {
-                for( int x = std::max( 0, mid.x - r ); x <= std::min( MAPSIZE_X - 1, mid.x + r ); ++x ) {
+            blocks( [&]( int bx0, int bx1, int by0, int by1, int bx, int by ) {
+                // A submap the avatar remembers nothing of answers with the
+                // shared default tile (mm_submap::get_tile).
+                if( &get_avatar().get_memorized_tile( here.get_abs( tripoint_bub_ms( bx, by, z ) ) ) ==
+                    &mm_submap::default_tile ) {
+                    return;
+                }
+            for( int y = by0; y <= by1; ++y ) {
+                for( int x = bx0; x <= bx1; ++x ) {
                     const tripoint_bub_ms p( x, y, z );
                     // Most of these storeys' tiles the avatar never saw: one
                     // memory lookup, not four layer calls finding nothing
@@ -210,6 +235,7 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
                     ct.draw_vpart_no_roof( p, lit_level::MEMORIZED, height_3d, unseen, false );
                 }
             }
+            } );
         }
         // Above it: the terrain itself (upper walls and floors, roofs), as
         // a building's shell is seen from outside; nothing on it, and never
@@ -228,8 +254,18 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
                 if( z > OVERMAP_HEIGHT ) {
                     break;
                 }
-                for( int y = std::max( 0, mid.y - r ); y <= std::min( MAPSIZE_Y - 1, mid.y + r ); ++y ) {
-                    for( int x = std::max( 0, mid.x - r ); x <= std::min( MAPSIZE_X - 1, mid.x + r ); ++x ) {
+                blocks( [&]( int bx0, int bx1, int by0, int by1, int bx, int by ) {
+                // A submap of one terrain (open air, most of them) with no
+                // floor holds nothing to show.
+                const submap *sm = here.get_submap_at( tripoint_bub_ms( bx, by, z ) );
+                if( sm != nullptr && sm->is_uniform() ) {
+                    const ter_id ut = sm->get_ter( point_sm_ms() );
+                    if( !ut || ut.obj().has_flag( ter_furn_flag::TFLAG_NO_FLOOR ) ) {
+                        return;
+                    }
+                }
+                for( int y = by0; y <= by1; ++y ) {
+                    for( int x = bx0; x <= bx1; ++x ) {
                         const tripoint_bub_ms p( x, y, z );
                         const ter_id &t = here.ter( p );
                         if( !t || t.obj().has_flag( ter_furn_flag::TFLAG_NO_FLOOR ) ) {
@@ -249,6 +285,7 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
                                              rotation, above_ll, false, height_3d );
                     }
                 }
+                } );
             }
         }
         godot_host::note_storeys_usec( static_cast<int>( std::chrono::duration_cast<std::chrono::microseconds>
