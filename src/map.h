@@ -459,6 +459,10 @@ class map
 {
         friend class teleport;
         friend class editmap_ui;
+#if defined(CDDA_GODOT)
+        // Dark Forest's map recording: whether a submap is uniform (godot_tiles.cpp).
+        friend struct godot_tiles;
+#endif
         friend std::list<item> map_cursor::remove_items_with( const std::function<bool( const item & )> &,
                 int );
 
