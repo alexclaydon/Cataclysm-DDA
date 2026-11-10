@@ -1663,9 +1663,10 @@ godot_host::timed_scope::~timed_scope()
 {
     const int usec = static_cast<int>( std::chrono::duration_cast<std::chrono::microseconds>
                                        ( std::chrono::steady_clock::now() - start ).count() );
-    timer_usec[static_cast<int>( which )] += usec;
+    // (fetch_add: enum_traits.h's operator templates take ++ on an atomic.)
+    timer_usec[static_cast<int>( which )].fetch_add( usec );
     if( which == timer::draw ) {
-        ++timed_draws;
+        timed_draws.fetch_add( 1 );
         int seen = timed_draw_max.load();
         while( usec > seen && !timed_draw_max.compare_exchange_weak( seen, usec ) ) {
         }
@@ -1674,7 +1675,7 @@ godot_host::timed_scope::~timed_scope()
 
 void godot_host::note_turn( int turn )
 {
-    turn_now = turn;
+    turn_now.store( turn );
 }
 
 godot_host::redraw_stats godot_host::take_redraw_stats()
