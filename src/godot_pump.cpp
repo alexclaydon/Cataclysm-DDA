@@ -50,8 +50,12 @@ void godot_host::pump_engine_state()
     }
     godot_host::set_in_menu( gamepad::is_in_menu() );
     {
-        input_context *top = input_context::input_context_stack.back();
-        godot_host::set_menu_pages( top != nullptr && top->is_registered_action( "PAGE_UP" ) );
+        // The context waiting for input (polling), not the stack's top: a
+        // context made once and kept (the first inventory opened made one)
+        // sat above the inventory's, and RADIUS didn't page the first time.
+        input_context *waiting = input_context::polling ? input_context::polling :
+                                 input_context::input_context_stack.back();
+        godot_host::set_menu_pages( waiting != nullptr && waiting->is_registered_action( "PAGE_UP" ) );
     }
     {
         // 3: on, and it just refused to attack a neutral creature.
