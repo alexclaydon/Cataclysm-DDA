@@ -782,6 +782,11 @@ struct sidebar_panel {
 };
 void set_native_sidebar( bool on );
 bool native_sidebar();
+// The host says the engine's pixel minimap goes unseen (its own sidebar
+// drawn, no peek at the engine's, not VR): cata_tiles::draw_minimap then
+// draws nothing (2026-11-10: a few ms a redraw on the Deck, never shown).
+void set_minimap_unseen( bool unseen );
+bool minimap_unseen();
 // Whether the switch changed since last asked (the panels then redraw in
 // full, into the frame or to the host).
 bool take_sidebar_switched();

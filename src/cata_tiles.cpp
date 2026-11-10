@@ -1700,6 +1700,9 @@ void cata_tiles::draw_minimap( const point &dest, const tripoint_bub_ms &center,
 {
 #if defined(CDDA_GODOT)
     const godot_host::timed_scope godot_timed( godot_host::timer::minimap );
+    if( godot_host::minimap_unseen() ) {
+        return;
+    }
 #endif
     minimap->set_type( is_isometric() ? pixel_minimap_type::iso : pixel_minimap_type::ortho );
     minimap->draw( SDL_Rect{ dest.x, dest.y, width, height }, center );

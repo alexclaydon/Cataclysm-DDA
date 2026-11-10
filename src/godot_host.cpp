@@ -41,6 +41,12 @@ uint64_t frame_sequence = 0;
 std::vector<unsigned char> last_rgba;
 int last_width = 0;
 int last_height = 0;
+// The last read-back as read (the renderer's format): compared first, so an
+// unchanged frame skips the conversion (2026-11-10: the read-back on every
+// present was a steady few percent of a core on the Deck with nothing
+// happening).
+std::vector<unsigned char> last_raw;
+SDL_PixelFormat last_raw_format = SDL_PIXELFORMAT_UNKNOWN;
 godot_host::frame_sink sink = nullptr;
 void *sink_context = nullptr;
 
@@ -262,6 +268,26 @@ void godot_host::publish_frame( SDL_Renderer *renderer )
     SDL_Surface *shot = SDL_RenderReadPixels( renderer, nullptr );
     if( shot == nullptr ) {
         return;
+    }
+    {
+        const size_t raw_row = static_cast<size_t>( shot->w ) * SDL_BYTESPERPIXEL( shot->format );
+        const unsigned char *raw = static_cast<const unsigned char *>( shot->pixels );
+        bool unchanged = shot->format == last_raw_format && shot->w == last_width &&
+                         shot->h == last_height && last_raw.size() == raw_row * shot->h;
+        for( int y = 0; y < shot->h && unchanged; ++y ) {
+            unchanged = std::memcmp( last_raw.data() + raw_row * y,
+                                     raw + static_cast<size_t>( shot->pitch ) * y, raw_row ) == 0;
+        }
+        if( unchanged ) {
+            SDL_DestroySurface( shot );
+            return;
+        }
+        last_raw.resize( raw_row * shot->h );
+        for( int y = 0; y < shot->h; ++y ) {
+            std::memcpy( last_raw.data() + raw_row * y, raw + static_cast<size_t>( shot->pitch ) * y,
+                         raw_row );
+        }
+        last_raw_format = shot->format;
     }
     SDL_Surface *rgba = SDL_ConvertSurface( shot, SDL_PIXELFORMAT_RGBA32 );
     SDL_DestroySurface( shot );
@@ -831,6 +857,21 @@ int godot_host::log_zoom()
 bool godot_host::take_sidebar_switched()
 {
     return sidebar_switched.exchange( false );
+}
+
+namespace
+{
+std::atomic<bool> minimap_hidden{ false };
+} // namespace
+
+void godot_host::set_minimap_unseen( bool unseen )
+{
+    minimap_hidden.store( unseen );
+}
+
+bool godot_host::minimap_unseen()
+{
+    return minimap_hidden.load();
 }
 
 bool godot_host::native_sidebar()
