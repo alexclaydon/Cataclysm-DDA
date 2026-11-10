@@ -3377,9 +3377,6 @@ bool game::handle_action()
         if( pad_key == JOY_B && !destination_preview.empty() ) {
             player_character.clear_destination();
             destination_preview.clear();
-            // Nothing else redraws here: the route stayed on screen until
-            // the next action (found on the phone, 2026-11-11).
-            invalidate_main_ui_adaptor();
             return false;
         }
         if( ( pad_key == JOY_A || ( act == ACTION_PAUSE && pad_key != -1 ) ) &&

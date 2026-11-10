@@ -617,6 +617,7 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     // An unchanged map: nothing to record or draw (godot_host::
     // map_draw_skipped), before any renderer state is set.
     if( godot_host::map_draw_skipped() ) {
+        godot_tiles::drop_one_shots( *this );
         return;
     }
 #endif

@@ -39,6 +39,16 @@
 
 static const std::string empty_string;
 
+void godot_tiles::drop_one_shots( cata_tiles &ct )
+{
+    ct.void_line();
+    ct.void_cursor();
+    ct.void_highlight();
+    ct.void_weather();
+    ct.void_sct();
+    ct.void_zones();
+}
+
 void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
 {
     // The sheets behind the snapshot's sprite indices, for the VR host.

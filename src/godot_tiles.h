@@ -25,6 +25,12 @@ struct godot_tiles {
     // the snapshot's sprite indices, and every terrain, furniture and field
     // type's properties for the 3D view's modelling rules.
     static void publish_tileset_and_objects( cata_tiles &ct );
+    // A map pass skipped as unchanged (godot_host::map_draw_skipped): the
+    // one-shot overlays the draw before it asked for (the route preview's
+    // line, the cursor, weather...) dropped, as a full pass drops them once
+    // drawn. Kept, a route preview cancelled after a skipped pass came back
+    // in the next one and stayed on the board (2026-11-11).
+    static void drop_one_shots( cata_tiles &ct );
     // While a snapshot is recorded: the weather, the sky, the creatures the
     // avatar sees, the light on its storey, then the other storeys (what
     // the avatar remembers below it, the terrain above), recorded through
