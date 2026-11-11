@@ -467,18 +467,23 @@ void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
         int n = 0;
         for( const candidate &c : candidates ) {
             std::optional<tile_lookup_res> res = ct.find_tile_looks_like( c.id, c.category, c.variant );
-            std::vector<int> subtiles = { -1 };
+            // The plain sprite, or each connection shape a multitile has
+            // (center to unconnected: they stand in for the plain one), then
+            // its open and broken states (doors, vehicle parts).
+            std::vector<int> subtiles;
             if( res && res->tile().multitile ) {
-                subtiles.clear();
+                const std::vector<std::string> &have = res->tile().available_subtiles;
                 for( size_t k = 0; k < shapes.size(); ++k ) {
-                    const std::vector<std::string> &have = res->tile().available_subtiles;
                     if( std::find( have.begin(), have.end(), shapes[k] ) != have.end() ) {
+                        if( k >= 6 && subtiles.empty() ) {
+                            subtiles.push_back( -1 );
+                        }
                         subtiles.push_back( static_cast<int>( k ) );
                     }
                 }
-                if( subtiles.empty() ) {
-                    subtiles.push_back( -1 );
-                }
+            }
+            if( subtiles.empty() ) {
+                subtiles.push_back( -1 );
             }
             for( const int subtile : subtiles ) {
                 godot_host::tile_catalogue_entry e;
