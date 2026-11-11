@@ -72,6 +72,13 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
         int aim_dx = 0;
         int aim_dy = 0;
         if( godot_host::take_action_request( wheel_action, aim_dx, aim_dy ) ) {
+            // Recenter: the view back on the avatar (at driving's offset
+            // in a moving vehicle, as upstream's centre action), no turn.
+            if( wheel_action == godot_host::recenter_action_id ) {
+                you.view_offset = tripoint_rel_ms( g.driving_view_offset.x(), g.driving_view_offset.y(), 0 );
+                g.invalidate_main_ui_adaptor();
+                return false;
+            }
             if( wheel_action == godot_host::stairs_action_id ) {
                 wheel_action = godot_host::stairs_action();
                 if( wheel_action.empty() ) {

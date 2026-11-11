@@ -617,11 +617,17 @@ void publish_catalogue( std::vector<wheel_action> catalogue );
 extern const char *const stairs_action_id;
 std::string stairs_action();
 
+// Recenter (the user's call, 2026-11-12): the view back on the avatar
+// after look-around (or the view shift keys) left it offset. The context
+// row offers it while the view is off its rest (driving's offset, or none);
+// the play loop takes it as a request of its own (godot_actions), no turn.
+extern const char *const recenter_action_id;
+
 // The touch pad's context row (ADR 0014): the actions that apply where the
 // avatar stands, in a fixed priority order (up, down, open, close, pick up,
-// talk, drive, butcher, examine). The play loop builds them before it waits
-// for input (context_actions_here, game code) and publishes them; the host
-// takes them when they change.
+// talk, drive, butcher, examine, and recenter while the view is offset).
+// The play loop builds them before it waits for input (context_actions_here,
+// game code) and publishes them; the host takes them when they change.
 std::vector<std::string> context_actions_here();
 void publish_context_actions( std::vector<std::string> actions );
 bool take_context_actions( std::vector<std::string> &out );

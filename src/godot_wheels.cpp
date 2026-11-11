@@ -109,6 +109,7 @@ static bool wheel_action_applies( action_id act, map &here, const tripoint_bub_m
 }
 
 const char *const godot_host::stairs_action_id = "stairs";
+const char *const godot_host::recenter_action_id = "recenter";
 
 std::string godot_host::stairs_action()
 {
@@ -190,6 +191,11 @@ std::vector<std::string> godot_host::context_actions_here()
     if( examine ) {
         out.emplace_back( "examine" );
     }
+    // The view off its rest (look-around left it offset): Recenter.
+    const tripoint_rel_ms rest( g->driving_view_offset.x(), g->driving_view_offset.y(), 0 );
+    if( you.view_offset != rest ) {
+        out.emplace_back( godot_host::recenter_action_id );
+    }
     return out;
 }
 
@@ -210,6 +216,10 @@ godot_host::bindings_map godot_host::context_bindings_here( const std::vector<st
         ids.emplace_back( id );
     }
     for( const std::string &id : ids ) {
+        // Ours, not a keybinding: none to look up (the lookup would add it).
+        if( id == recenter_action_id ) {
+            continue;
+        }
         action_bindings &b = out[id];
         for( const input_event &e : inp_mngr.get_input_for_action( id, category ) ) {
             if( e.sequence.size() != 1 ) {
