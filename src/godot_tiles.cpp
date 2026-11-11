@@ -141,7 +141,13 @@ void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
         godot_host::map_objects_info objects;
         for( size_t i = 0; i < ter_t::count(); ++i ) {
             const ter_t &t = ter_id( static_cast<int>( i ) ).obj();
-            godot_host::map_object o{ t.id.str(), false, props( t, false ), t.movecost, t.coverage };
+            godot_host::map_object o;
+            o.id = t.id.str();
+            o.furniture = false;
+            o.flags = props( t;
+            o.movecost = false );
+            o.coverage = t.movecost;
+            o.field = t.coverage;
             o.kind = godot_host::MOK_TERRAIN;
             common( o, t );
             if( !t.open.is_null() ) {
@@ -157,7 +163,13 @@ void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
         }
         for( size_t i = 0; i < furn_t::count(); ++i ) {
             const furn_t &f = furn_id( static_cast<int>( i ) ).obj();
-            godot_host::map_object o{ f.id.str(), true, props( f, true ), f.movecost, f.coverage };
+            godot_host::map_object o;
+            o.id = f.id.str();
+            o.furniture = true;
+            o.flags = props( f;
+            o.movecost = true );
+            o.coverage = f.movecost;
+            o.field = f.coverage;
             o.kind = godot_host::MOK_FURNITURE;
             common( o, f );
             o.numbers["mass"] = units::to_gram( f.mass );
@@ -180,7 +192,13 @@ void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
         }
         for( const field_type &ft : field_types::get_all() ) {
             const bool flat = ft.phase == phase_id::LIQUID || ft.phase == phase_id::SOLID;
-            godot_host::map_object o{ ft.id.str(), false, flat ? godot_host::MOF_FLAT : 0u, 0, 0, true };
+            godot_host::map_object o;
+            o.id = ft.id.str();
+            o.furniture = false;
+            o.flags = flat ? godot_host::MOF_FLAT : 0u;
+            o.movecost = 0;
+            o.coverage = 0;
+            o.field = true;
             o.kind = godot_host::MOK_FIELD;
             o.name = ft.get_name();
             static const char *const phases[] = { "null", "solid", "liquid", "gas", "plasma" };
@@ -202,7 +220,12 @@ void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
             objects.objects.push_back( std::move( o ) );
         }
         for( const vpart_info &vp : vehicles::parts::get_all() ) {
-            godot_host::map_object o{ "vp_" + vp.id.str(), false, 0u, 0, 0 };
+            godot_host::map_object o;
+            o.id = "vp_" + vp.id.str();
+            o.furniture = false;
+            o.flags = 0u;
+            o.movecost = 0;
+            o.coverage = 0;
             o.kind = godot_host::MOK_VEHICLE_PART;
             o.name = vp.name();
             o.flag_names.assign( vp.get_flags().begin(), vp.get_flags().end() );
@@ -229,7 +252,12 @@ void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
         }
         for( size_t i = 0; i < trap::count(); ++i ) {
             const trap &t = trap_id( static_cast<int>( i ) ).obj();
-            godot_host::map_object o{ t.id.str(), false, 0u, 0, 0 };
+            godot_host::map_object o;
+            o.id = t.id.str();
+            o.furniture = false;
+            o.flags = 0u;
+            o.movecost = 0;
+            o.coverage = 0;
             o.kind = godot_host::MOK_TRAP;
             o.name = t.name();
             o.numbers["benign"] = t.is_benign() ? 1 : 0;
