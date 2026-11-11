@@ -122,16 +122,18 @@ void pocket_favorite_callback::refresh( uilist *menu )
         ImGui::NewLine();
         ImGui::NewLine();
 
+        // Wrapped at the column's edge: unwrapped, a long line ran off it.
+        const float wrap = ImGui::GetContentRegionAvail().x;
         selected_pocket->general_info( info, pocket_num, true );
-        cataimgui::draw_colored_text( format_item_info( info, {} ) );
+        cataimgui::draw_colored_text( format_item_info( info, {} ), wrap );
         info.clear();
 
         selected_pocket->favorite_info( info );
-        cataimgui::draw_colored_text( format_item_info( info, {} ) );
+        cataimgui::draw_colored_text( format_item_info( info, {} ), wrap );
         info.clear();
 
         selected_pocket->contents_info( info, pocket_num, true );
-        cataimgui::draw_colored_text( format_item_info( info, {} ) );
+        cataimgui::draw_colored_text( format_item_info( info, {} ), wrap );
     }
 }
 
