@@ -17,6 +17,7 @@
 #include "game.h"
 #include "godot_actions.h"
 #include "godot_host.h"
+#include "godot_tiles.h"
 #include "input.h"
 #include "input_context.h"
 #include "options.h"
@@ -129,6 +130,13 @@ void godot_host::pump_engine_state()
             }
         }
         godot_host::set_radial_sides( sides );
+    }
+    // The 3D translation catalogue, asked for by the host (ADR 0020): once
+    // the core data is loaded (the main menu loads it), drawn here on the
+    // engine's thread.
+    std::string tile_catalogue_spec;
+    if( tilecontext && g && g->is_core_data_loaded() && godot_host::take_tile_catalogue_request( tile_catalogue_spec ) ) {
+        godot_tiles::record_catalogue( *tilecontext, tile_catalogue_spec );
     }
 }
 

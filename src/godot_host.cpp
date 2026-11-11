@@ -2092,4 +2092,59 @@ bool godot_host::take_map_snapshot( uint64_t &sequence, map_snapshot &out )
     return true;
 }
 
+namespace
+{
+std::mutex tile_catalogue_mutex;
+std::string tile_catalogue_spec;
+bool tile_catalogue_requested = false;
+godot_host::tile_catalogue_info tile_catalogue_published;
+} // namespace
+
+void godot_host::request_tile_catalogue( const std::string &spec )
+{
+    {
+        std::lock_guard<std::mutex> lock( tile_catalogue_mutex );
+        tile_catalogue_spec = spec;
+        tile_catalogue_requested = true;
+    }
+    // An engine waiting for input pumps on the next event.
+    wake();
+}
+
+bool godot_host::take_tile_catalogue_request( std::string &spec )
+{
+    std::lock_guard<std::mutex> lock( tile_catalogue_mutex );
+    if( !tile_catalogue_requested ) {
+        return false;
+    }
+    tile_catalogue_requested = false;
+    spec = tile_catalogue_spec;
+    return true;
+}
+
+void godot_host::publish_tile_catalogue( std::vector<tile_catalogue_entry> entries )
+{
+    map_recording = false;
+    {
+        std::lock_guard<std::mutex> lock( tileset_mutex );
+        map_building.tileset_generation = tileset_published.generation;
+    }
+    std::lock_guard<std::mutex> lock( tile_catalogue_mutex );
+    tile_catalogue_published.snapshot = std::move( map_building );
+    map_building = map_snapshot();
+    tile_catalogue_published.entries = std::move( entries );
+    ++tile_catalogue_published.generation;
+}
+
+bool godot_host::take_tile_catalogue( uint64_t &generation, tile_catalogue_info &out )
+{
+    std::lock_guard<std::mutex> lock( tile_catalogue_mutex );
+    if( tile_catalogue_published.generation == generation ) {
+        return false;
+    }
+    out = tile_catalogue_published;
+    generation = tile_catalogue_published.generation;
+    return true;
+}
+
 #endif // CDDA_GODOT

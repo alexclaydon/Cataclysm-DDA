@@ -9,6 +9,7 @@
 // into our own). A friend of cata_tiles, for its tileset and its layer
 // functions.
 
+#include <string>
 #include <vector>
 
 #include "coords_fwd.h"
@@ -45,6 +46,11 @@ struct godot_tiles {
     // Each blit draw_sprite_at makes (its sprite, rotation, flip, offset,
     // size, scale and opaque bounds), and an animated tile's whole cycle,
     // recorded for the host's snapshot.
+    // The 3D translation catalogue (ADR 0020; godot_host::request_tile_catalogue):
+    // every id of the categories `spec` asks for, drawn by the tileset's
+    // own lookup into a snapshot of its own, record-only, one tile each.
+    // On the engine's thread, at the main menu or in play.
+    static void record_catalogue( cata_tiles &ct, const std::string &spec );
     static void record_blit( const cata_tiles &ct, const texture &sprite_tex, int sprite_index,
                              double render_angle, CataFlipMode render_flip, const point &blit_at,
                              int width, int height, float pixelscale,

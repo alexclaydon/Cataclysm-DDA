@@ -17,23 +17,31 @@
 #include "avatar.h"
 #include "calendar.h"
 #include "cata_tiles.h"
+#include "cata_utility.h"
 #include "coordinates.h"
 #include "creature.h"
+#include "debug.h"
 #include "field_type.h"
 #include "game.h"
 #include "godot_host.h"
 #include "godot_tiles.h"
+#include "item_factory.h"
+#include "itype.h"
 #include "level_cache.h"
 #include "lightmap.h"
 #include "map.h"
 #include "map_memory.h"
 #include "map_scale_constants.h"
 #include "mapdata.h"
+#include "monstergenerator.h"
+#include "mtype.h"
 #include "point.h"
 #include "string_id.h"
 #include "submap.h"
+#include "trap.h"
 #include "type_id.h"
 #include "units.h"
+#include "veh_type.h"
 #include "weather.h"
 #include "weather_type.h"
 
@@ -338,6 +346,143 @@ void godot_tiles::record_blit( const cata_tiles &ct, const texture &sprite_tex, 
         const int base = static_cast<int>( ( ( at - ct.godot_anim_counter_ ) % total + total ) % total );
         godot_host::record_map_blit_animation( frames, base, total );
     }
+}
+
+void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
+{
+    // The tileset and the map objects first: the snapshot names the
+    // tileset's generation, and the host's rules read the objects.
+    publish_tileset_and_objects( ct );
+    // The categories asked for, each with how many to draw (0: all).
+    std::vector<std::pair<std::string, int>> wanted;
+    std::string floor = "t_floor";
+    for( const std::string &part : string_split( spec, ',' ) ) {
+        if( string_starts_with( part, "floor=" ) ) {
+            floor = part.substr( 6 );
+            continue;
+        }
+        const size_t colon = part.find( ':' );
+        wanted.emplace_back( part.substr( 0, colon ),
+                             colon == std::string::npos ? 0 : std::atoi( part.substr( colon + 1 ).c_str() ) );
+    }
+    struct candidate {
+        std::string id;
+        TILE_CATEGORY category;
+        std::string variant;
+    };
+    std::vector<candidate> candidates;
+    for( const auto &[name, most] : wanted ) {
+        std::vector<candidate> found;
+        if( name == "terrain" ) {
+            for( size_t i = 0; i < ter_t::count(); ++i ) {
+                found.push_back( { ter_id( static_cast<int>( i ) ).obj().id.str(), TILE_CATEGORY::TERRAIN, "" } );
+            }
+        } else if( name == "furniture" ) {
+            for( size_t i = 0; i < furn_t::count(); ++i ) {
+                found.push_back( { furn_id( static_cast<int>( i ) ).obj().id.str(), TILE_CATEGORY::FURNITURE, "" } );
+            }
+        } else if( name == "field" ) {
+            for( const field_type &ft : field_types::get_all() ) {
+                found.push_back( { ft.id.str(), TILE_CATEGORY::FIELD, "" } );
+            }
+        } else if( name == "trap" ) {
+            for( size_t i = 0; i < trap::count(); ++i ) {
+                found.push_back( { trap_id( static_cast<int>( i ) ).obj().id.str(), TILE_CATEGORY::TRAP, "" } );
+            }
+        } else if( name == "vehicle_part" ) {
+            for( const vpart_info &vp : vehicles::parts::get_all() ) {
+                if( vp.variants.empty() ) {
+                    found.push_back( { "vp_" + vp.id.str(), TILE_CATEGORY::VEHICLE_PART, "" } );
+                }
+                for( const auto &[variant, v] : vp.variants ) {
+                    found.push_back( { "vp_" + vp.id.str(), TILE_CATEGORY::VEHICLE_PART, variant } );
+                }
+            }
+        } else if( name == "monster" ) {
+            for( const mtype &m : MonsterGenerator::generator().get_all_mtypes() ) {
+                found.push_back( { m.id.str(), TILE_CATEGORY::MONSTER, "" } );
+            }
+        } else if( name == "item" ) {
+            for( const itype *t : item_controller->all() ) {
+                found.push_back( { t->get_id().str(), TILE_CATEGORY::ITEM, "" } );
+            }
+        } else {
+            debugmsg( "catalogue: unknown category '%s'", name );
+            continue;
+        }
+        // A sample: every Kth, in the engine's own order.
+        const size_t step = most > 0 && found.size() > static_cast<size_t>( most ) ?
+                            found.size() / most : 1;
+        for( size_t i = 0; i < found.size(); i += step ) {
+            candidates.push_back( std::move( found[i] ) );
+        }
+    }
+
+    // Each candidate, and each connection shape of a multitile, on a tile
+    // of its own: rows of WIDTH from (0, 0).
+    static constexpr int WIDTH = 64;
+    static const std::array<std::string, 8> shapes = { {
+            "center", "corner", "edge", "t_connection", "end_piece", "unconnected", "open", "broken"
+        }
+    };
+    std::vector<godot_host::tile_catalogue_entry> entries;
+    godot_host::begin_map_snapshot( 0, 0, 0, 0, 0, 0, 0, 0 );
+    {
+        const godot_host::record_only_scope record_only;
+        int n = 0;
+        for( const candidate &c : candidates ) {
+            std::optional<tile_lookup_res> res = ct.find_tile_looks_like( c.id, c.category, c.variant );
+            std::vector<int> subtiles = { -1 };
+            if( res && res->tile().multitile ) {
+                subtiles.clear();
+                for( size_t k = 0; k < shapes.size(); ++k ) {
+                    const std::vector<std::string> &have = res->tile().available_subtiles;
+                    if( std::find( have.begin(), have.end(), shapes[k] ) != have.end() ) {
+                        subtiles.push_back( static_cast<int>( k ) );
+                    }
+                }
+                if( subtiles.empty() ) {
+                    subtiles.push_back( -1 );
+                }
+            }
+            for( const int subtile : subtiles ) {
+                godot_host::tile_catalogue_entry e;
+                e.id = c.id;
+                e.category = static_cast<int>( c.category );
+                e.variant = c.variant;
+                e.subtile = subtile;
+                e.shape = subtile >= 0 ? shapes[subtile] : std::string();
+                e.x = n % WIDTH;
+                e.y = n / WIDTH;
+                e.found = res.has_value();
+                if( res && res->id() != c.id ) {
+                    e.looks_like = res->id();
+                }
+                const tripoint_bub_ms pos( e.x, e.y, 0 );
+                int height_3d = 0;
+                if( c.category != TILE_CATEGORY::TERRAIN && !floor.empty() ) {
+                    ct.draw_from_id_string( floor, TILE_CATEGORY::TERRAIN, empty_string, pos, -1, 0,
+                                            lit_level::LIT, false, height_3d );
+                }
+                // A vehicle part or a monster drawn by an override (as the
+                // vehicle part and monster previews do), so their variant
+                // seeds don't look for a vehicle or a creature on the map.
+                if( c.category == TILE_CATEGORY::VEHICLE_PART ) {
+                    ct.init_draw_vpart_override( pos, vpart_id( c.id.substr( 3 ) ), 0, 0_degrees, false,
+                                                 point_rel_ms::zero );
+                } else if( c.category == TILE_CATEGORY::MONSTER ) {
+                    ct.init_draw_monster_override( pos, mtype_id( c.id ), 1, false, Creature::Attitude::HOSTILE );
+                }
+                ct.draw_from_id_string( c.id, c.category, empty_string, pos, subtile, 0, lit_level::LIT,
+                                        false, height_3d, 0, c.variant );
+                entries.push_back( std::move( e ) );
+                ++n;
+            }
+        }
+        ct.void_vpart_override();
+        ct.void_monster_override();
+    }
+    godot_host::publish_tile_catalogue( std::move( entries ) );
 }
 
 #endif // CDDA_GODOT

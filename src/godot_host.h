@@ -928,6 +928,40 @@ void publish_dialog( const void *owner, dialog_state state );
 void clear_dialog( const void *owner );
 bool take_dialog_request( dialog_request &out );
 
+// The 3D translation catalogue (ADR 0020, plan 0024): every id of the
+// categories asked for, drawn by the tileset's own lookup (as a map draw
+// records it, nothing drawn) into a snapshot of its own, each entry on its
+// own tile, z 0, for the host to build and render one at a time. Asked for
+// at the main menu or in play; recorded on the engine's thread at its next
+// event pump (godot_tiles::record_catalogue).
+//
+// `spec`: comma-separated categories, each with an optional ":N" taking
+// every Kth id so that about N are drawn: terrain, furniture, field, trap,
+// vehicle_part, monster, item. "floor=ID" draws that terrain under every
+// entry that isn't terrain (default t_floor; "floor=" for none).
+struct tile_catalogue_entry {
+    std::string id;       // as the engine's draw asks for it (vehicle parts: vp_<part>)
+    int category = 0;     // TILE_CATEGORY
+    std::string variant;  // a vehicle part's variant, an item's
+    int subtile = -1;     // a multitile's connection shape (cata_tiles' multitile_type), or -1
+    std::string shape;    // its name (center, corner, edge, t_connection, end_piece,
+                          // unconnected, open, broken), "" for none
+    int x = 0, y = 0;     // its tile in the snapshot (tripoint_bub_ms, z 0)
+    bool found = false;   // the tileset has a sprite for it (directly or by looks_like)
+    std::string looks_like;  // the id the tileset's sprite was found under, if not the id
+};
+struct tile_catalogue_info {
+    uint64_t generation = 0;
+    map_snapshot snapshot;
+    std::vector<tile_catalogue_entry> entries;
+};
+void request_tile_catalogue( const std::string &spec );
+bool take_tile_catalogue_request( std::string &spec );
+// Ends a snapshot begun by begin_map_snapshot as the catalogue's, not the
+// map's.
+void publish_tile_catalogue( std::vector<tile_catalogue_entry> entries );
+bool take_tile_catalogue( uint64_t &generation, tile_catalogue_info &out );
+
 } // namespace godot_host
 
 #endif // CATA_SRC_GODOT_HOST_H
