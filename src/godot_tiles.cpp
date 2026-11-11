@@ -46,6 +46,7 @@
 #include "veh_type.h"
 #include "weather.h"
 #include "weather_type.h"
+#include "worldfactory.h"
 
 static const std::string empty_string;
 
@@ -360,12 +361,19 @@ void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
     }
     const restore_on_out_of_scope<bool> restore_recording( recording );
     recording = true;
-    // At the main menu the core data is loaded but not finalized (a world's
-    // start finalizes it, with its mods): finalize it, as --check-mods
-    // does for the core alone, so every id is complete. The catalogue's run
+    // At the main menu the core data isn't finalized (a world's start loads
+    // it again with the world's mods, and finalizes it): load and finalize
+    // the core alone, as --check-mods does (game::check_mod_data), in a
+    // world made for the purpose and deleted again. The catalogue's run
     // quits after; a game started later loads its data afresh.
     if( !g->is_core_data_loaded() ) {
+        world_generator->set_active_world( nullptr );
+        world_generator->init();
+        WORLD *world = world_generator->make_new_world( std::vector<mod_id>() );
+        world_generator->set_active_world( world );
+        g->load_core_data();
         DynamicDataLoader::get_instance().finalize_loaded_data();
+        world_generator->delete_world( world_generator->active_world->world_name, true );
     }
     // The tileset and the map objects first: the snapshot names the
     // tileset's generation, and the host's rules read the objects.
