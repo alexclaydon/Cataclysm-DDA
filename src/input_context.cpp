@@ -522,6 +522,14 @@ const std::string &input_context::handle_input( const int timeout )
         const std::string &action = input_to_action( next_action );
 
 #if defined(CDDA_GODOT)
+        // A keyboard move on the map turns with the view, as the pad's do.
+        if( next_action.type == input_event_t::keyboard_char ||
+            next_action.type == input_event_t::keyboard_code ) {
+            if( const std::string *turned = godot_actions::turned_move( *this, action ) ) {
+                result = turned;
+                break;
+            }
+        }
         // The touch pad's Filter: the key the host sent with the request
         // means this screen's own filter, whatever the key is bound to here.
         if( godot_host::take_filter_request() ) {

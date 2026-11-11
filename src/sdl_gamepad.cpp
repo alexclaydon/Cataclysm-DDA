@@ -478,7 +478,9 @@ static double map_turn()
 {
 #if defined(CDDA_GODOT)
     if( ( !is_in_menu() || in_map_cursor() ) && !alt_modifier_held ) {
-        return godot_host::view_yaw();
+        // In 45-degree steps with hysteresis (godot_host::move_step), so
+        // the host's chevrons show exactly where each direction goes.
+        return godot_host::move_step() * 45.0;
     }
 #endif
     return 0.0;

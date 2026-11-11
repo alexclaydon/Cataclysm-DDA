@@ -24,6 +24,11 @@ struct godot_actions {
     // registers; nullptr for none (the touch pad's Filter, 2026-11-12). A
     // pointer to a static string, as handle_input returns.
     static const std::string *filter_action( const input_context &ctxt );
+    // A keyboard move on the map (play, or a map cursor: look-around,
+    // aiming) turned with the view as the pad's are (godot_host::move_step;
+    // the user's call, 2026-11-12): the turned action, or nullptr when it
+    // stays (not a move, not on the map, or no turn).
+    static const std::string *turned_move( const input_context &ctxt, const std::string &action );
     // At the top of game::handle_action: Go here's held view, back once its
     // route is walked or dropped.
     static void settle_view( game &g, avatar &you );

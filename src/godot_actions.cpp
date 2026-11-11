@@ -279,3 +279,23 @@ const std::string *godot_actions::filter_action( const input_context &ctxt )
     return nullptr;
 }
 #endif // CDDA_GODOT
+
+#if defined(CDDA_GODOT)
+const std::string *godot_actions::turned_move( const input_context &ctxt, const std::string &action )
+{
+    // Clockwise from up, as the pad's directions.
+    static const std::array<std::string, 8> moves = {
+        "UP", "RIGHTUP", "RIGHT", "RIGHTDOWN", "DOWN", "LEFTDOWN", "LEFT", "LEFTUP"
+    };
+    const int step = godot_host::move_step();
+    if( step == 0 || !( ctxt.input_category() == "DEFAULTMODE" || ctxt.is_iso() ) ) {
+        return nullptr;
+    }
+    for( size_t i = 0; i < moves.size(); ++i ) {
+        if( moves[i] == action ) {
+            return &moves[( i + step ) % moves.size()];
+        }
+    }
+    return nullptr;
+}
+#endif // CDDA_GODOT

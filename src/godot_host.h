@@ -257,6 +257,13 @@ bool is_virtual_pad( uint32_t id );
 // turned. Host side, any thread; 0 outside VR.
 void set_view_yaw( float degrees );
 float view_yaw();
+// The view's yaw in 45-degree steps (0-7, clockwise), with hysteresis: it
+// moves to a new step only once the yaw is MOVE_TURN_HYSTERESIS past the
+// half-way line, so a wobble near it doesn't flip which way "left" goes
+// (2026-11-12). Map directions turn by this (sdl_gamepad's map_turn, the
+// keyboard's moves in godot_actions::turned_move), and the host's chevrons
+// show it.
+int move_step();
 
 // Optional: called on the engine thread with each new frame (RGBA8, tightly
 // packed, top row first) instead of keeping it for take_frame, so the host

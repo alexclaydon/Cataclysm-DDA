@@ -1665,9 +1665,23 @@ void godot_host::apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, 
     }
 }
 
+static std::atomic<int> move_step_now{ 0 };
+static constexpr float MOVE_TURN_HYSTERESIS = 6.0f;
+
 void godot_host::set_view_yaw( float degrees )
 {
     view_yaw_degrees.store( degrees );
+    const int step = move_step_now.load();
+    const float off = std::remainder( degrees - step * 45.0f, 360.0f );
+    if( std::abs( off ) > 22.5f + MOVE_TURN_HYSTERESIS ) {
+        const int nearest = static_cast<int>( std::lround( degrees / 45.0f ) );
+        move_step_now.store( ( ( nearest % 8 ) + 8 ) % 8 );
+    }
+}
+
+int godot_host::move_step()
+{
+    return move_step_now.load();
 }
 
 float godot_host::view_yaw()
