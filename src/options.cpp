@@ -1,4 +1,7 @@
 #include "options.h"
+#if defined(CDDA_GODOT)
+#include "godot_options.h"
+#endif
 
 #include <cfloat>
 #include <climits>
@@ -1559,6 +1562,9 @@ void options_manager::init()
     add_options_world_default();
     add_options_debug();
     add_options_android();
+#if defined(CDDA_GODOT)
+    godot_options::hide_hosted( *this );
+#endif
 
     for( Page &p : pages_ ) {
         p.removeRepeatedEmptyLines();
