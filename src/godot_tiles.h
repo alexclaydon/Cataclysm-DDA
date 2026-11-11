@@ -31,6 +31,11 @@ struct godot_tiles {
     // drawn. Kept, a route preview cancelled after a skipped pass came back
     // in the next one and stayed on the board (2026-11-11).
     static void drop_one_shots( cata_tiles &ct );
+    // An effect animation is playing (a projectile, an explosion, a hit
+    // flash, a monster's attack): each step's redraw must be recorded, not
+    // skipped as an unchanged map (sdltiles.cpp map_unchanged), or the 3D
+    // view never sees it while the game still waits on it (2026-11-11).
+    static bool animating( const cata_tiles &ct );
     // While a snapshot is recorded: the weather, the sky, the creatures the
     // avatar sees, the light on its storey, then the other storeys (what
     // the avatar remembers below it, the terrain above), recorded through

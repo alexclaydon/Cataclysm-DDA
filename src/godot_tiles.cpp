@@ -39,6 +39,12 @@
 
 static const std::string empty_string;
 
+bool godot_tiles::animating( const cata_tiles &ct )
+{
+    return ct.do_draw_bullet || ct.do_draw_explosion || ct.do_draw_custom_explosion ||
+           ct.do_draw_hit || ct.do_draw_async_anim;
+}
+
 void godot_tiles::drop_one_shots( cata_tiles &ct )
 {
     ct.void_line();

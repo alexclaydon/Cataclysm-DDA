@@ -52,6 +52,7 @@
 #if defined(CDDA_GODOT)
 #include "godot_actions.h"
 #include "godot_host.h"
+#include "godot_tiles.h"
 // From SDL_main.h, which would also redefine main() (see InitSDL).
 extern "C" SDL_DECLSPEC void SDLCALL SDL_SetMainReady( void );
 #endif
@@ -248,6 +249,7 @@ static bool map_unchanged( bool flush )
                              static_cast<int>( gamepad::get_left_stick_direction() ) );
     const uint32_t now = GetTicks();
     const bool unchanged = !flush && have_last && godot_host::board_shown() && !godot_host::aiming() &&
+                           !( tilecontext && godot_tiles::animating( *tilecontext ) ) &&
                            now_sig == last && now - last_ms < UNCHANGED_MAX_MS;
     if( !unchanged ) {
         last = now_sig;
