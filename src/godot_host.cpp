@@ -64,6 +64,7 @@ std::atomic<bool> text_is_wanted{ false };
 std::atomic<bool> menu_is_open{ false };
 std::atomic<bool> touch_pad_on{ false };
 std::atomic<int> safe_mode_now{ 0 };
+std::atomic<bool> activity_stoppable_now{ false };
 std::atomic<int> radial_sides_now{ 3 };
 std::atomic<bool> route_preview_now{ false };
 std::atomic<int> look_exit_requested{ 0 };  // request_look_exit's, 0 for none
@@ -1020,6 +1021,16 @@ void godot_host::set_safe_mode( int mode )
 int godot_host::safe_mode()
 {
     return safe_mode_now;
+}
+
+void godot_host::set_activity_stoppable( bool stoppable )
+{
+    activity_stoppable_now = stoppable;
+}
+
+bool godot_host::activity_stoppable()
+{
+    return activity_stoppable_now;
 }
 
 namespace

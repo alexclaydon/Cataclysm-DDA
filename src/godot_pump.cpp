@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "activity_type.h"
 #include "avatar.h"
 #include "calendar.h"
 #include "cata_imgui.h"
@@ -17,6 +18,7 @@
 #include "godot_host.h"
 #include "input.h"
 #include "input_context.h"
+#include "player_activity.h"
 #include "point.h"
 #include "sdl_gamepad.h"
 #include "sdltiles.h"
@@ -71,8 +73,14 @@ void godot_host::pump_engine_state()
         const avatar &you = get_avatar();
         godot_host::set_move_mode( you.get_desired_move_mode().str(),
                                    you.get_desired_move_mode() != you.current_movement_mode() );
+        // As handle_key_blocking_activity (do_turn.cpp) decides.
+        const bool unfinished = you.activity && ( you.activity.id()->based_on() == based_on_type::NEITHER ||
+                                you.activity.moves_left > 0 );
+        godot_host::set_activity_stoppable( ( unfinished && you.activity.is_interruptible_with_kb() ) ||
+                                            you.has_destination() );
     } else {
         godot_host::set_move_mode( std::string(), false );
+        godot_host::set_activity_stoppable( false );
     }
     // Which LT wheels the waiting context fills, for the touch pad.
     {

@@ -436,6 +436,14 @@ void set_move_mode( const std::string &id, bool pending );
 std::string move_mode();
 bool move_mode_pending();
 int safe_mode();
+// Whether the avatar's activity (crafting, waiting, reading...) or its
+// auto-move would stop on the pause action, as handle_key_blocking_activity
+// asks (an unfinished activity that takes a keypress, or a destination),
+// for the touch pad's Cancel during one: the wait popup isn't a menu, so
+// the pad showed none (2026-11-11). Asleep is no activity, so not here.
+// The engine thread sets it each event pump; the host reads it any time.
+void set_activity_stoppable( bool stoppable );
+bool activity_stoppable();
 // Which of the LT wheels have anything on the screen waiting for input
 // (bit 0 the left, bit 1 the right), for the touch pad: a finger on the
 // side of an empty wheel opens the other (ADR 0014, a stopgap until LT
