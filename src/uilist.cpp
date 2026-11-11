@@ -949,6 +949,7 @@ shared_ptr_fast<uilist_impl> uilist::query( bool loop, int timeout, bool allow_u
         } else {
             godot_host::clear_menu( this );
         }
+        godot_host::set_list_filters( filtering );
 #endif
         ui_manager::redraw();
         query_once( ctxt, timeout, allow_unfiltered_hotkeys );

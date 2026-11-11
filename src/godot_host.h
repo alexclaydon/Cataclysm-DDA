@@ -452,6 +452,11 @@ void set_filter_action( const std::string &id );
 std::string filter_action();
 void request_filter();
 bool take_filter_request();
+// Whether the list waiting for input filters (uilist::filtering, set each
+// pass of its loop): a few switch it off though they register UILIST.FILTER,
+// so Filter mustn't show over them.
+void set_list_filters( bool filters );
+bool list_filters();
 // The avatar's watch, for the host's digital watch (2026-11-11): shown only
 // when the game would tell the exact time (Character::has_watch: a watch, a
 // charged phone, a clock bionic, a vehicle's clock), as the sidebar's Time.

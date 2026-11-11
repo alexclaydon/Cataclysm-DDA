@@ -268,6 +268,10 @@ const std::string *godot_actions::filter_action( const input_context &ctxt )
         "UILIST.FILTER", "INVENTORY_FILTER", "FILTER", "SEARCH"
     };
     for( const std::string &id : ids ) {
+        // A list with filtering off registers it all the same.
+        if( id == "UILIST.FILTER" && !godot_host::list_filters() ) {
+            continue;
+        }
         if( ctxt.is_registered_action( id ) ) {
             return &id;
         }
