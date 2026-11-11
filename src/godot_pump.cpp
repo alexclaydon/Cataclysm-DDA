@@ -18,10 +18,29 @@
 #include "godot_host.h"
 #include "input.h"
 #include "input_context.h"
+#include "options.h"
 #include "player_activity.h"
 #include "point.h"
 #include "sdl_gamepad.h"
 #include "sdltiles.h"
+
+// The watch (godot_host::set_watch), as display::time_string and
+// date_string read the time and the date.
+static void godot_watch_publish( const avatar &you )
+{
+    if( !you.has_watch() ) {
+        godot_host::set_watch( -1, 0, 0, 0 );
+        return;
+    }
+    const std::string fmt = get_option<std::string>( "24_HOUR" );
+    const int format = fmt == "military" ? 2 : fmt == "24h" ? 1 : 0;
+    const int minute = hour_of_day<int>( calendar::turn ) * 60 + minute_of_hour<int>( calendar::turn );
+    int day = day_of_season<int>( calendar::turn ) + 1;
+    if( calendar::year_length() == 364_days && get_option<bool>( "SHOW_MONTHS" ) ) {
+        day = month_and_day( calendar::turn ).second;
+    }
+    godot_host::set_watch( minute, format, static_cast<int>( day_of_week( calendar::turn ) ), day );
+}
 
 void godot_host::pump_engine_state()
 {
@@ -78,7 +97,9 @@ void godot_host::pump_engine_state()
                                 you.activity.moves_left > 0 );
         godot_host::set_activity_stoppable( ( unfinished && you.activity.is_interruptible_with_kb() ) ||
                                             you.has_destination() );
+        godot_watch_publish( you );
     } else {
+        godot_host::set_watch( -1, 0, 0, 0 );
         godot_host::set_move_mode( std::string(), false );
         godot_host::set_activity_stoppable( false );
     }

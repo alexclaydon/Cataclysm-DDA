@@ -65,6 +65,8 @@ std::atomic<bool> menu_is_open{ false };
 std::atomic<bool> touch_pad_on{ false };
 std::atomic<int> safe_mode_now{ 0 };
 std::atomic<bool> activity_stoppable_now{ false };
+// minute << 16 | format << 12 | weekday << 8 | day; -1 with no watch.
+std::atomic<int> watch_now{ -1 };
 std::atomic<int> radial_sides_now{ 3 };
 std::atomic<bool> route_preview_now{ false };
 std::atomic<int> look_exit_requested{ 0 };  // request_look_exit's, 0 for none
@@ -1031,6 +1033,21 @@ void godot_host::set_activity_stoppable( bool stoppable )
 bool godot_host::activity_stoppable()
 {
     return activity_stoppable_now;
+}
+
+void godot_host::set_watch( int minute, int format, int weekday, int day )
+{
+    watch_now = minute < 0 ? -1 : ( minute << 16 ) | ( ( format & 0xf ) << 12 ) |
+                ( ( weekday & 0xf ) << 8 ) | ( day & 0xff );
+}
+
+std::array<int, 4> godot_host::watch()
+{
+    const int w = watch_now;
+    if( w < 0 ) {
+        return { -1, 0, 0, 0 };
+    }
+    return { w >> 16, ( w >> 12 ) & 0xf, ( w >> 8 ) & 0xf, w & 0xff };
 }
 
 namespace

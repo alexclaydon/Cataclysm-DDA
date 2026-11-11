@@ -444,6 +444,15 @@ int safe_mode();
 // The engine thread sets it each event pump; the host reads it any time.
 void set_activity_stoppable( bool stoppable );
 bool activity_stoppable();
+// The avatar's watch, for the host's digital watch (2026-11-11): shown only
+// when the game would tell the exact time (Character::has_watch: a watch, a
+// charged phone, a clock bionic, a vehicle's clock), as the sidebar's Time.
+// [minute of the day (0-1439), or -1 with no watch; the game's time format
+// (0 12-hour, 1 24-hour, 2 military); the weekday (0 Sunday); the day of
+// the month, or of the season without months]. The engine thread sets it
+// each event pump; the host reads it any time.
+void set_watch( int minute, int format, int weekday, int day );
+std::array<int, 4> watch();
 // Which of the LT wheels have anything on the screen waiting for input
 // (bit 0 the left, bit 1 the right), for the touch pad: a finger on the
 // side of an empty wheel opens the other (ADR 0014, a stopgap until LT
