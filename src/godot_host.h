@@ -164,6 +164,15 @@ enum map_object_flag : uint32_t {
     MOF_GOES_DOWN = 1u << 16,
 };
 
+// What a map_object is (map_object::kind).
+enum map_object_kind : int {
+    MOK_TERRAIN = 0,
+    MOK_FURNITURE = 1,
+    MOK_FIELD = 2,
+    MOK_VEHICLE_PART = 3,  // id as the tileset names it: vp_<part>
+    MOK_TRAP = 4,
+};
+
 struct map_object {
     std::string id;
     bool furniture;
@@ -174,6 +183,14 @@ struct map_object {
     // (blood, gibs, rubble), which lie on the ground; gases and plasma
     // (smoke, fire) stand.
     bool field = false;
+    // Everything else the engine knows of it that a 3D rule might read
+    // (ADR 0020, decision 4: the engine publishes everything once, Dark
+    // Forest picks), named as the game's JSON names it where it can be:
+    int kind = MOK_TERRAIN;
+    std::string name;
+    std::vector<std::string> flag_names;          // every flag it has
+    std::map<std::string, double> numbers;        // its numeric fields
+    std::map<std::string, std::string> strings;   // its other fields
 };
 
 struct map_objects_info {

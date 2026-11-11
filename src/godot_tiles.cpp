@@ -115,18 +115,128 @@ void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
             }
             return f;
         };
+        // And everything else of each that a 3D rule might read (ADR 0020:
+        // published once, Dark Forest picks): every flag by name, and the
+        // fields by their JSON names.
+        const auto common = []( godot_host::map_object & o, const map_data_common_t &t ) {
+            o.name = t.name();
+            o.flag_names.assign( t.get_flags().begin(), t.get_flags().end() );
+            o.numbers["movecost"] = t.movecost;
+            o.numbers["coverage"] = t.coverage;
+            o.numbers["light_emitted"] = t.light_emitted;
+            o.numbers["heat_radiation"] = t.heat_radiation;
+            o.numbers["comfort"] = t.comfort;
+            o.numbers["max_volume"] = units::to_milliliter( t.max_volume );
+            o.numbers["transparent"] = t.transparent ? 1 : 0;
+            o.numbers["connect_groups"] = static_cast<double>( t.connect_groups.to_ullong() );
+            o.numbers["connect_to_groups"] = static_cast<double>( t.connect_to_groups.to_ullong() );
+            o.numbers["rotate_to_groups"] = static_cast<double>( t.rotate_to_groups.to_ullong() );
+            if( !t.looks_like.empty() ) {
+                o.strings["looks_like"] = t.looks_like;
+            }
+            if( !t.base_item.is_null() ) {
+                o.strings["base_item"] = t.base_item.str();
+            }
+        };
         godot_host::map_objects_info objects;
         for( size_t i = 0; i < ter_t::count(); ++i ) {
             const ter_t &t = ter_id( static_cast<int>( i ) ).obj();
-            objects.objects.push_back( { t.id.str(), false, props( t, false ), t.movecost, t.coverage } );
+            godot_host::map_object o{ t.id.str(), false, props( t, false ), t.movecost, t.coverage };
+            o.kind = godot_host::MOK_TERRAIN;
+            common( o, t );
+            if( !t.open.is_null() ) {
+                o.strings["open"] = t.open.str();
+            }
+            if( !t.close.is_null() ) {
+                o.strings["close"] = t.close.str();
+            }
+            if( !t.roof.is_null() ) {
+                o.strings["roof"] = t.roof.str();
+            }
+            objects.objects.push_back( std::move( o ) );
         }
         for( size_t i = 0; i < furn_t::count(); ++i ) {
             const furn_t &f = furn_id( static_cast<int>( i ) ).obj();
-            objects.objects.push_back( { f.id.str(), true, props( f, true ), f.movecost, f.coverage } );
+            godot_host::map_object o{ f.id.str(), true, props( f, true ), f.movecost, f.coverage };
+            o.kind = godot_host::MOK_FURNITURE;
+            common( o, f );
+            o.numbers["mass"] = units::to_gram( f.mass );
+            o.numbers["move_str_req"] = f.move_str_req;
+            o.numbers["keg_capacity"] = units::to_milliliter( f.keg_capacity );
+            o.numbers["movable"] = f.is_movable() ? 1 : 0;
+            if( !f.open.is_null() ) {
+                o.strings["open"] = f.open.str();
+            }
+            if( !f.close.is_null() ) {
+                o.strings["close"] = f.close.str();
+            }
+            if( !f.crafting_pseudo_item.is_null() ) {
+                o.strings["crafting_pseudo_item"] = f.crafting_pseudo_item.str();
+            }
+            if( !f.deployed_item.is_null() ) {
+                o.strings["deployed_item"] = f.deployed_item.str();
+            }
+            objects.objects.push_back( std::move( o ) );
         }
         for( const field_type &ft : field_types::get_all() ) {
             const bool flat = ft.phase == phase_id::LIQUID || ft.phase == phase_id::SOLID;
-            objects.objects.push_back( { ft.id.str(), false, flat ? godot_host::MOF_FLAT : 0u, 0, 0, true } );
+            godot_host::map_object o{ ft.id.str(), false, flat ? godot_host::MOF_FLAT : 0u, 0, 0, true };
+            o.kind = godot_host::MOK_FIELD;
+            o.name = ft.get_name();
+            static const char *const phases[] = { "null", "solid", "liquid", "gas", "plasma" };
+            const int phase = static_cast<int>( ft.phase );
+            o.strings["phase"] = phase >= 0 && phase < 5 ? phases[phase] : "null";
+            o.numbers["priority"] = ft.priority;
+            o.numbers["intensity_levels"] = static_cast<double>( ft.intensity_levels.size() );
+            o.numbers["has_fire"] = ft.has_fire ? 1 : 0;
+            o.numbers["has_acid"] = ft.has_acid ? 1 : 0;
+            o.numbers["has_elec"] = ft.has_elec ? 1 : 0;
+            o.numbers["has_fume"] = ft.has_fume ? 1 : 0;
+            o.numbers["is_splattering"] = ft.is_splattering ? 1 : 0;
+            o.numbers["display_items"] = ft.display_items ? 1 : 0;
+            o.numbers["display_field"] = ft.display_field ? 1 : 0;
+            if( !ft.intensity_levels.empty() ) {
+                o.numbers["transparent"] = ft.intensity_levels.front().transparent ? 1 : 0;
+                o.numbers["dangerous"] = ft.intensity_levels.front().dangerous ? 1 : 0;
+            }
+            objects.objects.push_back( std::move( o ) );
+        }
+        for( const vpart_info &vp : vehicles::parts::get_all() ) {
+            godot_host::map_object o{ "vp_" + vp.id.str(), false, 0u, 0, 0 };
+            o.kind = godot_host::MOK_VEHICLE_PART;
+            o.name = vp.name();
+            o.flag_names.assign( vp.get_flags().begin(), vp.get_flags().end() );
+            o.strings["location"] = vp.location.str();
+            std::string categories;
+            for( const std::string &c : vp.get_categories() ) {
+                categories += ( categories.empty() ? "" : "," ) + c;
+            }
+            o.strings["categories"] = categories;
+            std::string variants;
+            for( const auto &[variant, v] : vp.variants ) {
+                variants += ( variants.empty() ? "" : "," ) + variant;
+            }
+            o.strings["variants"] = variants;
+            if( !vp.base_item.is_null() ) {
+                o.strings["base_item"] = vp.base_item.str();
+            }
+            o.numbers["durability"] = vp.durability;
+            o.numbers["size"] = units::to_milliliter( vp.size );
+            if( vp.folded_volume ) {
+                o.numbers["folded_volume"] = units::to_milliliter( *vp.folded_volume );
+            }
+            objects.objects.push_back( std::move( o ) );
+        }
+        for( size_t i = 0; i < trap::count(); ++i ) {
+            const trap &t = trap_id( static_cast<int>( i ) ).obj();
+            godot_host::map_object o{ t.id.str(), false, 0u, 0, 0 };
+            o.kind = godot_host::MOK_TRAP;
+            o.name = t.name();
+            o.numbers["benign"] = t.is_benign() ? 1 : 0;
+            o.numbers["always_invisible"] = t.is_always_invisible() ? 1 : 0;
+            o.numbers["trap_radius"] = t.get_trap_radius();
+            o.numbers["funnel"] = t.is_funnel() ? 1 : 0;
+            objects.objects.push_back( std::move( o ) );
         }
         godot_host::publish_map_objects( std::move( objects ) );
     }
