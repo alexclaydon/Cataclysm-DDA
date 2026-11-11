@@ -958,6 +958,10 @@ bool take_dialog_request( dialog_request &out );
 // entry that isn't terrain (default t_floor; "floor=" for none).
 // "mods=A+B": the mods loaded with the core at the main menu (default dda,
 // as a new world has); in play, the world's own data is used.
+// "scene=NAME:P+P+...": a context scene, tiles laid out together (wall
+// joins, doors in walls, a vehicle), each P "ID[#SHAPE][/ROTA]@X;Y" (SHAPE
+// a connection shape's name, ROTA its quarter turns, X;Y from the scene's
+// own origin); recorded as entries named for the scene, below the rest.
 struct tile_catalogue_entry {
     std::string id;       // as the engine's draw asks for it (vehicle parts: vp_<part>)
     int category = 0;     // TILE_CATEGORY
@@ -968,6 +972,8 @@ struct tile_catalogue_entry {
     int x = 0, y = 0;     // its tile in the snapshot (tripoint_bub_ms, z 0)
     bool found = false;   // the tileset has a sprite for it (directly or by looks_like)
     std::string looks_like;  // the id the tileset's sprite was found under, if not the id
+    int rota = 0;            // quarter turns (scenes)
+    std::string scene;       // the context scene it belongs to, or ""
 };
 struct tile_catalogue_info {
     uint64_t generation = 0;

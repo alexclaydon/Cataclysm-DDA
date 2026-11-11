@@ -502,6 +502,7 @@ void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
     std::vector<std::pair<std::string, int>> wanted;
     std::string floor = "t_floor";
     std::vector<mod_id> mods;
+    std::vector<std::string> scenes;
     for( const std::string &part : string_split( spec, ',' ) ) {
         if( string_starts_with( part, "floor=" ) ) {
             floor = part.substr( 6 );
@@ -511,6 +512,10 @@ void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
             for( const std::string &m : string_split( part.substr( 5 ), '+' ) ) {
                 mods.emplace_back( m );
             }
+            continue;
+        }
+        if( string_starts_with( part, "scene=" ) ) {
+            scenes.push_back( part.substr( 6 ) );
             continue;
         }
         const size_t colon = part.find( ':' );
@@ -654,6 +659,78 @@ void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
                 entries.push_back( std::move( e ) );
                 ++n;
             }
+        }
+        // The context scenes, each in a band of its own below the rows.
+        int band = ( n + WIDTH - 1 ) / WIDTH + 4;
+        for( const std::string &scene : scenes ) {
+            const size_t colon = scene.find( ':' );
+            if( colon == std::string::npos ) {
+                continue;
+            }
+            const std::string name = scene.substr( 0, colon );
+            int deepest = 0;
+            for( const std::string &place : string_split( scene.substr( colon + 1 ), '+' ) ) {
+                // ID[#SHAPE][/ROTA]@X;Y
+                const size_t at = place.find( '@' );
+                if( at == std::string::npos ) {
+                    continue;
+                }
+                std::string what = place.substr( 0, at );
+                const std::vector<std::string> xy = string_split( place.substr( at + 1 ), ';' );
+                if( xy.size() != 2 ) {
+                    continue;
+                }
+                int rota = 0;
+                if( const size_t slash = what.find( '/' ); slash != std::string::npos ) {
+                    rota = std::atoi( what.substr( slash + 1 ).c_str() );
+                    what = what.substr( 0, slash );
+                }
+                int subtile = -1;
+                std::string shape;
+                if( const size_t hash = what.find( '#' ); hash != std::string::npos ) {
+                    shape = what.substr( hash + 1 );
+                    what = what.substr( 0, hash );
+                    const auto it = std::find( shapes.begin(), shapes.end(), shape );
+                    subtile = it != shapes.end() ? static_cast<int>( it - shapes.begin() ) : -1;
+                }
+                const TILE_CATEGORY category = string_starts_with( what, "f_" ) ? TILE_CATEGORY::FURNITURE :
+                                               string_starts_with( what, "vp_" ) ? TILE_CATEGORY::VEHICLE_PART :
+                                               string_starts_with( what, "fd_" ) ? TILE_CATEGORY::FIELD :
+                                               string_starts_with( what, "tr_" ) ? TILE_CATEGORY::TRAP :
+                                               string_starts_with( what, "mon_" ) ? TILE_CATEGORY::MONSTER :
+                                               TILE_CATEGORY::TERRAIN;
+                // A vehicle part's variant: vp_<part>:<variant>.
+                std::string variant;
+                if( const size_t v = what.find( ':' ); v != std::string::npos ) {
+                    variant = what.substr( v + 1 );
+                    what = what.substr( 0, v );
+                }
+                godot_host::tile_catalogue_entry e;
+                e.id = what;
+                e.category = static_cast<int>( category );
+                e.variant = variant;
+                e.subtile = subtile;
+                e.shape = shape;
+                e.rota = rota;
+                e.scene = name;
+                e.x = std::atoi( xy[0].c_str() );
+                e.y = band + std::atoi( xy[1].c_str() );
+                deepest = std::max( deepest, std::atoi( xy[1].c_str() ) );
+                const std::optional<tile_lookup_res> res = ct.find_tile_looks_like( what, category, variant );
+                e.found = res.has_value();
+                const tripoint_bub_ms pos( e.x, e.y, 0 );
+                int height_3d = 0;
+                if( category == TILE_CATEGORY::VEHICLE_PART ) {
+                    ct.init_draw_vpart_override( pos, vpart_id( what.substr( 3 ) ), 0, 0_degrees, false,
+                                                 point_rel_ms( e.x, e.y ) );
+                } else if( category == TILE_CATEGORY::MONSTER ) {
+                    ct.init_draw_monster_override( pos, mtype_id( what ), 1, false, Creature::Attitude::HOSTILE );
+                }
+                ct.draw_from_id_string( what, category, empty_string, pos, subtile, rota, lit_level::LIT,
+                                        false, height_3d, 0, variant );
+                entries.push_back( std::move( e ) );
+            }
+            band += deepest + 4;
         }
         ct.void_vpart_override();
         ct.void_monster_override();
