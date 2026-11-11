@@ -35,6 +35,7 @@
 #include "map_memory.h"
 #include "map_scale_constants.h"
 #include "mapdata.h"
+#include "mod_manager.h"
 #include "monstergenerator.h"
 #include "mtype.h"
 #include "point.h"
