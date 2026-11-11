@@ -746,8 +746,13 @@ void uilist::calc_data()
         extra_space_right = callback->desired_extra_space_right( ) + s.FramePadding.x;
     }
 
-    float longest_line_width = std::max( { title_size.x, text_size.x,
-                                           calculated_menu_size.x, desc_size.x } );
+    // The title, text and description span the whole window, side columns
+    // and all: the menu column grows only by what they exceed it with them,
+    // or a wide text took the side column's room (organise contents at 80
+    // columns: the pocket panel a sliver).
+    float longest_line_width = std::max( calculated_menu_size.x,
+                                         std::max( { title_size.x, text_size.x, desc_size.x } ) -
+                                         extra_space_left - extra_space_right );
     calculated_bounds.w = extra_space_left + extra_space_right + longest_line_width
                           + window_padding_x + window_border;
     calculated_bounds.h = calculated_menu_size.y + additional_height;
