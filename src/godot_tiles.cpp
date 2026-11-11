@@ -144,10 +144,9 @@ void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
             godot_host::map_object o;
             o.id = t.id.str();
             o.furniture = false;
-            o.flags = props( t;
-            o.movecost = false );
-            o.coverage = t.movecost;
-            o.field = t.coverage;
+            o.flags = props( t, false );
+            o.movecost = t.movecost;
+            o.coverage = t.coverage;
             o.kind = godot_host::MOK_TERRAIN;
             common( o, t );
             if( !t.open.is_null() ) {
@@ -166,10 +165,9 @@ void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
             godot_host::map_object o;
             o.id = f.id.str();
             o.furniture = true;
-            o.flags = props( f;
-            o.movecost = true );
-            o.coverage = f.movecost;
-            o.field = f.coverage;
+            o.flags = props( f, true );
+            o.movecost = f.movecost;
+            o.coverage = f.coverage;
             o.kind = godot_host::MOK_FURNITURE;
             common( o, f );
             o.numbers["mass"] = units::to_gram( f.mass );
