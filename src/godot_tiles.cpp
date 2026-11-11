@@ -25,6 +25,7 @@
 #include "game.h"
 #include "godot_host.h"
 #include "godot_tiles.h"
+#include "init.h"
 #include "item_factory.h"
 #include "itype.h"
 #include "level_cache.h"
@@ -350,6 +351,13 @@ void godot_tiles::record_blit( const cata_tiles &ct, const texture &sprite_tex, 
 
 void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
 {
+    // At the main menu the core data is loaded but not finalized (a world's
+    // start finalizes it, with its mods): finalize it, as --check-mods
+    // does for the core alone, so every id is complete. The catalogue's run
+    // quits after; a game started later loads its data afresh.
+    if( !g->is_core_data_loaded() ) {
+        DynamicDataLoader::get_instance().finalize_loaded_data();
+    }
     // The tileset and the map objects first: the snapshot names the
     // tileset's generation, and the host's rules read the objects.
     publish_tileset_and_objects( ct );
