@@ -132,9 +132,13 @@ void godot_host::pump_engine_state()
         godot_host::set_radial_sides( sides );
     }
     // The 3D translation catalogue, asked for by the host (ADR 0020): drawn
-    // here on the engine's thread, at the main menu or in play.
+    // here on the engine's thread, in play or waiting at the main menu (not
+    // while data loads: its loading screen pumps too).
     std::string tile_catalogue_spec;
-    if( tilecontext && g && godot_host::take_tile_catalogue_request( tile_catalogue_spec ) ) {
+    const bool at_main_menu = input_context::polling != nullptr &&
+                              input_context::polling->input_category() == "MAIN_MENU";
+    if( tilecontext && g && ( g->is_core_data_loaded() || at_main_menu ) &&
+        godot_host::take_tile_catalogue_request( tile_catalogue_spec ) ) {
         godot_tiles::record_catalogue( *tilecontext, tile_catalogue_spec );
     }
 }
