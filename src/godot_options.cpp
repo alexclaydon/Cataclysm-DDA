@@ -19,7 +19,7 @@ void godot_options::hide_hosted( options_manager &om )
     for( const char *name : hosted ) {
         const auto it = om.options.find( name );
         if( it != om.options.end() ) {
-            it->second.hide = COPT_ALWAYS_HIDE;
+            it->second.hide = options_manager::COPT_ALWAYS_HIDE;
         }
     }
 }
