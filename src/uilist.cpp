@@ -750,6 +750,19 @@ void uilist::calc_data()
     // and all: the menu column grows only by what they exceed it with them,
     // or a wide text took the side column's room (organise contents at 80
     // columns: the pocket panel a sliver).
+    // And with a side column, the menu column gives way to it where the
+    // window would be wider than the screen: entries longer than the room
+    // left are cut at the column's edge (organise contents' nested entries
+    // took all but a sliver of 80 columns from its pocket panel).
+    if( extra_space_left + extra_space_right > 0.0f ) {
+        const float room = ImGui::GetMainViewport()->Size.x - extra_space_left - extra_space_right -
+                           window_padding_x - window_border;
+        if( room > 0.0f && calculated_menu_size.x > room ) {
+            calculated_menu_size.x = room;
+            calculated_label_width = std::max( 0.0f, room - calculated_hotkey_width -
+                                               calculated_secondary_width - 3.0f * padding );
+        }
+    }
     float longest_line_width = std::max( calculated_menu_size.x,
                                          std::max( { title_size.x, text_size.x, desc_size.x } ) -
                                          extra_space_left - extra_space_right );
