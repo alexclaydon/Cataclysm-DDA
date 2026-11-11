@@ -9,12 +9,16 @@
 
 void godot_options::hide_hosted( options_manager &om )
 {
-    static const std::array<const char *, 14> hosted = {
+    // The display profile sets the first ones; the animations are drawn on
+    // the engine's own map, which Dark Forest never shows, so they only cost
+    // redraws (display/dark-forest-common.json sets them off, 2026-11-11).
+    static const std::array<const char *, 16> hosted = {
         "TERMINAL_X", "TERMINAL_Y",
         "FONT_WIDTH", "FONT_HEIGHT", "FONT_SIZE",
         "MAP_FONT_WIDTH", "MAP_FONT_HEIGHT", "MAP_FONT_SIZE",
         "OVERMAP_FONT_WIDTH", "OVERMAP_FONT_HEIGHT", "OVERMAP_FONT_SIZE",
         "FULLSCREEN", "SCALING_FACTOR", "DISPLAY",
+        "ANIMATION_RAIN", "ANIMATION_SCT",
     };
     for( const char *name : hosted ) {
         const auto it = om.options.find( name );
