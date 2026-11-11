@@ -16,6 +16,7 @@
 
 #include "avatar.h"
 #include "calendar.h"
+#include "cata_scope_helpers.h"
 #include "cata_tiles.h"
 #include "cata_utility.h"
 #include "coordinates.h"
@@ -351,6 +352,14 @@ void godot_tiles::record_blit( const cata_tiles &ct, const texture &sprite_tex, 
 
 void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
 {
+    // Finalizing shows a loading screen, which pumps events, which would
+    // come back here for a request the host repeated meanwhile.
+    static bool recording = false;
+    if( recording ) {
+        return;
+    }
+    const restore_on_out_of_scope<bool> restore_recording( recording );
+    recording = true;
     // At the main menu the core data is loaded but not finalized (a world's
     // start finalizes it, with its mods): finalize it, as --check-mods
     // does for the core alone, so every id is complete. The catalogue's run
@@ -491,6 +500,9 @@ void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
         ct.void_monster_override();
     }
     godot_host::publish_tile_catalogue( std::move( entries ) );
+    // Requests repeated while this ran are answered by it.
+    std::string repeated;
+    godot_host::take_tile_catalogue_request( repeated );
 }
 
 #endif // CDDA_GODOT
