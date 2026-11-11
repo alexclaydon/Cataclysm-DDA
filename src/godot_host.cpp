@@ -2147,4 +2147,20 @@ bool godot_host::take_tile_catalogue( uint64_t &generation, tile_catalogue_info 
     return true;
 }
 
+namespace
+{
+std::map<std::string, std::string> tile_substitutes;
+} // namespace
+
+void godot_host::set_tile_substitutes( std::map<std::string, std::string> substitutes )
+{
+    tile_substitutes = std::move( substitutes );
+}
+
+const std::string *godot_host::tile_substitute( const std::string &id )
+{
+    const auto it = tile_substitutes.find( id );
+    return it != tile_substitutes.end() ? &it->second : nullptr;
+}
+
 #endif // CDDA_GODOT

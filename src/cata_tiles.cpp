@@ -2515,6 +2515,14 @@ cata_tiles::find_tile_looks_like( const std::string &id, TILE_CATEGORY category,
     if( auto ret = find_tile_with_season( id ) ) {
         return ret; // no variant
     }
+#if defined(CDDA_GODOT)
+    // Dark Forest's substitute for an id the tileset has no art for.
+    if( const std::string *sub = godot_host::tile_substitute( id ); sub != nullptr ) {
+        if( auto ret = find_tile_looks_like( *sub, category, variant, looks_like_jumps_limit - 1 ) ) {
+            return ret;
+        }
+    }
+#endif
 
     // Oops we found nothing for it --> looks_like or bust.
     switch( category ) {

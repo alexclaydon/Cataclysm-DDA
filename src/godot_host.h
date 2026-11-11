@@ -993,6 +993,14 @@ bool take_tile_catalogue_request( std::string &spec );
 void publish_tile_catalogue( std::vector<tile_catalogue_entry> entries );
 bool take_tile_catalogue( uint64_t &generation, tile_catalogue_info &out );
 
+// Substitutes for ids the tileset has no art for (Dark Forest's
+// placeholders.json, the user's call, 2026-11-12): id -> an id whose sprite
+// stands in, tried by cata_tiles::find_tile_looks_like after the tileset's
+// own lookup fails and before the game data's looks_like. Set by the host
+// before run(); read-only after.
+void set_tile_substitutes( std::map<std::string, std::string> substitutes );
+const std::string *tile_substitute( const std::string &id );
+
 } // namespace godot_host
 
 #endif // CATA_SRC_GODOT_HOST_H
