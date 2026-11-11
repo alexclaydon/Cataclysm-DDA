@@ -939,6 +939,8 @@ bool take_dialog_request( dialog_request &out );
 // every Kth id so that about N are drawn: terrain, furniture, field, trap,
 // vehicle_part, monster, item. "floor=ID" draws that terrain under every
 // entry that isn't terrain (default t_floor; "floor=" for none).
+// "mods=A+B": the mods loaded with the core at the main menu (default dda,
+// as a new world has); in play, the world's own data is used.
 struct tile_catalogue_entry {
     std::string id;       // as the engine's draw asks for it (vehicle parts: vp_<part>)
     int category = 0;     // TILE_CATEGORY

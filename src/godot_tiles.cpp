@@ -361,35 +361,44 @@ void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
     }
     const restore_on_out_of_scope<bool> restore_recording( recording );
     recording = true;
-    // At the main menu the core data isn't finalized (a world's start loads
-    // it again with the world's mods, and finalizes it): load and finalize
-    // the core alone, as --check-mods does (game::check_mod_data), in a
-    // world made for the purpose and deleted again. The catalogue's run
-    // quits after; a game started later loads its data afresh.
-    if( !g->is_core_data_loaded() ) {
-        world_generator->set_active_world( nullptr );
-        world_generator->init();
-        WORLD *world = world_generator->make_new_world( std::vector<mod_id>() );
-        world_generator->set_active_world( world );
-        g->load_core_data();
-        DynamicDataLoader::get_instance().finalize_loaded_data();
-        world_generator->delete_world( world_generator->active_world->world_name, true );
-    }
-    // The tileset and the map objects first: the snapshot names the
-    // tileset's generation, and the host's rules read the objects.
-    publish_tileset_and_objects( ct );
     // The categories asked for, each with how many to draw (0: all).
     std::vector<std::pair<std::string, int>> wanted;
     std::string floor = "t_floor";
+    std::vector<mod_id> mods;
     for( const std::string &part : string_split( spec, ',' ) ) {
         if( string_starts_with( part, "floor=" ) ) {
             floor = part.substr( 6 );
+            continue;
+        }
+        if( string_starts_with( part, "mods=" ) ) {
+            for( const std::string &m : string_split( part.substr( 5 ), '+' ) ) {
+                mods.emplace_back( m );
+            }
             continue;
         }
         const size_t colon = part.find( ':' );
         wanted.emplace_back( part.substr( 0, colon ),
                              colon == std::string::npos ? 0 : std::atoi( part.substr( colon + 1 ).c_str() ) );
     }
+    // At the main menu no world's data is loaded (the menu loads the bare
+    // core, unfinalized; a world's start loads it again with the world's
+    // mods, dda among them, and finalizes it). Load it as a game's start
+    // does (game::setup), for a world made for the purpose with the mods
+    // asked for (dda when none), deleted again after. The catalogue's run
+    // quits after; a game started later loads its data afresh.
+    if( !g->is_core_data_loaded() ) {
+        world_generator->set_active_world( nullptr );
+        world_generator->init();
+        WORLD *world = world_generator->make_new_world( mods );
+        world_generator->set_active_world( world );
+        g->load_core_data();
+        world_generator->get_mod_manager().check_mods_list( world );
+        g->load_world_modfiles();
+        world_generator->delete_world( world->world_name, true );
+    }
+    // The tileset and the map objects: the snapshot names the tileset's
+    // generation, and the host's rules read the objects.
+    publish_tileset_and_objects( ct );
     struct candidate {
         std::string id;
         TILE_CATEGORY category;
