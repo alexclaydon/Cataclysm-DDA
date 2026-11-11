@@ -457,6 +457,12 @@ bool take_filter_request();
 // so Filter mustn't show over them.
 void set_list_filters( bool filters );
 bool list_filters();
+// The text a prompt starts from (string_input_popup::query_string), for the
+// host's on-screen keyboard: iOS's keyboard deletes only what its own hidden
+// field holds, so it opens with this in it, or an edited filter's old text
+// couldn't be backspaced (2026-11-12).
+void set_text_entry( const std::string &text );
+std::string text_entry();
 // The avatar's watch, for the host's digital watch (2026-11-11): shown only
 // when the game would tell the exact time (Character::has_watch: a watch, a
 // charged phone, a clock bionic, a vehicle's clock), as the sidebar's Time.

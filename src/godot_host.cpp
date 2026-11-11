@@ -67,6 +67,8 @@ std::atomic<int> safe_mode_now{ 0 };
 std::atomic<bool> activity_stoppable_now{ false };
 std::atomic<bool> filter_requested{ false };
 std::atomic<bool> list_filters_now{ true };
+std::mutex text_entry_mutex;
+std::string text_entry_now;
 std::mutex filter_mutex;
 std::string filter_action_now;
 // minute << 16 | format << 12 | weekday << 8 | day; -1 with no watch.
@@ -1059,6 +1061,18 @@ void godot_host::request_filter()
 bool godot_host::take_filter_request()
 {
     return filter_requested.exchange( false );
+}
+
+void godot_host::set_text_entry( const std::string &text )
+{
+    std::lock_guard<std::mutex> lock( text_entry_mutex );
+    text_entry_now = text;
+}
+
+std::string godot_host::text_entry()
+{
+    std::lock_guard<std::mutex> lock( text_entry_mutex );
+    return text_entry_now;
 }
 
 void godot_host::set_list_filters( bool filters )

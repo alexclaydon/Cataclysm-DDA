@@ -23,6 +23,9 @@
 #if defined(TILES)
 #include "sdl_gamepad.h"
 #endif
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
 
 #if defined(TILES)
 #include "sdl_wrappers.h"
@@ -408,6 +411,9 @@ const std::string &string_input_popup::query_string( const bool loop, const bool
     _text_changed = false;
     utf8_wrapper ret( _text );
     utf8_wrapper edit( ctxt->get_edittext() );
+#if defined(CDDA_GODOT)
+    godot_host::set_text_entry( _text );
+#endif
     if( _position == -1 ) {
         _position = ret.length();
     }
