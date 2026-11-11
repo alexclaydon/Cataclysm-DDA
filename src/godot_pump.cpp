@@ -15,6 +15,7 @@
 #include "cata_tiles.h"
 #include "coordinates.h"
 #include "game.h"
+#include "godot_actions.h"
 #include "godot_host.h"
 #include "input.h"
 #include "input_context.h"
@@ -78,6 +79,8 @@ void godot_host::pump_engine_state()
                                  input_context::input_context_stack.back();
         godot_host::set_menu_pages( waiting != nullptr && waiting->is_registered_action( "PAGE_UP" ) );
         godot_host::set_waiting_category( waiting != nullptr ? waiting->input_category() : std::string() );
+        const std::string *filter = waiting != nullptr ? godot_actions::filter_action( *waiting ) : nullptr;
+        godot_host::set_filter_action( filter != nullptr ? *filter : std::string() );
     }
     {
         // 3: on, and it just refused to attack a neutral creature.

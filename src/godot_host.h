@@ -444,6 +444,14 @@ int safe_mode();
 // The engine thread sets it each event pump; the host reads it any time.
 void set_activity_stoppable( bool stoppable );
 bool activity_stoppable();
+// The touch pad's Filter (2026-11-12): the text filter the screen waiting
+// for input offers (godot_actions::filter_action; empty for none), set each
+// event pump; and the host's request to use it, taken by input_context's
+// handle_input on the next input (the host sends a key to wake it).
+void set_filter_action( const std::string &id );
+std::string filter_action();
+void request_filter();
+bool take_filter_request();
 // The avatar's watch, for the host's digital watch (2026-11-11): shown only
 // when the game would tell the exact time (Character::has_watch: a watch, a
 // charged phone, a clock bionic, a vehicle's clock), as the sidebar's Time.

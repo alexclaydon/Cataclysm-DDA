@@ -65,6 +65,9 @@ std::atomic<bool> menu_is_open{ false };
 std::atomic<bool> touch_pad_on{ false };
 std::atomic<int> safe_mode_now{ 0 };
 std::atomic<bool> activity_stoppable_now{ false };
+std::atomic<bool> filter_requested{ false };
+std::mutex filter_mutex;
+std::string filter_action_now;
 // minute << 16 | format << 12 | weekday << 8 | day; -1 with no watch.
 std::atomic<int> watch_now{ -1 };
 std::atomic<int> radial_sides_now{ 3 };
@@ -1033,6 +1036,28 @@ void godot_host::set_activity_stoppable( bool stoppable )
 bool godot_host::activity_stoppable()
 {
     return activity_stoppable_now;
+}
+
+void godot_host::set_filter_action( const std::string &id )
+{
+    std::lock_guard<std::mutex> lock( filter_mutex );
+    filter_action_now = id;
+}
+
+std::string godot_host::filter_action()
+{
+    std::lock_guard<std::mutex> lock( filter_mutex );
+    return filter_action_now;
+}
+
+void godot_host::request_filter()
+{
+    filter_requested = true;
+}
+
+bool godot_host::take_filter_request()
+{
+    return filter_requested.exchange( false );
 }
 
 void godot_host::set_watch( int minute, int format, int weekday, int day )

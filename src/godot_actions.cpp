@@ -4,6 +4,7 @@
 // from handle_action.cpp unchanged (2026-11-09, plan 0022).
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <optional>
 #include <string>
@@ -14,6 +15,7 @@
 #include "calendar.h"
 #include "coordinates.h"
 #include "game.h"
+#include "input_context.h"
 #include "map_scale_constants.h"
 #include "godot_actions.h"
 #include "godot_host.h"
@@ -257,4 +259,19 @@ void godot_actions::publish_overmap_state( const tripoint_abs_omt &curs )
     godot_host::set_overmap_state( !route.empty() && route.front().xy() == curs.xy() ? 2 : 1 );
 }
 
+#endif // CDDA_GODOT
+
+#if defined(CDDA_GODOT)
+const std::string *godot_actions::filter_action( const input_context &ctxt )
+{
+    static const std::array<std::string, 4> ids = {
+        "UILIST.FILTER", "INVENTORY_FILTER", "FILTER", "SEARCH"
+    };
+    for( const std::string &id : ids ) {
+        if( ctxt.is_registered_action( id ) ) {
+            return &id;
+        }
+    }
+    return nullptr;
+}
 #endif // CDDA_GODOT

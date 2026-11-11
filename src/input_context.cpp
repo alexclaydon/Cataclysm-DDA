@@ -38,6 +38,10 @@
 #include "string_input_popup.h"
 #include "translations.h"
 #include "ui_manager.h"
+#if defined(CDDA_GODOT)
+#include "godot_actions.h"
+#include "godot_host.h"
+#endif
 #include "localized_comparator.h"
 #include "uilist.h"
 #include "sdl_gamepad.h"
@@ -518,6 +522,14 @@ const std::string &input_context::handle_input( const int timeout )
         const std::string &action = input_to_action( next_action );
 
 #if defined(CDDA_GODOT)
+        // The touch pad's Filter: the key the host sent with the request
+        // means this screen's own filter, whatever the key is bound to here.
+        if( godot_host::take_filter_request() ) {
+            if( const std::string *filter = godot_actions::filter_action( *this ) ) {
+                result = filter;
+                break;
+            }
+        }
         // The touch pad's X is always the action list (ADR 0014: it is
         // labelled Actions), the screen's own X action listed in it. A real
         // pad's X keeps that action.

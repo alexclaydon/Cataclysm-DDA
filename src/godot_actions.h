@@ -16,8 +16,14 @@
 
 class avatar;
 class game;
+class input_context;
 
 struct godot_actions {
+    // The text filter the screen waiting for input offers, the first of
+    // UILIST.FILTER, INVENTORY_FILTER, FILTER and the overmap's SEARCH it
+    // registers; nullptr for none (the touch pad's Filter, 2026-11-12). A
+    // pointer to a static string, as handle_input returns.
+    static const std::string *filter_action( const input_context &ctxt );
     // At the top of game::handle_action: Go here's held view, back once its
     // route is walked or dropped.
     static void settle_view( game &g, avatar &you );
