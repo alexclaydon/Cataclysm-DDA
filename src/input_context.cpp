@@ -523,8 +523,9 @@ const std::string &input_context::handle_input( const int timeout )
 
 #if defined(CDDA_GODOT)
         // A keyboard move on the map turns with the view, as the pad's do.
-        if( next_action.type == input_event_t::keyboard_char ||
-            next_action.type == input_event_t::keyboard_code ) {
+        // Not the num keys the pad sends on map cursors: already turned.
+        if( ( next_action.type == input_event_t::keyboard_char ||
+              next_action.type == input_event_t::keyboard_code ) && !gamepad::last_input_was_pad() ) {
             if( const std::string *turned = godot_actions::turned_move( *this, action ) ) {
                 result = turned;
                 break;
