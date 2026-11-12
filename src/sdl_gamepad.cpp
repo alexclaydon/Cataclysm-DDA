@@ -1689,10 +1689,42 @@ void test_button( pad_button which, bool down )
     handle_event( event );
 }
 
+#if defined(CDDA_GODOT)
+// A held stick turns with the view: a stick's direction is read, turned by
+// the view's step (map_turn), only when it moves, so when the step changes
+// with a stick pushed, read it again from the pad in use. (The host re-sent
+// only the on-screen virtual pad's stick: a physical pad held its old
+// direction while the camera turned, 2026-11-12.)
+static void reread_sticks_on_turn()
+{
+    static int step_seen = 0;
+    const int step = godot_host::move_step();
+    if( step == step_seen ) {
+        return;
+    }
+    step_seen = step;
+    if( controller == nullptr && !test_mode ) {
+        return;
+    }
+    for( int i = 0; i < max_sticks; ++i ) {
+        if( ( i == 0 ? left_stick_dir : right_stick_dir ) == direction::NONE ) {
+            continue;
+        }
+        SDL_Event again{};
+        again.type = CATA_CONTROLLERAXISMOTION;
+        again.gaxis.which = controller_id;
+        again.gaxis.axis = static_cast<Uint8>( sticks_axis[i][0] );
+        again.gaxis.value = get_controller_axis( sticks_axis[i][0] );
+        handle_axis_event( again );
+    }
+}
+#endif
+
 bool handle_event( SDL_Event &event )
 {
     check_wheel();
 #if defined(CDDA_GODOT)
+    reread_sticks_on_turn();
     // The host has the pad (godot_host::set_pad_captured): it reads the pad
     // itself, and nothing reaches the game until it lets go.
     {
