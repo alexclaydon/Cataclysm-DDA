@@ -442,6 +442,14 @@ bool talking();
 // bare screen as Escape. The engine thread sets it; the host reads it.
 void set_aiming( bool aiming );
 bool aiming();
+// Aiming's target cursor, as look-around's above, for Dark Forest's touch
+// slide: target_ui::run reports it each pass (`dx`, `dy` tiles from the
+// avatar; none while not aiming, set_aiming( false ) clears it) and takes
+// the host's request there, moving the target and centring the view on it.
+void set_aim_cursor( int dx, int dy );
+bool aim_cursor( int &dx, int &dy );
+void request_aim_cursor( int dx, int dy );
+bool take_aim_cursor_request( int &dx, int &dy );
 // The game's safe mode (game::safe_mode: 0 off, 1 on, 2 stopped by a newly
 // spotted hostile; and ours, 3: on, having just refused to attack a neutral
 // creature, note_safe_refusal), for the host's touch Safe mode control. The engine

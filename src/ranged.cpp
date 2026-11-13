@@ -2873,6 +2873,11 @@ target_handler::trajectory target_ui::run()
     // Load settings
     unload_RAS_weapon = get_option<bool>( "UNLOAD_RAS_WEAPON" );
     snap_to_target = get_option<bool>( "SNAP_TO_TARGET" );
+#if defined(CDDA_GODOT)
+    // On the touch pad the view follows the target, as look-around's
+    // follows its cursor: the slide moves both.
+    snap_to_target = snap_to_target || godot_host::touch_pad();
+#endif
     if( mode == TargetMode::Turrets ) {
         // Due to how cluttered the display would become, disable it by default
         // unless aiming a single turret.
@@ -2994,9 +2999,23 @@ target_handler::trajectory target_ui::run()
 
         // Wait for user input (or use value retrieved from activity)
         if( action.empty() ) {
+#if defined(CDDA_GODOT)
+            godot_host::set_aim_cursor( dst.x() - src.x(), dst.y() - src.y() );
+#endif
             int timeout = get_option<int>( "EDGE_SCROLL" );
             action = ctxt.handle_input( timeout );
         }
+#if defined(CDDA_GODOT)
+        // The touch pad's slide and taps: the target to the tile, the view
+        // centred on it (its nudge wakes the input above).
+        if( int adx = 0, ady = 0; godot_host::take_aim_cursor_request( adx, ady ) ) {
+            set_cursor_pos( src + tripoint_rel_ms( adx, ady, dst.z() - src.z() ) );
+            set_view_offset( dst - src );
+            if( action == "MOUSE_MOVE" || action == "TIMEOUT" ) {
+                continue;
+            }
+        }
+#endif
 
         // If an aiming mode is selected, use "*_SHOT" instead of "FIRE"
         if( mode == TargetMode::Fire && action == "FIRE" && aim_mode->has_threshold ) {

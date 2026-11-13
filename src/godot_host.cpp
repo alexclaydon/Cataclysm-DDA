@@ -688,6 +688,9 @@ namespace
 // Packed as looking << 32 | dx << 16 | dy, 16 bits each (two's complement).
 std::atomic<uint64_t> look_cursor_state{ 0 };
 std::atomic<uint64_t> look_cursor_request{ 0 };  // 1 << 32 | dx << 16 | dy, 0 for none
+// Aiming's, packed the same way.
+std::atomic<uint64_t> aim_cursor_state{ 0 };
+std::atomic<uint64_t> aim_cursor_request{ 0 };
 
 uint64_t pack_cursor( int dx, int dy )
 {
@@ -1523,6 +1526,41 @@ int godot_host::glyph_style()
 void godot_host::set_aiming( bool aiming )
 {
     aiming_now = aiming;
+    if( !aiming ) {
+        aim_cursor_state.store( 0 );
+        aim_cursor_request.store( 0 );
+    }
+}
+
+void godot_host::set_aim_cursor( int dx, int dy )
+{
+    aim_cursor_state.store( pack_cursor( dx, dy ) );
+}
+
+bool godot_host::aim_cursor( int &dx, int &dy )
+{
+    const uint64_t v = aim_cursor_state.load();
+    if( v == 0 ) {
+        return false;
+    }
+    unpack_cursor( v, dx, dy );
+    return true;
+}
+
+void godot_host::request_aim_cursor( int dx, int dy )
+{
+    aim_cursor_request.store( pack_cursor( dx, dy ) );
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_aim_cursor_request( int &dx, int &dy )
+{
+    const uint64_t v = aim_cursor_request.exchange( 0 );
+    if( v == 0 ) {
+        return false;
+    }
+    unpack_cursor( v, dx, dy );
+    return true;
 }
 
 bool godot_host::aiming()
