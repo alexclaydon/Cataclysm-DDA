@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <map>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -34,9 +35,19 @@
 #include "string_formatter.h"
 #include "translations.h"
 #include "type_id.h"
+#include "uilist.h"
+
+static const activity_id ACT_DISASSEMBLE( "ACT_DISASSEMBLE" );
+static const itype_id itype_disassembly( "disassembly" );
 
 namespace
 {
+
+// A batch is placing its in-progress disassemblies (query_placement): the
+// first answer to "What to do with the in progress disassembly?" stands
+// for the rest, rather than one question per item.
+bool batch_placement = false;
+std::optional<int> kept_placement;
 
 const recipe &uncraft_of( const item &it )
 {
@@ -156,6 +167,9 @@ bool godot_disassemble::menu( Character &you )
         return false;
     }
 
+    batch_placement = false;
+    kept_placement.reset();
+
     // Asked once for the lot: favourited, worn and others' items, which
     // upstream asks about one by one. No leaves them out.
     std::string cautions;
@@ -192,7 +206,8 @@ bool godot_disassemble::menu( Character &you )
     // whether one might teach its recipe.
     if( get_option<bool>( "QUERY_DISASSEMBLE" ) ) {
         std::map<itype_id, int> yields;
-        std::vector<std::string> items;
+        // Each name once, with how many (eight sheets are one line).
+        std::vector<std::pair<drop_location, int>> items;
         int64_t moves = 0;
         bool learn = false;
         for( const drop_location &sel : chosen ) {
@@ -200,7 +215,15 @@ bool godot_disassemble::menu( Character &you )
             for( const item_comp &comp : sel.first->get_uncraft_components() ) {
                 yields[comp.type] += comp.count * n;
             }
-            items.push_back( named( sel ) );
+            auto same = std::find_if( items.begin(), items.end(),
+            [&sel]( const std::pair<drop_location, int> &i ) {
+                return !sel.first->count_by_charges() && i.first.first->stacks_with( *sel.first );
+            } );
+            if( same == items.end() ) {
+                items.emplace_back( sel, 1 );
+            } else {
+                ++same->second;
+            }
             moves += moves_of( you, sel );
             const recipe &r = uncraft_of( *sel.first );
             learn = learn || ( !r.learn_by_disassembly.empty() && !you.knows_recipe( &r ) &&
@@ -211,8 +234,10 @@ bool godot_disassemble::menu( Character &you )
             yield_list += "- " + item_comp( y.first, y.second ).to_string() + "\n";
         }
         std::string item_list;
-        for( const std::string &name : items ) {
-            item_list += "- " + name + "\n";
+        for( const std::pair<drop_location, int> &i : items ) {
+            item_list += "- " + ( i.second > 1 ?
+                                  string_format( "%d %s", i.second, colorize( i.first.first->tname( i.second ),
+                                          i.first.first->color_in_inventory() ) ) : named( i.first ) ) + "\n";
         }
         std::string question = string_format(
                                    _( "Disassemble:\n%s\nMay yield:\n%s\nTime: %s\nReally disassemble?" ),
@@ -239,6 +264,12 @@ bool godot_disassemble::menu( Character &you )
     std::stable_partition( chosen.begin(), chosen.end(), [&partial]( const drop_location & sel ) {
         return !partial( sel );
     } );
+    // Recipes read now: starting the activity turns the first item into its
+    // in-progress disassembly, and its location then points at nothing.
+    std::vector<const recipe *> recipes;
+    for( const drop_location &sel : chosen ) {
+        recipes.push_back( &uncraft_of( *sel.first ) );
+    }
     const drop_location &first = chosen.back();
     player_activity act( disassemble_activity_actor( moves_of( you, first ) ) );
     for( const drop_location &sel : chosen ) {
@@ -249,10 +280,31 @@ bool godot_disassemble::menu( Character &you )
     act.index = false;
     act.position = amount_of( first );
     act.values.push_back( 1 );
+    batch_placement = true;
+    kept_placement.reset();
     you.assign_activity( act );
-    for( const drop_location &sel : chosen ) {
-        uncraft_of( *sel.first ).apply_negative_morale_mods( you );
+    for( const recipe *r : recipes ) {
+        r->apply_negative_morale_mods( you );
     }
     return true;
+}
+
+void godot_disassemble::query_placement( uilist &menu, const Character &you, const item &craft )
+{
+    const bool batch = batch_placement && craft.typeId() == itype_disassembly &&
+                       you.activity.id() == ACT_DISASSEMBLE;
+    if( batch && kept_placement ) {
+        menu.ret = *kept_placement;
+    } else {
+        menu.query();
+        if( batch ) {
+            kept_placement = menu.ret;
+        }
+    }
+    // The last of the batch (the activity pops each target once placed).
+    if( batch && you.activity.targets.size() <= 1 ) {
+        batch_placement = false;
+        kept_placement.reset();
+    }
 }
 #endif // CDDA_GODOT

@@ -1001,7 +1001,11 @@ static item_location place_craft_or_disassembly(
             amenu.addentry( STASH, can_stash, '3', _( "Store it in your inventory." ) );
             amenu.addentry( DROP, true, '4', _( "Drop it on the ground." ) );
 
+#if defined( CDDA_GODOT )
+            godot_disassemble::query_placement( amenu, ch, craft );
+#else
             amenu.query();
+#endif
             const option choice = amenu.ret == UILIST_CANCEL ? DROP : static_cast<option>( amenu.ret );
             switch( choice ) {
                 case WIELD_CRAFT: {
