@@ -952,6 +952,7 @@ struct dialog_state {
     bool cancel = false;     // may be cancelled
     bool anykey = false;     // a popup any key dismisses
     int max_length = 0;      // an input's, 0 none
+    int selected = -1;       // a popup's option the keys and the pad are on, -1 none
 };
 enum class dialog_request_kind : int { choose, cancel, dismiss, submit };
 struct dialog_request {
@@ -963,6 +964,9 @@ bool get_dialog( dialog_state &out );
 void request_dialog( const dialog_request &r );
 void publish_dialog( const void *owner, dialog_state state );
 void clear_dialog( const void *owner );
+// The popup's current option, as it moves (query_popup's loop): a new
+// serial when it changes, so the host outlines it.
+void set_dialog_selected( const void *owner, int selected );
 bool take_dialog_request( dialog_request &out );
 
 // The 3D translation catalogue (ADR 0020, plan 0024): every id of the

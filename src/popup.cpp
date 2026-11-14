@@ -486,6 +486,11 @@ query_popup::result query_popup::query_once()
     }
 #endif
     do {
+#if defined(CDDA_GODOT)
+        if( host_drawn ) {
+            godot_host::set_dialog_selected( this, impl->keyboard_selected_option );
+        }
+#endif
         ui_manager::redraw();
         res.action = ctxt.handle_input( 50 );
         res.evt = ctxt.get_raw_input();

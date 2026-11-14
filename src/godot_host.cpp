@@ -1507,6 +1507,15 @@ void godot_host::publish_dialog( const void *owner, dialog_state state )
     dialog_up = true;
 }
 
+void godot_host::set_dialog_selected( const void *owner, int selected )
+{
+    std::lock_guard<std::mutex> lock( dialog_mutex );
+    if( dialog_up && owner == dialog_owner && dialog_now.selected != selected ) {
+        dialog_now.selected = selected;
+        dialog_now.serial = ++dialog_serial;
+    }
+}
+
 void godot_host::clear_dialog( const void *owner )
 {
     std::lock_guard<std::mutex> lock( dialog_mutex );
