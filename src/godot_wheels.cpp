@@ -15,6 +15,9 @@
 #include "creature_tracker.h"
 #include "item.h"
 #include "item_location.h"
+#include "itype.h"
+#include "damage.h"
+#include "flag.h"
 #include "game.h"
 #include "godot_host.h"
 #include "input.h"
@@ -136,13 +139,33 @@ std::string godot_host::stairs_action()
     return "";
 }
 
+static const damage_type_id damage_bash( "bash" );
+static const flag_id flag_JAVELIN( "JAVELIN" );
+
 namespace
 {
+// Made for throwing (the user's call, 2026-11-15: the game throws anything,
+// but Throw stands for what is meant to be thrown): thrown damage of its
+// own, unlike the default every item gets on loading (item_factory's
+// finalize: three quarters of its melee bash), or a throwing flag (rocks,
+// javelins), or armed (DANGEROUS: a lit grenade or Molotov).
+bool made_for_throwing( const item &it )
+{
+    if( it.has_flag( flag_NPC_THROWN ) || it.has_flag( flag_JAVELIN ) || it.has_flag( flag_DANGEROUS ) ) {
+        return true;
+    }
+    const itype &t = *it.type;
+    const auto bash = t.melee.damage_map.find( damage_bash );
+    const float fallback = bash == t.melee.damage_map.end() ? 0.0f : bash->second * 0.75f;
+    const std::vector<damage_unit> &units = t.thrown_damage.damage_units;
+    return !( units.size() == 1 && units[0].type == damage_bash && units[0].amount == fallback );
+}
+
 // The context row's combat actions (context_actions_here), in order:
 // autoattack while a hostile is in the wielded weapon's reach (as
 // avatar_action::autoattack finds them, hostiles only), fire while wielding
 // a gun, reload_wielded while it can be reloaded, throw while wielding
-// anything (the game throws whatever is held; the user's call, 2026-11-15).
+// something made for throwing (made_for_throwing).
 std::vector<const char *> combat_actions_here( const avatar &you )
 {
     std::vector<const char *> out;
@@ -166,7 +189,9 @@ std::vector<const char *> combat_actions_here( const avatar &you )
     if( weapon->is_reloadable() && you.can_reload( *weapon ) ) {
         out.push_back( "reload_wielded" );
     }
-    out.push_back( "throw" );
+    if( made_for_throwing( *weapon ) ) {
+        out.push_back( "throw" );
+    }
     return out;
 }
 } // namespace
