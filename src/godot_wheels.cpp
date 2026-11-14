@@ -13,6 +13,10 @@
 #include "coordinates.h"
 #include "creature.h"
 #include "creature_tracker.h"
+#include "flag.h"
+#include "item.h"
+#include "item_location.h"
+#include "itype.h"
 #include "game.h"
 #include "godot_host.h"
 #include "input.h"
@@ -134,6 +138,44 @@ std::string godot_host::stairs_action()
     return "";
 }
 
+namespace
+{
+// The context row's combat actions (context_actions_here), in order:
+// autoattack while a hostile is in the wielded weapon's reach (as
+// avatar_action::autoattack finds them, hostiles only), fire while wielding
+// a gun, reload_wielded while it can be reloaded, throw while wielding
+// something made for throwing (its own thrown damage) or armed (DANGEROUS:
+// a lit grenade or Molotov).
+std::vector<const char *> combat_actions_here( const avatar &you )
+{
+    std::vector<const char *> out;
+    const item_location weapon = you.get_wielded_item();
+    const int reach = weapon ? weapon->reach_range( you ).first : 1;
+    for( Creature *c : you.get_targetable_creatures( reach, true ) ) {
+        if( ( reach == 1 && !you.is_adjacent( c, true ) ) || !you.can_reach_attack( *c ) ) {
+            continue;
+        }
+        if( c->attitude_to( you ) == Creature::Attitude::HOSTILE ) {
+            out.push_back( "autoattack" );
+            break;
+        }
+    }
+    if( !weapon ) {
+        return out;
+    }
+    if( weapon->is_gun() ) {
+        out.push_back( "fire" );
+    }
+    if( weapon->is_reloadable() && you.can_reload( *weapon ) ) {
+        out.push_back( "reload_wielded" );
+    }
+    if( !weapon->type->thrown_damage.empty() || weapon->has_flag( flag_DANGEROUS ) ) {
+        out.push_back( "throw" );
+    }
+    return out;
+}
+} // namespace
+
 std::vector<std::string> godot_host::context_actions_here()
 {
     std::vector<std::string> out;
@@ -164,6 +206,13 @@ std::vector<std::string> godot_host::context_actions_here()
     const optional_vpart_position vp = here.veh_at( pos );
     const bool drive = vp && vp.part_with_feature( VPFLAG_CONTROLS, true );
     // The fixed priority order: the same action keeps its place.
+    // First what the wielded item and the creatures in reach offer (the
+    // user's call, 2026-11-15: the touch pad's LB and RB are its wheels
+    // alone, these their taps; Dark Forest leaves them out of the desktop's
+    // cues): Attack, Fire, Reload, Throw.
+    for( const char *id : combat_actions_here( you ) ) {
+        out.emplace_back( id );
+    }
     if( can_move_vertical_at( here, pos, 1 ) ) {
         out.emplace_back( "LEVEL_UP" );
     }

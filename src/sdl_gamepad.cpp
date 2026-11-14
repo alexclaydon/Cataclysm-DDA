@@ -1244,6 +1244,15 @@ static bool handle_button_event( SDL_Event &event )
         wheel_pressed_at = now_ms();
         // Only the left stick aims: a right stick already pushed picks.
         wheel_stick_was_pushed = { { left_stick_dir != direction::NONE, false } };
+#if defined(CDDA_GODOT)
+        // The touch pad's bumpers in play are their wheels alone (the user's
+        // call, 2026-11-15: their taps, autoattack and fire, are the context
+        // row's buttons now): the wheel opens at the press, no hold to wait
+        // out, and a tap sends nothing.
+        if( button_from_touch_pad && !is_in_menu() ) {
+            open_wheel();
+        }
+#endif
         return false;
     }
 
