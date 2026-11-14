@@ -1131,6 +1131,21 @@ bool godot_host::stick_camera()
     return stick_camera_on;
 }
 
+namespace
+{
+std::atomic<bool> stick_slide_on{ false };
+} // namespace
+
+void godot_host::set_stick_slide( bool on )
+{
+    stick_slide_on = on;
+}
+
+bool godot_host::stick_slide()
+{
+    return stick_slide_on;
+}
+
 void godot_host::set_overmap_state( int state )
 {
     overmap_state_now = state;

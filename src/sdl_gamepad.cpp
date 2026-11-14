@@ -634,6 +634,25 @@ static bool stick_camera_now()
     return false;
 #endif
 }
+// Look-around or aiming with the host sliding the view by the sticks
+// (godot_host::set_stick_slide): no layer, no radial. A real pad's: the
+// touch pad's move ring (its virtual pad) keeps stepping the cursor.
+static bool stick_slide_now( SDL_JoystickID source )
+{
+#if defined(CDDA_GODOT)
+    int dx = 0;
+    int dy = 0;
+    if( godot_host::touch_pad() && godot_host::is_virtual_pad( source ) ) {
+        return false;
+    }
+    return godot_host::stick_slide() && is_in_menu() && in_map_cursor() && !alt_modifier_held &&
+           !any_radial_open() && wheel_state == wheel_phase::none &&
+           ( godot_host::look_cursor( dx, dy ) || godot_host::aiming() );
+#else
+    ( void )source;
+    return false;
+#endif
+}
 static bool test_wheels = false;  // test_enable_wheels
 static uint32_t test_ticks = 0;   // test_advance: added to GetTicks
 static std::vector<int> test_wheel_kinds;  // test_take_wheel_events
@@ -1006,6 +1025,10 @@ static bool handle_axis_event( SDL_Event &event )
                 if( dir != direction::NONE && r3_pending ) {
                     r3_stick_moved = true;
                 }
+                cancel_task( stick_task );
+                stick_sent[i] = -1;
+            } else if( stick_slide_now( event_source ) ) {
+                // The host slides the view by this stick (look-around, aiming).
                 cancel_task( stick_task );
                 stick_sent[i] = -1;
             } else if( stick_consumed[i] ) {

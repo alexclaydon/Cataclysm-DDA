@@ -249,6 +249,12 @@ bool take_df_panel_request();
 // (look-around) or a hold (the camera's zoom and reset, the host's).
 void set_stick_camera( bool on );
 bool stick_camera();
+// The sticks slide Dark Forest's view in look-around and aiming (as a
+// finger does): the pad layer sends neither stick's tilts there, and the
+// host moves the view and the cursor with it (request_look_cursor,
+// request_aim_cursor). The d-pad still steps the cursor.
+void set_stick_slide( bool on );
+bool stick_slide();
 void set_overmap_state( int state );
 int overmap_state();
 // One of the open screen's own actions by id (the touch pad's map
