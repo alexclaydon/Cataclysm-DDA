@@ -488,7 +488,13 @@ query_popup::result query_popup::query_once()
     do {
 #if defined(CDDA_GODOT)
         if( host_drawn ) {
-            godot_host::set_dialog_selected( this, impl->keyboard_selected_option );
+            // None outlined while the pad answers a prompt with a Yes by A
+            // and B alone (its d-pad moves nothing there: pad_arrow below).
+            const bool pad_yes = gamepad::last_input_was_pad() &&
+            std::any_of( options.begin(), options.end(), []( const query_option & o ) {
+                return o.action == "YES";
+            } );
+            godot_host::set_dialog_selected( this, pad_yes ? -1 : impl->keyboard_selected_option );
         }
 #endif
         ui_manager::redraw();
