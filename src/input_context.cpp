@@ -539,6 +539,13 @@ const std::string &input_context::handle_input( const int timeout )
                 break;
             }
         }
+        // The touch pad's - and +: this screen's count, down or up.
+        if( const int dir = godot_host::take_count_request() ) {
+            if( const std::string *count = godot_actions::count_action( *this, dir ) ) {
+                result = count;
+                break;
+            }
+        }
         // The touch pad's X is always the action list (ADR 0014: it is
         // labelled Actions), the screen's own X action listed in it. A real
         // pad's X keeps that action.

@@ -498,6 +498,14 @@ void set_filter_action( const std::string &id );
 std::string filter_action();
 void request_filter();
 bool take_filter_request();
+// The touch pad's - and + (2026-11-15): whether the screen waiting for
+// input has a count (godot_actions::count_action), set each event pump;
+// and the host's request to count down (-1) or up (1), taken by
+// input_context's handle_input as Filter's is.
+void set_counts( bool on );
+bool counts();
+void request_count( int dir );
+int take_count_request();
 // Whether the list waiting for input filters (uilist::filtering, set each
 // pass of its loop): a few switch it off though they register UILIST.FILTER,
 // so Filter mustn't show over them.

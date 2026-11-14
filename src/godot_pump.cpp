@@ -82,6 +82,7 @@ void godot_host::pump_engine_state()
         godot_host::set_waiting_category( waiting != nullptr ? waiting->input_category() : std::string() );
         const std::string *filter = waiting != nullptr ? godot_actions::filter_action( *waiting ) : nullptr;
         godot_host::set_filter_action( filter != nullptr ? *filter : std::string() );
+        godot_host::set_counts( waiting != nullptr && godot_actions::count_action( *waiting, 1 ) != nullptr );
     }
     {
         // 3: on, and it just refused to attack a neutral creature.

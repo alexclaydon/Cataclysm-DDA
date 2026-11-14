@@ -285,6 +285,22 @@ const std::string *godot_actions::filter_action( const input_context &ctxt )
     }
     return nullptr;
 }
+
+const std::string *godot_actions::count_action( const input_context &ctxt, int dir )
+{
+    static const std::array<std::array<std::string, 2>, 2> pairs = {{
+            {{ "DECREASE_COUNT", "INCREASE_COUNT" }},
+            {{ "BATCH_SIZE_DOWN", "BATCH_SIZE_UP" }}
+        }
+    };
+    for( const std::array<std::string, 2> &pair : pairs ) {
+        const std::string &id = pair[dir > 0 ? 1 : 0];
+        if( ctxt.is_registered_action( id ) ) {
+            return &id;
+        }
+    }
+    return nullptr;
+}
 #endif // CDDA_GODOT
 
 #if defined(CDDA_GODOT)

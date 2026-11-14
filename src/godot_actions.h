@@ -24,6 +24,10 @@ struct godot_actions {
     // registers; nullptr for none (the touch pad's Filter, 2026-11-12). A
     // pointer to a static string, as handle_input returns.
     static const std::string *filter_action( const input_context &ctxt );
+    // The touch pad's - and +: the count action the screen offers, one
+    // down (dir -1) or up (1): an item screen's DECREASE/INCREASE_COUNT,
+    // crafting's BATCH_SIZE_DOWN/UP; nullptr for none.
+    static const std::string *count_action( const input_context &ctxt, int dir );
     // A keyboard move on the map (play, or a map cursor: look-around,
     // aiming) turned with the view as the pad's are (godot_host::move_step;
     // the user's call, 2026-11-12): the turned action, or nullptr when it

@@ -1066,6 +1066,32 @@ bool godot_host::take_filter_request()
     return filter_requested.exchange( false );
 }
 
+namespace
+{
+std::atomic<bool> counts_now{ false };
+std::atomic<int> count_requested{ 0 };
+} // namespace
+
+void godot_host::set_counts( bool on )
+{
+    counts_now = on;
+}
+
+bool godot_host::counts()
+{
+    return counts_now;
+}
+
+void godot_host::request_count( int dir )
+{
+    count_requested = dir;
+}
+
+int godot_host::take_count_request()
+{
+    return count_requested.exchange( 0 );
+}
+
 void godot_host::set_text_entry( const std::string &text )
 {
     std::lock_guard<std::mutex> lock( text_entry_mutex );
