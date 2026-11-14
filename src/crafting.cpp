@@ -49,6 +49,9 @@
 #include "game.h"
 #include "game_constants.h"
 #include "game_inventory.h"
+#if defined( CDDA_GODOT )
+#include "godot_disassemble.h"
+#endif
 #include "handle_liquid.h"
 #include "input_popup.h"
 #include "iexamine.h"
@@ -5299,7 +5302,11 @@ item_location Character::create_in_progress_disassembly( item_location target )
 
 bool Character::disassemble()
 {
+#if defined( CDDA_GODOT )
+    return godot_disassemble::menu( *this );
+#else
     return disassemble( game_menus::inv::disassemble( *this ), false );
+#endif
 }
 
 // returns 0 if cancelled
