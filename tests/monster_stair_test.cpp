@@ -216,6 +216,30 @@ TEST_CASE( "ground_creatures_blocked_by_ladders", "[monster][z-level]" )
     }
 }
 
+// Down a ladder takes climbing too (calc_movecost refuses it otherwise): a
+// ground creature on the upper ladder, wanting the floor below, stays put
+// and logs no "cannot climb over ladder" debugmsg (seen in play, 2026-11-14).
+TEST_CASE( "ground_creatures_dont_descend_ladders", "[monster][z-level][fork]" )
+{
+    clear_map( -2, 2 );
+    map &here = get_map();
+    get_player_character().setpos( here, tripoint_bub_ms( 60, 60, 0 ) );
+
+    std::vector<point_bub_ms> origins;
+    setup_towers( here, ter_t_ladder_up, ter_t_ladder_down,
+                  ground_creatures.size(), 5, origins );
+
+    int idx = 0;
+    for( const auto &[mon_type, label] : ground_creatures ) {
+        DYNAMIC_SECTION( label << " stays up the ladder (z=1 to z=0)" ) {
+            std::set<int> visited = run_creature_in_tower(
+                                        here, origins[idx], mon_type, 1, 0, test_turns );
+            CHECK( visited.count( 0 ) == 0 );
+        }
+        ++idx;
+    }
+}
+
 TEST_CASE( "climbing_creatures_use_ladders", "[monster][z-level]" )
 {
     clear_map( -2, 2 );

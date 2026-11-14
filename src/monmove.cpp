@@ -1359,6 +1359,15 @@ void monster::move()
                     }
                 }
 
+                // A ladder (DIFFICULT_Z at either end) takes climbing either way,
+                // as calc_movecost holds: the fallback above let non-climbers
+                // choose one, and each try failed there with a debugmsg.
+                if( !can_climb() &&
+                    ( here.has_flag( ter_furn_flag::TFLAG_DIFFICULT_Z, pos_bub() ) ||
+                      here.has_flag( ter_furn_flag::TFLAG_DIFFICULT_Z, candidate ) ) ) {
+                    can_z_move = false;
+                }
+
                 if( !can_z_move ) {
                     continue;
                 }
@@ -2682,7 +2691,11 @@ void monster::stumble_base( const bool is_voluntary )
         const bool flier_supported = flies() && here.has_floor_or_water( pos_bub() );
         const bool flier_aloft = flies() && !here.has_floor_or_water( pos_bub() );
         const tripoint_bub_ms below( pos_bub() + tripoint::below );
-        if( here.valid_move( pos_bub(), below, false, true ) ) {
+        // Not down a ladder without climbing (calc_movecost refuses it).
+        const bool ladder_down =
+            here.has_flag( ter_furn_flag::TFLAG_DIFFICULT_Z, pos_bub() ) ||
+            here.has_flag( ter_furn_flag::TFLAG_DIFFICULT_Z, below );
+        if( here.valid_move( pos_bub(), below, false, true ) && ( can_climb() || !ladder_down ) ) {
             valid_stumbles.push_back( below );
             if( flier_aloft ) {
                 valid_stumbles.push_back( below );
