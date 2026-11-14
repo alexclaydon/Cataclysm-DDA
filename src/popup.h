@@ -219,9 +219,14 @@ class query_popup
         bool ontop;
         bool fullscr;
         keyboard_mode pref_kbd_mode;
-        // The option the pad's B answers (query_once), or -1: its glyph goes
-        // on that button.
+        // The options the pad's face buttons answer (query_once,
+        // gamepad::answer_buttons), or -1: their glyphs go on those
+        // buttons. pad_all: every option has one.
         int pad_b_option = -1;
+        int pad_a_option = -1;
+        int pad_x_option = -1;
+        int pad_y_option = -1;
+        bool pad_all = false;
 
         struct button {
             button( const std::string &text, const point & );

@@ -1,5 +1,6 @@
 #if defined(TILES)
 
+#include <string>
 #include <vector>
 
 #include "cata_catch.h"
@@ -347,6 +348,61 @@ TEST_CASE( "gamepad_lt_with_a_shoulder_stays_its_alt_twin", "[gamepad][fork]" )
     gamepad::test_advance( 1000 );
     CHECK_FALSE( gamepad::wheel_is_open() );
     gamepad::test_axis( pad_axis::LT, 0 );
+}
+
+// A prompt's face buttons (query_popup, the user's rule 2026-11-15): A Yes
+// (or the first option), B what Escape takes (given), X and Y the third
+// and fourth, a screen-opening Manager after the rest. Each prompt with
+// more than two options in the engine, as it is called.
+TEST_CASE( "gamepad_prompt_face_buttons_answer_every_option", "[gamepad][fork]" )
+{
+    using actions = std::vector<std::string>;
+    SECTION( "yes no" ) {
+        const gamepad::prompt_answers p = gamepad::answer_buttons( actions{ "YES", "NO" }, 1 );
+        CHECK( p.a == 0 );
+        CHECK( p.b == 1 );
+        CHECK( p.x == -1 );
+        CHECK( p.all );
+    }
+    SECTION( "a distraction: Ignore on X, the manager on Y" ) {
+        const gamepad::prompt_answers p = gamepad::answer_buttons(
+                                              actions{ "YES", "NO", "MANAGER", "IGNORE" }, 1 );
+        CHECK( p.a == 0 );
+        CHECK( p.b == 1 );
+        CHECK( p.x == 3 );
+        CHECK( p.y == 2 );
+        CHECK( p.all );
+    }
+    SECTION( "yes no cancel: No on X" ) {
+        const gamepad::prompt_answers p = gamepad::answer_buttons( actions{ "YES", "NO", "QUIT" }, 2 );
+        CHECK( p.a == 0 );
+        CHECK( p.b == 2 );
+        CHECK( p.x == 1 );
+        CHECK( p.all );
+    }
+    SECTION( "stealing: Always on X, Never on Y" ) {
+        const gamepad::prompt_answers p = gamepad::answer_buttons(
+                                              actions{ "YES", "NO", "ALWAYS", "NEVER" }, 1 );
+        CHECK( p.x == 2 );
+        CHECK( p.y == 3 );
+        CHECK( p.all );
+    }
+    SECTION( "no Yes: A the first option" ) {
+        const gamepad::prompt_answers p = gamepad::answer_buttons(
+                                              actions{ "FRIENDS", "ME", "CANCEL" }, 2 );
+        CHECK( p.a == 0 );
+        CHECK( p.x == 1 );
+        CHECK( p.b == 2 );
+        CHECK( p.all );
+    }
+    SECTION( "more options than buttons" ) {
+        const gamepad::prompt_answers p = gamepad::answer_buttons(
+                                              actions{ "ONE", "TWO", "THREE", "FOUR", "FIVE" }, -1 );
+        CHECK( p.a == 0 );
+        CHECK( p.x == 1 );
+        CHECK( p.y == 2 );
+        CHECK_FALSE( p.all );
+    }
 }
 
 #endif // TILES

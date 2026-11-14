@@ -1590,6 +1590,39 @@ bool is_gamepad_event( const SDL_Event &event )
     }
 }
 
+prompt_answers answer_buttons( const std::vector<std::string> &actions, int b )
+{
+    prompt_answers out;
+    const int n = static_cast<int>( actions.size() );
+    out.b = b >= 0 && b < n ? b : -1;
+    std::vector<int> rest;
+    for( int i = 0; i < n; ++i ) {
+        if( i == out.b ) {
+            continue;
+        }
+        if( actions[i] == "YES" && out.a < 0 ) {
+            out.a = i;
+        } else {
+            rest.push_back( i );
+        }
+    }
+    std::stable_partition( rest.begin(), rest.end(), [&]( int i ) {
+        return actions[i] != "MANAGER";
+    } );
+    size_t next = 0;
+    if( out.a < 0 && next < rest.size() ) {
+        out.a = rest[next++];
+    }
+    if( next < rest.size() ) {
+        out.x = rest[next++];
+    }
+    if( next < rest.size() ) {
+        out.y = rest[next++];
+    }
+    out.all = n > 0 && next == rest.size();
+    return out;
+}
+
 menu_press last_menu_press()
 {
     return menu_press_seen;

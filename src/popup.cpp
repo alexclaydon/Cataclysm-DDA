@@ -87,19 +87,17 @@ std::vector<int> query_popup_impl::pad_glyphs() const
     if( !gamepad::is_active() || !gamepad::last_input_was_pad() ) {
         return want;
     }
-    // A answers Yes where there is one, else the highlighted button
-    // (query_once).
-    int a = keyboard_selected_option;
-    for( size_t i = 0; i < parent->options.size(); ++i ) {
-        if( parent->options[i].action == "YES" ) {
-            a = int( i );
+    // Each face button on the option it answers (query_once); A on the
+    // highlighted button where the buttons don't answer every option and
+    // there's no Yes.
+    const int a = parent->pad_a_option >= 0 &&
+                  ( parent->pad_all || parent->options[parent->pad_a_option].action == "YES" ) ?
+                  parent->pad_a_option : keyboard_selected_option;
+    const int bits[] = { a, parent->pad_b_option, parent->pad_x_option, parent->pad_y_option };
+    for( int k = 0; k < 4; ++k ) {
+        if( bits[k] >= 0 && bits[k] < int( want.size() ) ) {
+            want[bits[k]] |= 1 << k;
         }
-    }
-    if( a >= 0 && a < int( want.size() ) ) {
-        want[a] |= 1;
-    }
-    if( parent->pad_b_option >= 0 && parent->pad_b_option < int( want.size() ) ) {
-        want[parent->pad_b_option] |= 2;
     }
     return want;
 }
@@ -111,11 +109,13 @@ float query_popup_impl::glyphs_width( size_t ind ) const
     }
     const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
     float width = 0.0f;
-    if( glyphs[ind] & 1 ) {
-        width += gamepad::glyph_width( gamepad::pad_button::A ) + gap;
-    }
-    if( glyphs[ind] & 2 ) {
-        width += gamepad::glyph_width( gamepad::pad_button::B ) + gap;
+    const gamepad::pad_button face[] = { gamepad::pad_button::A, gamepad::pad_button::B,
+                                         gamepad::pad_button::X, gamepad::pad_button::Y
+                                       };
+    for( int k = 0; k < 4; ++k ) {
+        if( glyphs[ind] & ( 1 << k ) ) {
+            width += gamepad::glyph_width( face[k] ) + gap;
+        }
     }
     return width;
 }
@@ -156,13 +156,14 @@ void query_popup_impl::draw_controls()
             ImGui::SetCursorPosX( float( parent->buttons[ind].pos.x ) );
 #if defined(TILES)
             const int glyph = ind < glyphs.size() ? glyphs[ind] : 0;
-            if( glyph & 1 ) {
-                gamepad::draw_glyph( gamepad::pad_button::A );
-                ImGui::SameLine( 0.0f, ImGui::GetStyle().ItemInnerSpacing.x );
-            }
-            if( glyph & 2 ) {
-                gamepad::draw_glyph( gamepad::pad_button::B );
-                ImGui::SameLine( 0.0f, ImGui::GetStyle().ItemInnerSpacing.x );
+            const gamepad::pad_button face[] = { gamepad::pad_button::A, gamepad::pad_button::B,
+                                                 gamepad::pad_button::X, gamepad::pad_button::Y
+                                               };
+            for( int k = 0; k < 4; ++k ) {
+                if( glyph & ( 1 << k ) ) {
+                    gamepad::draw_glyph( face[k] );
+                    ImGui::SameLine( 0.0f, ImGui::GetStyle().ItemInnerSpacing.x );
+                }
             }
 #endif
             // A click on a button is ImGui's (it captures the mouse over its
@@ -457,6 +458,23 @@ query_popup::result query_popup::query_once()
             pad_b_option = int( i );
         }
     }
+    // Else a Cancel that Escape doesn't take (a character template's).
+    for( size_t i = 0; i < options.size() && pad_b_option < 0 && !cancel; ++i ) {
+        if( options[i].action == "CANCEL" ) {
+            pad_b_option = int( i );
+        }
+    }
+    {
+        std::vector<std::string> actions;
+        for( const query_option &o : options ) {
+            actions.push_back( o.action );
+        }
+        const gamepad::prompt_answers pad = gamepad::answer_buttons( actions, pad_b_option );
+        pad_a_option = pad.a;
+        pad_x_option = pad.x;
+        pad_y_option = pad.y;
+        pad_all = pad.all;
+    }
 #endif
 
     result res;
@@ -473,12 +491,13 @@ query_popup::result query_popup::query_once()
         s.kind = 0;
         s.message = godot_host::bbcode( text );
         // Each option by its name (no key in it: the host shows the pad
-        // button answering it as a glyph): A answers Yes, B the option
-        // pad_b_option says.
+        // button answering it as a glyph, gamepad::answer_buttons).
         for( size_t i = 0; i < options.size(); ++i ) {
+            const int at = static_cast<int>( i );
             s.options.push_back( ctxt.get_action_name( options[i].action ) );
-            s.option_glyphs.emplace_back( options[i].action == "YES" ? "A" :
-                                          static_cast<int>( i ) == pad_b_option ? "B" : "" );
+            s.option_glyphs.emplace_back( at == pad_b_option ? "B" :
+                                          at == pad_x_option ? "X" : at == pad_y_option ? "Y" :
+                                          at == pad_a_option && ( pad_all || options[i].action == "YES" ) ? "A" : "" );
         }
         s.cancel = cancel;
         s.anykey = anykey;
@@ -488,13 +507,10 @@ query_popup::result query_popup::query_once()
     do {
 #if defined(CDDA_GODOT)
         if( host_drawn ) {
-            // None outlined while the pad answers a prompt with a Yes by A
-            // and B alone (its d-pad moves nothing there: pad_arrow below).
-            const bool pad_yes = gamepad::last_input_was_pad() &&
-            std::any_of( options.begin(), options.end(), []( const query_option & o ) {
-                return o.action == "YES";
-            } );
-            godot_host::set_dialog_selected( this, pad_yes ? -1 : impl->keyboard_selected_option );
+            // None outlined while the pad's face buttons answer every
+            // option (its d-pad moves nothing there: pad_arrow below).
+            const bool pad_answers = gamepad::last_input_was_pad() && pad_all;
+            godot_host::set_dialog_selected( this, pad_answers ? -1 : impl->keyboard_selected_option );
         }
 #endif
         ui_manager::redraw();
@@ -540,28 +556,34 @@ query_popup::result query_popup::query_once()
         } );
     };
 #if defined(TILES)
-    // The pad (the fork's controller scheme): A answers Yes on any prompt
-    // with a Yes, whatever is highlighted; B answers No where nothing on the
-    // prompt takes Escape. The keyboard's Enter and Escape keep the
-    // prompt's own default.
+    // The pad (the fork's controller scheme): each face button answers its
+    // option (gamepad::answer_buttons), whatever is highlighted: A Yes (or
+    // the first option, where the buttons answer them all), B the one
+    // Escape takes or No or Cancel, X and Y the third and fourth. The
+    // keyboard's Enter and Escape keep the prompt's own default.
     const gamepad::menu_press pad = by_mouse ? gamepad::menu_press::none : gamepad::last_menu_press();
-    if( pad == gamepad::menu_press::a && res.action == "CONFIRM" && has_option( "YES" ) ) {
-        res.action = "YES";
-        res.wait_input = false;
-        return res;
+    int pad_answer = -1;
+    if( pad == gamepad::menu_press::a && res.action == "CONFIRM" && pad_a_option >= 0 &&
+        ( pad_all || options[pad_a_option].action == "YES" ) ) {
+        pad_answer = pad_a_option;
+    } else if( pad == gamepad::menu_press::b && !cancel && res.evt.type == input_event_t::keyboard_code &&
+               res.evt.get_first_input() == KEY_ESCAPE && !has_option( res.action ) ) {
+        pad_answer = pad_b_option;
+    } else if( !by_mouse && res.evt.type == input_event_t::gamepad ) {
+        const int button = res.evt.get_first_input();
+        pad_answer = button == JOY_X ? pad_x_option : button == JOY_Y ? pad_y_option : -1;
     }
-    if( pad == gamepad::menu_press::b && !cancel && res.evt.type == input_event_t::keyboard_code &&
-        res.evt.get_first_input() == KEY_ESCAPE && !has_option( res.action ) && has_option( "NO" ) ) {
-        res.action = "NO";
+    if( pad_answer >= 0 && pad_answer < static_cast<int>( options.size() ) ) {
+        res.action = options[pad_answer].action;
         res.wait_input = false;
         return res;
     }
 #endif
 #if defined(TILES)
-    // On a prompt with a Yes the pad answers with A and B alone, so its
-    // d-pad (arrow keys in a menu) moves nothing: the glyphs stay put.
+    // Where the face buttons answer every option the d-pad (arrow keys in
+    // a menu) moves nothing: the glyphs stay put.
     const bool pad_arrow = ( res.action == "LEFT" || res.action == "RIGHT" ) &&
-                           gamepad::last_input_was_pad() && has_option( "YES" );
+                           gamepad::last_input_was_pad() && pad_all;
 #else
     const bool pad_arrow = false;
 #endif

@@ -2,6 +2,7 @@
 #ifndef CATA_SRC_SDL_GAMEPAD_H
 #define CATA_SRC_SDL_GAMEPAD_H
 #if defined(TILES)
+#include <string>
 #include <vector>
 
 #include "input_enums.h"
@@ -56,6 +57,21 @@ bool move_due();
 // keyboard's Enter keeps the prompt's default (query_popup).
 enum class menu_press { none, a, b };
 menu_press last_menu_press();
+// The face buttons answering a prompt's options (query_popup), each an
+// option's index or -1 (the user's rule, 2026-11-15): B the option `b`
+// (the one taking Escape, else No or Cancel), A Yes or else the first
+// other, then X and Y the rest in order, an option that opens a screen
+// (MANAGER) after the others. A prompt with more options than buttons
+// leaves the rest to the d-pad.
+struct prompt_answers {
+    int a = -1;
+    int b = -1;
+    int x = -1;
+    int y = -1;
+    // Every option has a button: the d-pad's highlight has no use.
+    bool all = false;
+};
+prompt_answers answer_buttons( const std::vector<std::string> &actions, int b );
 void note_keyboard_input();
 
 // Whether the latest input came from the pad: set by every event it sends
