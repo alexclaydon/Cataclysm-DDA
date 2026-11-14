@@ -594,9 +594,11 @@ static constexpr uint32_t start_hold_ms = 500;
 static bool start_pending = false;
 static bool start_held = false;  // the hold went to the host: its release is spent
 static uint32_t start_pressed_at = 0;
+#if defined(CDDA_GODOT)
 // Whether the host had the pad at the last event: letting go spends the
 // sticks, as a wheel closing does.
 static bool pad_was_captured = false;
+#endif
 // The host has the pad now: the triggers still keep their state (as under
 // a wheel), so a release while it had it can't leave LT's layer on.
 static bool host_has_pad = false;
