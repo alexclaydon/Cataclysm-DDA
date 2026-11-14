@@ -241,6 +241,14 @@ bool pad_captured();
 // Forest's settings panel. A tap is still the game's menu.
 void request_df_panel();
 bool take_df_panel_request();
+// The dynamic sidebar is on (the host's set_side_toggle): Back in play is a
+// tap or a hold too, a tap toggling the full sidebar (request_side_toggle,
+// on release), a hold the game's map (Back's binding). Off, Back is as it
+// was: its binding at the press.
+void set_side_toggle( bool on );
+bool side_toggle();
+void request_side_toggle();
+bool take_side_toggle_request();
 // The overmap, for the touch pad's map buttons: 0 closed, 1 open, 2 open
 // with a route plotted to the cursor (the Route button reads Travel;
 // godot_actions::publish_overmap_state).

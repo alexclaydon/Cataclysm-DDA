@@ -595,6 +595,14 @@ static bool start_pending = false;
 static bool start_held = false;  // the hold went to the host: its release is spent
 static uint32_t start_pressed_at = 0;
 #if defined(CDDA_GODOT)
+// Back in play while the dynamic sidebar is on (godot_host::side_toggle):
+// a tap toggles the full sidebar (on release), a hold (start_hold_ms) is
+// Back's binding, the map (the user's call, 2026-11-15).
+static bool back_pending = false;
+static bool back_held = false;  // the hold sent the map: its release is spent
+static uint32_t back_pressed_at = 0;
+#endif
+#if defined(CDDA_GODOT)
 // Whether the host had the pad at the last event: letting go spends the
 // sticks, as a wheel closing does.
 static bool pad_was_captured = false;
@@ -1151,6 +1159,16 @@ static bool handle_button_event( SDL_Event &event )
             }
             return false;
         }
+#if defined(CDDA_GODOT)
+        if( button == CATA_BUTTON_BACK && ( back_pending || back_held ) ) {
+            if( back_pending ) {
+                godot_host::request_side_toggle();
+            }
+            back_pending = false;
+            back_held = false;
+            return false;
+        }
+#endif
         if( button == CATA_BUTTON_START && ( start_pending || start_held ) ) {
             const bool tap = start_pending;
             start_pending = false;
@@ -1200,6 +1218,15 @@ static bool handle_button_event( SDL_Event &event )
         r3_pressed_at = now_ms();
         return false;
     }
+#if defined(CDDA_GODOT)
+    if( button == CATA_BUTTON_BACK && godot_host::side_toggle() && wheels_on() && !is_in_menu() &&
+        !alt_modifier_held && !any_radial_open() ) {
+        back_pending = true;
+        back_held = false;
+        back_pressed_at = now_ms();
+        return false;
+    }
+#endif
     if( button == CATA_BUTTON_START && wheels_on() && !is_in_menu() && !alt_modifier_held &&
         !any_radial_open() ) {
         start_pending = true;
@@ -1441,6 +1468,13 @@ static void handle_scheduler_event( SDL_Event &/*event*/ )
         godot_host::request_df_panel();
 #endif
     }
+#if defined(CDDA_GODOT)
+    if( back_pending && now_ms() - back_pressed_at >= start_hold_ms ) {
+        back_pending = false;
+        back_held = true;
+        send_input( JOY_BACK );
+    }
+#endif
     uint32_t now = GetTicks();
     for( size_t i = 0; i < all_tasks.size(); ++i ) {
         gamepad::task_t &task = all_tasks[i];
@@ -1794,6 +1828,7 @@ bool handle_event( SDL_Event &event )
                 cancel_task( task );
             }
             start_pending = false;
+            back_pending = false;
         }
         if( !captured && pad_was_captured ) {
             // Sticks still pushed as the host lets go are spent.

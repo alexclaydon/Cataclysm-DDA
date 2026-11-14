@@ -1218,6 +1218,32 @@ bool godot_host::take_df_panel_request()
     return df_panel_requested.exchange( false );
 }
 
+namespace
+{
+std::atomic<bool> side_toggle_on{ false };
+std::atomic<bool> side_toggle_requested{ false };
+} // namespace
+
+void godot_host::set_side_toggle( bool on )
+{
+    side_toggle_on = on;
+}
+
+bool godot_host::side_toggle()
+{
+    return side_toggle_on;
+}
+
+void godot_host::request_side_toggle()
+{
+    side_toggle_requested = true;
+}
+
+bool godot_host::take_side_toggle_request()
+{
+    return side_toggle_requested.exchange( false );
+}
+
 void godot_host::request_look_exit( look_exit how )
 {
     look_exit_requested = static_cast<int>( how );
