@@ -69,6 +69,9 @@
 #include "uilist.h"
 #include "uistate.h"
 #include "vitamin.h"
+#if defined( CDDA_GODOT )
+#include "godot_crafting.h"
+#endif
 
 static const efftype_id effect_contacts( "contacts" );
 static const json_character_flag json_flag_HYPEROPIC( "HYPEROPIC" );
@@ -2443,6 +2446,9 @@ void crafting_ui_impl::recalculate_recipes()
         line = std::clamp( manual_batch - 1, 0,
                            std::max( 0, static_cast<int>( current.size() ) - 1 ) );
     }
+#if defined( CDDA_GODOT )
+    godot_crafting::follow_recipe( manual_batch, batch, current, line );
+#endif
     invalidate_info_panels();
     recalc_unread = highlight_unread;
 }
@@ -2569,13 +2575,16 @@ void crafting_ui_impl::process_action( const std::string &action_in,
         if( can_batch_here ) {
             int new_batch = std::clamp( manual_batch + pending_batch_delta, 1, 50 );
             if( new_batch != manual_batch ) {
+#if !defined( CDDA_GODOT )
                 // Auto-enter batch mode on first increment from x1
+                // (Dark Forest counts in place: godot_crafting.cpp)
                 if( manual_batch == 1 && new_batch > 1 && !batch ) {
                     chosen = current[line];
                     batch_line = line;
                     batch = true;
                     recalc = true;
                 }
+#endif
                 manual_batch = new_batch;
                 if( batch && !recalc ) {
                     line = manual_batch - 1;
@@ -2957,6 +2966,9 @@ void crafting_ui_impl::process_action( const std::string &action_in,
         line < static_cast<int>( current.size() ) ) {
         manual_batch = line + 1;
     }
+#if defined( CDDA_GODOT )
+    godot_crafting::follow_recipe( manual_batch, batch, current, line );
+#endif
 
     // Invalidate info panels if selection changed
     if( line != prev_line ) {
