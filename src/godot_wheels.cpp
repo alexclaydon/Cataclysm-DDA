@@ -13,10 +13,8 @@
 #include "coordinates.h"
 #include "creature.h"
 #include "creature_tracker.h"
-#include "flag.h"
 #include "item.h"
 #include "item_location.h"
-#include "itype.h"
 #include "game.h"
 #include "godot_host.h"
 #include "input.h"
@@ -144,8 +142,7 @@ namespace
 // autoattack while a hostile is in the wielded weapon's reach (as
 // avatar_action::autoattack finds them, hostiles only), fire while wielding
 // a gun, reload_wielded while it can be reloaded, throw while wielding
-// something made for throwing (its own thrown damage) or armed (DANGEROUS:
-// a lit grenade or Molotov).
+// anything (the game throws whatever is held; the user's call, 2026-11-15).
 std::vector<const char *> combat_actions_here( const avatar &you )
 {
     std::vector<const char *> out;
@@ -169,9 +166,7 @@ std::vector<const char *> combat_actions_here( const avatar &you )
     if( weapon->is_reloadable() && you.can_reload( *weapon ) ) {
         out.push_back( "reload_wielded" );
     }
-    if( !weapon->type->thrown_damage.empty() || weapon->has_flag( flag_DANGEROUS ) ) {
-        out.push_back( "throw" );
-    }
+    out.push_back( "throw" );
     return out;
 }
 } // namespace
