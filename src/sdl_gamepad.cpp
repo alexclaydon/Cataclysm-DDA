@@ -1219,8 +1219,10 @@ static bool handle_button_event( SDL_Event &event )
         return false;
     }
 #if defined(CDDA_GODOT)
-    if( button == CATA_BUTTON_BACK && godot_host::side_toggle() && wheels_on() && !is_in_menu() &&
-        !alt_modifier_held && !any_radial_open() ) {
+    // Not the touch pad's: its Map sends Back and is the map, its own Side
+    // the sidebar's toggle.
+    if( button == CATA_BUTTON_BACK && godot_host::side_toggle() && !button_from_touch_pad &&
+        wheels_on() && !is_in_menu() && !alt_modifier_held && !any_radial_open() ) {
         back_pending = true;
         back_held = false;
         back_pressed_at = now_ms();
