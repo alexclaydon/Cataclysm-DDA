@@ -134,6 +134,11 @@ struct map_vehicle_mount {
     int mount_x, mount_y;
     int sprite;
     int roof_sprite;
+    // Where each is drawn from its tile's top left, tileset pixels (the
+    // tileset's 3/4 view draws tall vehicle sprites rising over the row in
+    // front: 32x64 at -32, 32x48 at -16).
+    int offset_x, offset_y;
+    int roof_offset_x, roof_offset_y;
 };
 struct map_vehicle {
     int face;               // degrees, clockwise from east (the engine's tileray)

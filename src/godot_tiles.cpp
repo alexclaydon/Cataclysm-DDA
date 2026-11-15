@@ -378,7 +378,9 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
                     mv.pivot_z = pivot.z();
                     // Each mount's sprite as the tileset draws it unturned:
                     // what shows there below the roof, and the roof.
-                    const auto sprite_of = [&]( const vpart_display & vd ) {
+                    // A part's sprite and its draw offset, or -1.
+                    const auto sprite_of = [&]( const vpart_display & vd, point & offset ) {
+                        offset = point::zero;
                         if( vd.id.is_null() ) {
                             return -1;
                         }
@@ -394,6 +396,7 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
                                 tt = state;
                             }
                         }
+                        offset = tt->offset;
                         for( const auto &choice : tt->fg ) {
                             if( !choice.first.empty() ) {
                                 return choice.first.front();
@@ -407,11 +410,14 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
                             continue;
                         }
                         const point_rel_ms m( part.mount_x, part.mount_y );
+                        point below_offset;
+                        point above_offset;
                         const int below = veh.part_displayed_at( m, false, true, false ) >= 0 ?
-                                          sprite_of( veh.get_display_of_tile( m, false, false, true, false ) ) : -1;
+                                          sprite_of( veh.get_display_of_tile( m, false, false, true, false ), below_offset ) : -1;
                         const int above = veh.part_displayed_at( m, false, false, true ) >= 0 ?
-                                          sprite_of( veh.get_display_of_tile( m, false, false, false, true ) ) : -1;
-                        mv.mounts.push_back( { part.mount_x, part.mount_y, below, above } );
+                                          sprite_of( veh.get_display_of_tile( m, false, false, false, true ), above_offset ) : -1;
+                        mv.mounts.push_back( { part.mount_x, part.mount_y, below, above, below_offset.x, below_offset.y,
+                                               above_offset.x, above_offset.y } );
                     }
                     vehicles.push_back( std::move( mv ) );
                 }
