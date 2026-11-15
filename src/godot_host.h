@@ -156,7 +156,9 @@ struct map_snapshot {
     int player[3];  // the avatar (tripoint_bub_ms)
     int player_abs[3];  // the avatar (tripoint_abs_ms): the map's place in the world,
                         // for what must not change as the map shifts (a tree's variant)
-    int radius;     // tiles around the view centre it covers (snapshot_radius)
+    int radius;     // tiles around the view centre the table shows (snapshot_radius)
+    int margin = 0; // tiles recorded beyond it each way (look_margin): the
+                    // board a finger pans over without a new snapshot
     uint64_t tileset_generation;  // see take_tileset
     int storeys_usec;  // the engine's time recording the storeys below
     std::vector<map_sprite> sprites;
@@ -825,6 +827,24 @@ void apply_mouse( bool ( *tile_to_pixels )( int dx, int dy, int &x, int &y ) );
 // whole height away, and the passes stop at its ends (OVERMAP_DEPTH,
 // OVERMAP_HEIGHT in map_scale_constants.h, both 10).
 int snapshot_radius();
+// Look-around under a finger or stick (2026-11-15: a slide redrew the whole
+// map at every tile it crossed, a quarter of the phone's core): once the
+// host moves the cursor (set_look_margin, from godot_actions::look_pass),
+// the snapshot is recorded look_margin() tiles wider than the table shows,
+// and the view's centre moves only in jumps (look_pass), so the cursor's
+// steps in between redraw no map (sdltiles.cpp map_unchanged: the cursor
+// isn't in the map's signature) and the host pans over the recorded board,
+// drawing the cursor itself. Off again as look-around closes
+// (set_look_cursor). record_radius() is what the map pass records: the
+// radius and the margin. Engine thread.
+void set_look_margin( bool on );
+// The view's centre onto the cursor (the host, as a slide settles: the
+// centre follows the cursor in jumps meanwhile). Host side, any thread;
+// look_pass takes it.
+void request_look_centre();
+bool take_look_centre_request();
+int look_margin();
+int record_radius();
 constexpr int snapshot_levels_below = 20;  // OVERMAP_DEPTH + OVERMAP_HEIGHT
 constexpr int snapshot_levels_above = 20;
 // Steps in (+, a smaller radius) or out (-) through the radius levels.

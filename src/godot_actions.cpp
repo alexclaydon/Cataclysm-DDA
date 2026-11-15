@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdlib>
 #include <optional>
 #include <string>
 #include <utility>
@@ -280,6 +281,22 @@ bool godot_actions::look_pass( avatar &u, tripoint_bub_ms &lp, tripoint_bub_ms &
             // Inside the map, as the cursor's own moves stay.
             lp.x() = std::clamp( u.pos_bub().x() + cursor_dx, 0, MAPSIZE_X - 1 );
             lp.y() = std::clamp( u.pos_bub().y() + cursor_dy, 0, MAPSIZE_Y - 1 );
+            // The view's centre follows only in jumps (godot_host::
+            // look_margin): past half the margin from it, it moves that far
+            // ahead of the cursor, the way the cursor went, so the cursor
+            // crosses a whole margin before the next. In between the map
+            // isn't redrawn, and the host pans over the wider snapshot.
+            godot_host::set_look_margin( true );
+            const int half = godot_host::look_margin() / 2;
+            const int dx = lp.x() - center.x();
+            const int dy = lp.y() - center.y();
+            if( std::max( std::abs( dx ), std::abs( dy ) ) > half ) {
+                center.x() = std::clamp( lp.x() + std::clamp( dx, -half, half ), 0, MAPSIZE_X - 1 );
+                center.y() = std::clamp( lp.y() + std::clamp( dy, -half, half ), 0, MAPSIZE_Y - 1 );
+            }
+        }
+        // The slide settled: the view's centre onto the cursor.
+        if( godot_host::take_look_centre_request() ) {
             center.x() = lp.x();
             center.y() = lp.y();
         }

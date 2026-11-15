@@ -234,6 +234,9 @@ static bool skip_map_snapshot( bool flush )
 // draws (its line is the map pass's); the age limit catches what the
 // signature can't see (a debug edit of the map).
 static constexpr uint32_t UNCHANGED_MAX_MS = 1000;
+// Longer in look-around under a finger (godot_host::look_margin): no turn
+// passes there, and the cursor's steps are what the map would redraw for.
+static constexpr uint32_t LOOK_UNCHANGED_MAX_MS = 5000;
 
 static bool map_unchanged( bool flush )
 {
@@ -244,13 +247,14 @@ static bool map_unchanged( bool flush )
     static uint32_t last_ms = 0;
     const avatar &you = get_avatar();
     const signature now_sig( to_turns<int>( calendar::turn - calendar::turn_zero ), you.get_moves(),
-                             you.pos_abs(), g->ter_view_p, you.view_offset, godot_host::snapshot_radius(),
+                             you.pos_abs(), g->ter_view_p, you.view_offset, godot_host::record_radius(),
                              godot_host::flat_view(), TERMX, TERMY, godot_actions::route_preview(),
                              static_cast<int>( gamepad::get_left_stick_direction() ) );
     const uint32_t now = GetTicks();
     const bool unchanged = !flush && have_last && godot_host::board_shown() && !godot_host::aiming() &&
                            !( tilecontext && godot_tiles::animating( *tilecontext ) ) &&
-                           now_sig == last && now - last_ms < UNCHANGED_MAX_MS;
+                           now_sig == last && now - last_ms < ( godot_host::look_margin() > 0 ? LOOK_UNCHANGED_MAX_MS :
+                                   UNCHANGED_MAX_MS );
     if( !unchanged ) {
         last = now_sig;
         last_ms = now;

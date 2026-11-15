@@ -670,7 +670,7 @@ void cata_tiles::draw( const point &dest, const tripoint_bub_ms &center, int wid
     // view's centre too, so look-around's pan moves the board as it moves
     // the flat game's view. Beyond the window, drawing is clipped away.
     if( godot_host::recording_map() && !is_isometric() ) {
-        const int r = godot_host::snapshot_radius();
+        const int r = godot_host::record_radius();
         min_col = std::min( min_col, POSX - r );
         max_col = std::max( max_col, POSX + r + 1 );
         min_row = std::min( min_row, POSY - r );

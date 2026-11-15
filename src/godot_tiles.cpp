@@ -280,7 +280,7 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
     // avatar remembers of them (the 2D view never shows them), recorded by
     // the same layer functions in their memory mode, without drawing.
     if( godot_host::recording_map() ) {
-        const int r = godot_host::snapshot_radius();
+        const int r = godot_host::record_radius();
         // The square the snapshot covers: about the view's centre, as the
         // board is (the avatar's storey, though: look-around's cursor can
         // change storeys, the board doesn't).

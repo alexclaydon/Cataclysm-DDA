@@ -781,6 +781,8 @@ namespace
 // Packed as looking << 32 | dx << 16 | dy, 16 bits each (two's complement).
 std::atomic<uint64_t> look_cursor_state{ 0 };
 std::atomic<uint64_t> look_cursor_request{ 0 };  // 1 << 32 | dx << 16 | dy, 0 for none
+std::atomic<bool> look_margin_on{ false };
+std::atomic<bool> look_centre_request{ false };
 // Aiming's, packed the same way.
 std::atomic<uint64_t> aim_cursor_state{ 0 };
 std::atomic<uint64_t> aim_cursor_request{ 0 };
@@ -801,6 +803,37 @@ void unpack_cursor( uint64_t v, int &dx, int &dy )
 void godot_host::set_look_cursor( bool looking, int dx, int dy )
 {
     look_cursor_state.store( looking ? pack_cursor( dx, dy ) : 0 );
+    if( !looking ) {
+        look_margin_on = false;
+    }
+}
+
+void godot_host::set_look_margin( bool on )
+{
+    look_margin_on = on;
+}
+
+void godot_host::request_look_centre()
+{
+    look_centre_request = true;
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_look_centre_request()
+{
+    return look_centre_request.exchange( false );
+}
+
+int godot_host::look_margin()
+{
+    // A third of the radius (10 tiles at the default 30), at least 6: the
+    // wider, the fewer map passes a slide costs, each a little dearer.
+    return look_margin_on ? std::max( 6, snapshot_radius() / 3 ) : 0;
+}
+
+int godot_host::record_radius()
+{
+    return snapshot_radius() + look_margin();
 }
 
 bool godot_host::look_cursor( int &dx, int &dy )
@@ -2092,6 +2125,7 @@ void godot_host::begin_map_snapshot( int center_x, int center_y, int center_z, i
     map_building.player_abs[1] = player_abs_y;
     map_building.player_abs[2] = player_z;
     map_building.radius = snapshot_radius();
+    map_building.margin = look_margin();
     map_building.sprites.clear();
     map_building.blits.clear();
     map_building.anim_frames.clear();
