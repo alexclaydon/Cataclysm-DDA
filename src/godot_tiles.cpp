@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -371,6 +372,47 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
                                           vp.open, vp.is_broken() } );
                 }
                 if( near && !mv.parts.empty() ) {
+                    const tripoint_bub_ms pivot = veh.pos_bub( here );
+                    mv.pivot_x = pivot.x();
+                    mv.pivot_y = pivot.y();
+                    mv.pivot_z = pivot.z();
+                    // Each mount's sprite as the tileset draws it unturned:
+                    // what shows there below the roof, and the roof.
+                    const auto sprite_of = [&]( const vpart_display & vd ) {
+                        if( vd.id.is_null() ) {
+                            return -1;
+                        }
+                        std::optional<tile_lookup_res> res = ct.find_tile_looks_like( "vp_" + vd.id.str(),
+                                                             TILE_CATEGORY::VEHICLE_PART, vd.variant.id );
+                        if( !res ) {
+                            return -1;
+                        }
+                        const tile_type *tt = &res->tile();
+                        if( tt->multitile && ( vd.is_open || vd.is_broken ) ) {
+                            if( const tile_type *state = ct.tileset_ptr->find_tile_type( res->id() +
+                                                         ( vd.is_open ? "_open" : "_broken" ) ) ) {
+                                tt = state;
+                            }
+                        }
+                        for( const auto &choice : tt->fg ) {
+                            if( !choice.first.empty() ) {
+                                return choice.first.front();
+                            }
+                        }
+                        return -1;
+                    };
+                    std::set<std::pair<int, int>> seen;
+                    for( const godot_host::map_vehicle_part &part : mv.parts ) {
+                        if( !seen.insert( { part.mount_x, part.mount_y } ).second ) {
+                            continue;
+                        }
+                        const point_rel_ms m( part.mount_x, part.mount_y );
+                        const int below = veh.part_displayed_at( m, false, true, false ) >= 0 ?
+                                          sprite_of( veh.get_display_of_tile( m, false, false, true, false ) ) : -1;
+                        const int above = veh.part_displayed_at( m, false, false, true ) >= 0 ?
+                                          sprite_of( veh.get_display_of_tile( m, false, false, false, true ) ) : -1;
+                        mv.mounts.push_back( { part.mount_x, part.mount_y, below, above } );
+                    }
                     vehicles.push_back( std::move( mv ) );
                 }
             }

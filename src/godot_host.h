@@ -126,9 +126,20 @@ struct map_vehicle_part {
     bool open;
     bool broken;
 };
+// One mount of a vehicle (a tile of its own frame), for Dark Forest's
+// vehicle mesh: the sprite the tileset draws for what shows there, at the
+// facing that draws sprites unturned (north, 270 degrees), and its roof's
+// where there is one (-1 none). Global sprite indices, as map_blit's.
+struct map_vehicle_mount {
+    int mount_x, mount_y;
+    int sprite;
+    int roof_sprite;
+};
 struct map_vehicle {
     int face;               // degrees, clockwise from east (the engine's tileray)
+    int pivot_x, pivot_y, pivot_z;  // tripoint_bub_ms of mount (0, 0)
     std::vector<map_vehicle_part> parts;
+    std::vector<map_vehicle_mount> mounts;
 };
 
 struct map_snapshot {
