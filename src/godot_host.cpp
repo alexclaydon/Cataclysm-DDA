@@ -9,6 +9,7 @@
 #include <string_view>
 
 #include "calendar.h"
+#include "map_scale_constants.h"
 #include "color.h"
 #include "output.h"
 #include "sdl_utils.h"
@@ -835,13 +836,16 @@ bool godot_host::look_whole()
     return look_whole_on;
 }
 
+// The avatar's middle submap's near side to the map's far edge.
+static_assert( godot_host::look_whole_radius == MAPSIZE_X - 1 - HALF_MAPSIZE_X );
+
 int godot_host::look_margin()
 {
     if( !look_margin_on ) {
         return 0;
     }
-    // The whole loaded map: to its edge from the view's centre (the
-    // avatar: it doesn't move while look_whole is on).
+    // The whole loaded map: to its farthest edge from the view's centre
+    // (the avatar: it doesn't move while look_whole is on).
     if( look_whole_on ) {
         return std::max( 6, look_whole_radius - snapshot_radius() );
     }

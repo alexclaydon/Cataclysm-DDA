@@ -845,7 +845,11 @@ void set_look_margin( bool on );
 // open. Any thread.
 void set_look_whole( bool on );
 bool look_whole();
-constexpr int look_whole_radius = 66;  // MAPSIZE_X / 2: the loaded map (map_scale_constants.h)
+// The loaded map's farthest edge from the avatar (map_scale_constants.h):
+// the avatar stays in the middle submap (tiles 60-71 of 132), so the edge
+// is 60 to 71 tiles away; 66 (half the map) left up to 5 blank tiles
+// where the cursor could still go.
+constexpr int look_whole_radius = 71;  // checked in godot_host.cpp
 // The view's centre onto the cursor (the host, as a slide settles: the
 // centre follows the cursor in jumps meanwhile). Host side, any thread;
 // look_pass takes it.
