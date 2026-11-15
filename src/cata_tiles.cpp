@@ -2677,6 +2677,11 @@ bool cata_tiles::find_overlay_looks_like( const bool male, const std::string &ov
         const itype *new_it = item::find_type( itype_id( looks_like ) );
         looks_like = new_it->looks_like.str();
     }
+#if defined(CDDA_GODOT)
+    if( !exists ) {
+        return godot_tiles::overlay_fallback( *this, male, overlay, variant, draw_id );
+    }
+#endif
     return exists;
 }
 

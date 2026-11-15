@@ -51,6 +51,17 @@ struct godot_tiles {
     // own lookup into a snapshot of its own, record-only, one tile each.
     // On the engine's thread, at the main menu or in play.
     static void record_catalogue( cata_tiles &ct, const std::string &spec );
+    // A worn or wielded overlay the tileset has no art for, after the game
+    // data's looks_like chain (the hook at find_overlay_looks_like's end):
+    // Dark Forest's substitute's overlay (godot_host::tile_substitute,
+    // keyed "worn_<id>" or "wielded_<id>" first, then "<id>"); failing that,
+    // a wielded item's own sprite, as "overlay_held_<its tile id>", which
+    // tile_substitute resolves to that tile and the host draws in the hand.
+    // Without it a worn placeholder drew nothing on the body (issue #2,
+    // 2026-11-15: denim overalls), and so did anything held without
+    // wielded art.
+    static bool overlay_fallback( cata_tiles &ct, bool male, const std::string &overlay,
+                                  const std::string &variant, std::string &draw_id );
     static void record_blit( const cata_tiles &ct, const texture &sprite_tex, int sprite_index,
                              double render_angle, CataFlipMode render_flip, const point &blit_at,
                              int width, int height, float pixelscale,

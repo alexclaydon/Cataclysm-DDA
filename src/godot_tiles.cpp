@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -582,6 +583,16 @@ void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
             for( const itype *t : item_controller->all() ) {
                 found.push_back( { t->get_id().str(), TILE_CATEGORY::ITEM, "" } );
             }
+        } else if( name == "worn" || name == "wielded" ) {
+            // A character's overlays, as worn (every wearable) or wielded
+            // (every item): the id "worn_<item>" or "wielded_<item>",
+            // looked up as find_overlay_looks_like does, its fallbacks
+            // included (issue #2).
+            for( const itype *t : item_controller->all() ) {
+                if( name == "wielded" || t->armor ) {
+                    found.push_back( { name + "_" + t->get_id().str(), TILE_CATEGORY::NONE, "" } );
+                }
+            }
         } else {
             debugmsg( "catalogue: unknown category '%s'", name );
             continue;
@@ -607,6 +618,33 @@ void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
         const godot_host::record_only_scope record_only;
         int n = 0;
         for( const candidate &c : candidates ) {
+            // An overlay (worn_<item>, wielded_<item>): the sprite the
+            // character would wear or hold, on a tile of its own.
+            if( c.category == TILE_CATEGORY::NONE &&
+                ( string_starts_with( c.id, "worn_" ) || string_starts_with( c.id, "wielded_" ) ) ) {
+                std::string draw_id;
+                godot_host::tile_catalogue_entry e;
+                e.id = c.id;
+                e.category = static_cast<int>( c.category );
+                e.subtile = -1;
+                e.x = n % WIDTH;
+                e.y = n / WIDTH;
+                e.found = ct.find_overlay_looks_like( true, c.id, "", draw_id );
+                if( e.found ) {
+                    e.looks_like = draw_id;
+                    const tripoint_bub_ms pos( e.x, e.y, 0 );
+                    int height_3d = 0;
+                    if( !floor.empty() ) {
+                        ct.draw_from_id_string( floor, TILE_CATEGORY::TERRAIN, empty_string, pos, -1, 0,
+                                                lit_level::LIT, false, height_3d );
+                    }
+                    ct.draw_from_id_string( draw_id, TILE_CATEGORY::NONE, empty_string, pos, -1, 0,
+                                            lit_level::LIT, false, height_3d );
+                }
+                entries.push_back( std::move( e ) );
+                ++n;
+                continue;
+            }
             std::optional<tile_lookup_res> res = ct.find_tile_looks_like( c.id, c.category, c.variant );
             // The plain sprite, or each connection shape a multitile has
             // (center to unconnected: they stand in for the plain one), then
@@ -742,3 +780,41 @@ void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
 }
 
 #endif // CDDA_GODOT
+
+bool godot_tiles::overlay_fallback( cata_tiles &ct, const bool male, const std::string &overlay,
+                                    const std::string &variant, std::string &draw_id )
+{
+    // A substitute's own overlay lookup comes back here when it misses too:
+    // once is enough.
+    static bool inside = false;
+    if( inside ) {
+        return false;
+    }
+    const restore_on_out_of_scope<bool> restore_inside( inside );
+    inside = true;
+    std::string type;
+    if( string_starts_with( overlay, "worn_" ) ) {
+        type = "worn_";
+    } else if( string_starts_with( overlay, "wielded_" ) ) {
+        type = "wielded_";
+    } else {
+        return false;
+    }
+    const std::string id = overlay.substr( type.size() );
+    for( const std::string &key : {
+             type + id, id
+         } ) {
+        if( const std::string *sub = godot_host::tile_substitute( key ); sub != nullptr ) {
+            if( ct.find_overlay_looks_like( male, type + *sub, variant, draw_id ) ) {
+                return true;
+            }
+        }
+    }
+    if( type == "wielded_" ) {
+        if( std::optional<tile_lookup_res> res = ct.find_tile_looks_like( id, TILE_CATEGORY::ITEM, variant ) ) {
+            draw_id = "overlay_held_" + res->id();
+            return true;
+        }
+    }
+    return false;
+}

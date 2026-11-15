@@ -2289,7 +2289,17 @@ void godot_host::set_tile_substitutes( std::map<std::string, std::string> substi
 const std::string *godot_host::tile_substitute( const std::string &id )
 {
     const auto it = tile_substitutes.find( id );
-    return it != tile_substitutes.end() ? &it->second : nullptr;
+    if( it != tile_substitutes.end() ) {
+        return &it->second;
+    }
+    // A held item drawn by its own sprite (godot_tiles::overlay_fallback):
+    // the tile id after the prefix.
+    static const std::string held = "overlay_held_";
+    if( id.size() > held.size() && id.compare( 0, held.size(), held ) == 0 ) {
+        static std::map<std::string, std::string> held_tiles;
+        return &held_tiles.try_emplace( id, id.substr( held.size() ) ).first->second;
+    }
+    return nullptr;
 }
 
 #endif // CDDA_GODOT

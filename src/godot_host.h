@@ -1037,7 +1037,10 @@ bool take_tile_catalogue( uint64_t &generation, tile_catalogue_info &out );
 // placeholders.json, the user's call, 2026-11-12): id -> an id whose sprite
 // stands in, tried by cata_tiles::find_tile_looks_like after the tileset's
 // own lookup fails and before the game data's looks_like. Set by the host
-// before run(); read-only after.
+// before run(); read-only after. Keys "worn_<id>" and "wielded_<id>" stand
+// in for an overlay only (godot_tiles::overlay_fallback); an id
+// "overlay_held_<tile id>" resolves to that tile (a held item drawn by its
+// own sprite).
 void set_tile_substitutes( std::map<std::string, std::string> substitutes );
 const std::string *tile_substitute( const std::string &id );
 
