@@ -243,14 +243,18 @@ static constexpr uint32_t LOOK_WHOLE_UNCHANGED_MAX_MS = 60000;
 
 static bool map_unchanged( bool flush )
 {
-    using signature = std::tuple<int, int, tripoint_abs_ms, tripoint_bub_ms, tripoint_rel_ms, int, bool,
-          int, int, std::pair<size_t, tripoint_bub_ms>, int>;
+    // The view's radius and what's recorded (radius and margin) apart:
+    // with the whole map recorded the margin takes up a zoom, and the
+    // recorded radius alone left a zoom in look-around unseen (2026-11-16).
+    using signature = std::tuple<int, int, tripoint_abs_ms, tripoint_bub_ms, tripoint_rel_ms,
+          std::pair<int, int>, bool, int, int, std::pair<size_t, tripoint_bub_ms>, int>;
     static signature last;
     static bool have_last = false;
     static uint32_t last_ms = 0;
     const avatar &you = get_avatar();
     const signature now_sig( to_turns<int>( calendar::turn - calendar::turn_zero ), you.get_moves(),
-                             you.pos_abs(), g->ter_view_p, you.view_offset, godot_host::record_radius(),
+                             you.pos_abs(), g->ter_view_p, you.view_offset,
+                             std::make_pair( godot_host::snapshot_radius(), godot_host::record_radius() ),
                              godot_host::flat_view(), TERMX, TERMY, godot_actions::route_preview(),
                              static_cast<int>( gamepad::get_left_stick_direction() ) );
     const uint32_t now = GetTicks();
