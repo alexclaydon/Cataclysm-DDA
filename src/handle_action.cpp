@@ -2358,6 +2358,11 @@ bool game::do_regular_action( action_id &act, avatar &player_character,
             break;
 
         case ACTION_OPEN_MOVEMENT:
+#if defined( CDDA_GODOT )
+            if( godot_actions::open_movement() ) {
+                break;
+            }
+#endif
             open_movement_mode_menu();
             break;
 

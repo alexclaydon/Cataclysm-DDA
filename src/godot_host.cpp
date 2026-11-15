@@ -436,8 +436,17 @@ void godot_host::request_look( int dx, int dy )
     push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
 }
 
+namespace
+{
+// A move wheel's pick waiting for the play loop (request_move_mode).
+std::atomic<bool> move_mode_waiting{ false };
+} // namespace
+
 bool godot_host::look_pending()
 {
+    if( move_mode_waiting ) {
+        return true;
+    }
     std::lock_guard<std::mutex> lock( look_mutex );
     return look_requested || click_requested || !goto_type.empty() || time_hour >= 0
            || !action_requested.empty() || catalogue_requested || zoom_requested.load() != 0;
@@ -867,6 +876,77 @@ std::string godot_host::move_mode()
 {
     std::lock_guard<std::mutex> lock( move_mode_mutex );
     return move_mode_now;
+}
+
+namespace
+{
+std::vector<godot_host::move_mode_entry> move_modes_now;
+std::atomic<bool> move_wheel_requested{ false };
+std::string move_mode_requested;  // under move_mode_mutex
+} // namespace
+
+void godot_host::set_move_modes( std::vector<move_mode_entry> modes )
+{
+    std::lock_guard<std::mutex> lock( move_mode_mutex );
+    if( move_modes_now != modes ) {
+        move_modes_now = std::move( modes );
+    }
+}
+
+std::vector<godot_host::move_mode_entry> godot_host::move_modes()
+{
+    std::lock_guard<std::mutex> lock( move_mode_mutex );
+    return move_modes_now;
+}
+
+void godot_host::request_move_wheel()
+{
+    move_wheel_requested = true;
+}
+
+bool godot_host::take_move_wheel_request()
+{
+    return move_wheel_requested.exchange( false );
+}
+
+namespace
+{
+std::atomic<bool> move_wheel_on{ false };
+} // namespace
+
+void godot_host::enable_move_wheel()
+{
+    move_wheel_on = true;
+}
+
+bool godot_host::move_wheel_enabled()
+{
+    return move_wheel_on;
+}
+
+void godot_host::request_move_mode( const std::string &id )
+{
+    if( id.empty() ) {
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock( move_mode_mutex );
+        move_mode_requested = id;
+    }
+    move_mode_waiting = true;
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_move_mode_request( std::string &id )
+{
+    std::lock_guard<std::mutex> lock( move_mode_mutex );
+    if( move_mode_requested.empty() ) {
+        return false;
+    }
+    id = std::move( move_mode_requested );
+    move_mode_requested.clear();
+    move_mode_waiting = false;
+    return true;
 }
 
 namespace

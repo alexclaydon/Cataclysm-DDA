@@ -100,6 +100,7 @@ void godot_host::pump_engine_state()
         const avatar &you = get_avatar();
         godot_host::set_move_mode( you.get_desired_move_mode().str(),
                                    you.get_desired_move_mode() != you.current_movement_mode() );
+        godot_actions::publish_move_modes( you );
         // As handle_key_blocking_activity (do_turn.cpp) decides.
         const bool unfinished = you.activity && ( you.activity.id()->based_on() == based_on_type::NEITHER ||
                                 you.activity.moves_left > 0 );
@@ -109,6 +110,7 @@ void godot_host::pump_engine_state()
     } else {
         godot_host::set_watch( -1, 0, 0, 0 );
         godot_host::set_move_mode( std::string(), false );
+        godot_host::set_move_modes( {} );
         godot_host::set_activity_stoppable( false );
     }
     // Which LT wheels the waiting context fills, for the touch pad.

@@ -481,6 +481,39 @@ int safe_refusal_turn();
 void set_move_mode( const std::string &id, bool pending );
 std::string move_mode();
 bool move_mode_pending();
+// The movement modes for the host's move wheel (2026-11-15, the user's
+// call: it replaced upstream's menu on touch and the pad), in
+// move_modes_by_speed's order: whether the avatar can switch to each now,
+// and what the switch from the current mode costs, in seconds. Set by the
+// engine thread each event pump (in play; empty out of it).
+struct move_mode_entry {
+    std::string id;
+    std::string name;
+    std::string letter;
+    bool can = false;
+    float seconds = 0.0f;
+    bool operator==( const move_mode_entry &o ) const {
+        return id == o.id && name == o.name && letter == o.letter && can == o.can && seconds == o.seconds;
+    }
+    bool operator!=( const move_mode_entry &o ) const {
+        return !( *this == o );
+    }
+};
+void set_move_modes( std::vector<move_mode_entry> modes );
+std::vector<move_mode_entry> move_modes();
+// open_movement from a pad or a host's request (godot_actions::
+// open_movement), with the move wheel enabled: the host opens it. The keyboard keeps
+// upstream's menu.
+void request_move_wheel();
+bool take_move_wheel_request();
+// The host draws the move wheel (its play mode: not VR yet), set before
+// start(); without it open_movement is upstream's menu everywhere.
+void enable_move_wheel();
+bool move_wheel_enabled();
+// Host side, any thread: the move wheel's pick, a mode id, which the play
+// loop sets as the desired mode (godot_actions::take_requests).
+void request_move_mode( const std::string &id );
+bool take_move_mode_request( std::string &id );
 int safe_mode();
 // Whether the avatar's activity (crafting, waiting, reading...) or its
 // auto-move would stop on the pause action, as handle_key_blocking_activity

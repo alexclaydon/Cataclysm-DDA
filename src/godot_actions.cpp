@@ -20,6 +20,7 @@
 #include "godot_actions.h"
 #include "godot_host.h"
 #include "messages.h"
+#include "move_mode.h"
 #include "omdata.h"
 #include "overmapbuffer.h"
 #include "point.h"
@@ -60,6 +61,18 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
         godot_host::zoom_view( steps );
         g.mark_main_ui_adaptor_resize();
     }
+    // The host's move wheel chose a mode: the desired one, which the next
+    // step takes up, as upstream's menu sets it. No turn.
+    {
+        std::string mode;
+        if( godot_host::take_move_mode_request( mode ) ) {
+            const move_mode_id id( mode );
+            if( id.is_valid() && you.can_switch_to( id ) ) {
+                you.set_desired_movement_mode( id );
+            }
+            return false;
+        }
+    }
     // The host's hotbar asked for the action catalogue (ADR 0013).
     if( godot_host::take_catalogue_request() ) {
         godot_host::publish_catalogue( godot_host::wheel_catalogue( 0, 0 ) );
@@ -77,6 +90,12 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
             if( wheel_action == godot_host::recenter_action_id ) {
                 you.view_offset = tripoint_rel_ms( g.driving_view_offset.x(), g.driving_view_offset.y(), 0 );
                 g.invalidate_main_ui_adaptor();
+                return false;
+            }
+            // Move mode from the hotbar or the RB wheel: the host's move
+            // wheel, as from a pad.
+            if( wheel_action == "open_movement" && godot_host::move_wheel_enabled() ) {
+                godot_host::request_move_wheel();
                 return false;
             }
             if( wheel_action == godot_host::stairs_action_id ) {
@@ -152,6 +171,32 @@ std::pair<size_t, tripoint_bub_ms> godot_actions::route_preview()
 bool godot_actions::wait_popup_shown()
 {
     return g != nullptr && g->wait_popup != nullptr;
+}
+
+bool godot_actions::open_movement()
+{
+    if( !godot_host::move_wheel_enabled() || !( gamepad::last_input_was_pad() || godot_host::touch_pad() ) ) {
+        return false;
+    }
+    godot_host::request_move_wheel();
+    return true;
+}
+
+void godot_actions::publish_move_modes( const avatar &you )
+{
+    std::vector<godot_host::move_mode_entry> modes;
+    const move_mode_id &current = you.current_movement_mode();
+    const int speed = std::max( 1, you.get_speed() );
+    for( const move_mode_id &m : move_modes_by_speed() ) {
+        godot_host::move_mode_entry e;
+        e.id = m.str();
+        e.name = m->name();
+        e.letter = std::string( 1, m->letter() );
+        e.can = you.can_switch_to( m );
+        e.seconds = static_cast<float>( you.move_mode_switch_cost( current, m ) ) / speed;
+        modes.push_back( std::move( e ) );
+    }
+    godot_host::set_move_modes( std::move( modes ) );
 }
 
 bool godot_actions::flush_owed( const std::string &action )

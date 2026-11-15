@@ -51,6 +51,12 @@ struct godot_actions {
     // skipped one), the view turned 2D or 3D, or the native sidebar
     // switched: flush and invalidate the main UI. True if it did.
     static bool flush_owed( const std::string &action );
+    // ACTION_OPEN_MOVEMENT (handle_action.cpp): from a pad (or the touch
+    // pad), the host's move wheel instead of upstream's menu. True when the
+    // host took it; the keyboard keeps the menu.
+    static bool open_movement();
+    // Each event pump (godot_pump.cpp): the movement modes for the wheel.
+    static void publish_move_modes( const avatar &you );
     // At the top of each look-around pass (game::look_around): the host's
     // touch drag (the cursor and the view centre to its tile), the touch
     // pad's radius slider, and its Go here and Recenter, which leave the
