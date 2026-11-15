@@ -237,6 +237,9 @@ static constexpr uint32_t UNCHANGED_MAX_MS = 1000;
 // Longer in look-around under a finger (godot_host::look_margin): no turn
 // passes there, and the cursor's steps are what the map would redraw for.
 static constexpr uint32_t LOOK_UNCHANGED_MAX_MS = 5000;
+// With the whole map recorded (godot_host::look_whole), a minute: the point
+// is no map pass while looking around.
+static constexpr uint32_t LOOK_WHOLE_UNCHANGED_MAX_MS = 60000;
 
 static bool map_unchanged( bool flush )
 {
@@ -253,8 +256,8 @@ static bool map_unchanged( bool flush )
     const uint32_t now = GetTicks();
     const bool unchanged = !flush && have_last && godot_host::board_shown() && !godot_host::aiming() &&
                            !( tilecontext && godot_tiles::animating( *tilecontext ) ) &&
-                           now_sig == last && now - last_ms < ( godot_host::look_margin() > 0 ? LOOK_UNCHANGED_MAX_MS :
-                                   UNCHANGED_MAX_MS );
+                           now_sig == last && now - last_ms < ( godot_host::look_margin() == 0 ? UNCHANGED_MAX_MS :
+                                   godot_host::look_whole() ? LOOK_WHOLE_UNCHANGED_MAX_MS : LOOK_UNCHANGED_MAX_MS );
     if( !unchanged ) {
         last = now_sig;
         last_ms = now;

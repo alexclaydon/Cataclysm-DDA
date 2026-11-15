@@ -287,16 +287,18 @@ bool godot_actions::look_pass( avatar &u, tripoint_bub_ms &lp, tripoint_bub_ms &
             // crosses a whole margin before the next. In between the map
             // isn't redrawn, and the host pans over the wider snapshot.
             godot_host::set_look_margin( true );
+            // The whole map recorded (look_whole): the centre stays put.
             const int half = godot_host::look_margin() / 2;
             const int dx = lp.x() - center.x();
             const int dy = lp.y() - center.y();
-            if( std::max( std::abs( dx ), std::abs( dy ) ) > half ) {
+            if( !godot_host::look_whole() && std::max( std::abs( dx ), std::abs( dy ) ) > half ) {
                 center.x() = std::clamp( lp.x() + std::clamp( dx, -half, half ), 0, MAPSIZE_X - 1 );
                 center.y() = std::clamp( lp.y() + std::clamp( dy, -half, half ), 0, MAPSIZE_Y - 1 );
             }
         }
-        // The slide settled: the view's centre onto the cursor.
-        if( godot_host::take_look_centre_request() ) {
+        // The slide settled: the view's centre onto the cursor (not with
+        // the whole map recorded: the host eases onto the cursor itself).
+        if( godot_host::take_look_centre_request() && !godot_host::look_whole() ) {
             center.x() = lp.x();
             center.y() = lp.y();
         }
@@ -334,7 +336,10 @@ void godot_actions::look_go_here( avatar &u, const tripoint_bub_ms &lp,
 {
     godot_host::request_click( lp.x() - u.pos_bub().x(), lp.y() - u.pos_bub().y() );
     godot_host::hold_view( prev_offset.x(), prev_offset.y(), prev_offset.z() );
-    u.view_offset = center - u.pos_bub();
+    // After a slide the view is on the cursor whatever the engine's centre
+    // (godot_host::look_margin: it follows in jumps, or not at all).
+    const tripoint_bub_ms at = godot_host::look_margin() > 0 ? tripoint_bub_ms( lp.x(), lp.y(), center.z() ) : center;
+    u.view_offset = at - u.pos_bub();
     prev_offset = u.view_offset;
 }
 

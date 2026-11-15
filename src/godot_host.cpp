@@ -782,6 +782,7 @@ namespace
 std::atomic<uint64_t> look_cursor_state{ 0 };
 std::atomic<uint64_t> look_cursor_request{ 0 };  // 1 << 32 | dx << 16 | dy, 0 for none
 std::atomic<bool> look_margin_on{ false };
+std::atomic<bool> look_whole_on{ false };
 std::atomic<bool> look_centre_request{ false };
 // Aiming's, packed the same way.
 std::atomic<uint64_t> aim_cursor_state{ 0 };
@@ -824,11 +825,29 @@ bool godot_host::take_look_centre_request()
     return look_centre_request.exchange( false );
 }
 
+void godot_host::set_look_whole( bool on )
+{
+    look_whole_on = on;
+}
+
+bool godot_host::look_whole()
+{
+    return look_whole_on;
+}
+
 int godot_host::look_margin()
 {
+    if( !look_margin_on ) {
+        return 0;
+    }
+    // The whole loaded map: to its edge from the view's centre (the
+    // avatar: it doesn't move while look_whole is on).
+    if( look_whole_on ) {
+        return std::max( 6, look_whole_radius - snapshot_radius() );
+    }
     // A third of the radius (10 tiles at the default 30), at least 6: the
     // wider, the fewer map passes a slide costs, each a little dearer.
-    return look_margin_on ? std::max( 6, snapshot_radius() / 3 ) : 0;
+    return std::max( 6, snapshot_radius() / 3 );
 }
 
 int godot_host::record_radius()

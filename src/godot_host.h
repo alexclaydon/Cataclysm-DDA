@@ -838,6 +838,14 @@ int snapshot_radius();
 // (set_look_cursor). record_radius() is what the map pass records: the
 // radius and the margin. Engine thread.
 void set_look_margin( bool on );
+// The whole loaded map instead (the host's switch, 2026-11-15, to try
+// against the jumps): the margin reaches the loaded map's edge from the
+// avatar (look_whole_radius), so one snapshot covers every tile
+// look-around can reach and the view's centre never moves while it's
+// open. Any thread.
+void set_look_whole( bool on );
+bool look_whole();
+constexpr int look_whole_radius = 66;  // MAPSIZE_X / 2: the loaded map (map_scale_constants.h)
 // The view's centre onto the cursor (the host, as a slide settles: the
 // centre follows the cursor in jumps meanwhile). Host side, any thread;
 // look_pass takes it.
