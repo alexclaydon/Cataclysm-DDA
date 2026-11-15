@@ -412,7 +412,13 @@ input_context game::get_player_input( std::string &action )
                 }
             }
 
-            if( pixel_minimap_option && g->w_pixel_minimap ) {
+            if( pixel_minimap_option && g->w_pixel_minimap
+#if defined(CDDA_GODOT)
+                // (Not where nothing shows it: each tick drew it and
+                // presented a frame, godot_host::minimap_unseen.)
+                && !godot_host::minimap_unseen()
+#endif
+              ) {
                 if( liveview.is_enabled() ) {
                     // Mouse View overlaps the minimap; a direct wnoutrefresh
                     // ignores ui_adaptor z-order and paints over it.

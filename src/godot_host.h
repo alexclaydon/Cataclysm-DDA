@@ -1071,8 +1071,11 @@ struct sidebar_panel {
 void set_native_sidebar( bool on );
 bool native_sidebar();
 // The host says the engine's pixel minimap goes unseen (its own sidebar
-// drawn, no peek at the engine's, not VR): cata_tiles::draw_minimap then
-// draws nothing (2026-11-10: a few ms a redraw on the Deck, never shown).
+// drawn, which has none, not VR): cata_tiles::draw_minimap then draws
+// nothing (2026-11-10: a few ms a redraw on the Deck, never shown), and
+// the input loop's idle tick leaves it alone (handle_action.cpp: 2026-11-16,
+// 4-25 ms each eighth of a second on Nova and the phone, and a frame
+// presented each time). The user's rule: never update it unseen.
 void set_minimap_unseen( bool unseen );
 bool minimap_unseen();
 // Whether the switch changed since last asked (the panels then redraw in
