@@ -97,6 +97,40 @@ struct map_creature {
     int attitude;   // 0 the avatar, 1 hostile, 2 neutral, 3 friendly
 };
 
+// A vehicle's part, for Dark Forest's vehicles built as groups (ADR 0020,
+// addendum 2026-11-15): its tile, its place in the vehicle, what it is.
+enum map_vehicle_flag : uint32_t {
+    MVF_OBSTACLE = 1u << 0,
+    MVF_OPAQUE = 1u << 1,
+    MVF_ROOF = 1u << 2,
+    MVF_WHEEL = 1u << 3,
+    MVF_SEAT = 1u << 4,
+    MVF_WINDOW = 1u << 5,
+    MVF_OPENABLE = 1u << 6,
+    MVF_CARGO = 1u << 7,
+    MVF_BOARDABLE = 1u << 8,
+    MVF_AISLE = 1u << 9,
+    MVF_TURRET = 1u << 10,
+    MVF_ENGINE = 1u << 11,
+    MVF_CONTROLS = 1u << 12,
+    MVF_BED = 1u << 13,
+    MVF_PROTRUSION = 1u << 14,
+};
+struct map_vehicle_part {
+    int x, y, z;            // tripoint_bub_ms
+    int mount_x, mount_y;   // in the vehicle's own frame
+    std::string id;         // as the tileset names it: vp_<part>
+    std::string variant;
+    std::string location;   // structure, under, center, roof, on_roof...
+    uint32_t flags;         // map_vehicle_flag
+    bool open;
+    bool broken;
+};
+struct map_vehicle {
+    int face;               // degrees, clockwise from east (the engine's tileray)
+    std::vector<map_vehicle_part> parts;
+};
+
 struct map_snapshot {
     int center[3];  // the view centre (tripoint_bub_ms)
     int player[3];  // the avatar (tripoint_bub_ms)
@@ -114,6 +148,7 @@ struct map_snapshot {
     int lights_x, lights_y, lights_size;
     std::vector<map_light> lights;
     std::vector<map_creature> creatures;
+    std::vector<map_vehicle> vehicles;  // with a part in the snapshot's square
     // The weather, for the 3D view's effects: where the wind blows from
     // (degrees clockwise from north, as the sidebar's arrow), its speed in
     // mph (before local shelter), and precipitation (precip_class: 0 none
@@ -872,6 +907,7 @@ void record_map_sky( float sun_from, float sun_altitude, float moon_from, float 
                      int moon_phase, int light_modifier );
 // The creatures list for the snapshot being recorded, cleared, to fill.
 std::vector<map_creature> &record_map_creatures();
+std::vector<map_vehicle> &record_map_vehicles();
 
 // Around the map view's draw: record sprite lookups between begin and end,
 // then publish them. A draw that recorded nothing (aborted, or nothing

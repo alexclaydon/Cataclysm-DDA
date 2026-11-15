@@ -2241,6 +2241,12 @@ std::vector<godot_host::map_creature> &godot_host::record_map_creatures()
     return map_building.creatures;
 }
 
+std::vector<godot_host::map_vehicle> &godot_host::record_map_vehicles()
+{
+    map_building.vehicles.clear();
+    return map_building.vehicles;
+}
+
 godot_host::sprite_lookup_scope::sprite_lookup_scope()
 {
     ++lookup_depth;

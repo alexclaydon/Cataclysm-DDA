@@ -46,6 +46,9 @@
 #include "type_id.h"
 #include "units.h"
 #include "veh_type.h"
+#include "vehicle.h"
+#include "vpart_position.h"
+#include "vpart_range.h"
 #include "weather.h"
 #include "weather_type.h"
 #include "worldfactory.h"
@@ -326,6 +329,50 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
                     }
                 }
                 creatures.push_back( { p.x(), p.y(), p.z(), attitude } );
+            }
+        }
+        {
+            // The vehicles with a part in the snapshot's square, every real
+            // part of each, for Dark Forest's vehicles built as groups (ADR
+            // 0020, addendum 2026-11-15). Only tiles the 2D draw shows are
+            // shaped: the parts only say what each is.
+            static const std::pair<const char *, uint32_t> named[] = {
+                { "OBSTACLE", godot_host::MVF_OBSTACLE }, { "OPAQUE", godot_host::MVF_OPAQUE },
+                { "ROOF", godot_host::MVF_ROOF }, { "WHEEL", godot_host::MVF_WHEEL },
+                { "SEAT", godot_host::MVF_SEAT }, { "WINDOW", godot_host::MVF_WINDOW },
+                { "OPENABLE", godot_host::MVF_OPENABLE }, { "CARGO", godot_host::MVF_CARGO },
+                { "BOARDABLE", godot_host::MVF_BOARDABLE }, { "AISLE", godot_host::MVF_AISLE },
+                { "TURRET", godot_host::MVF_TURRET }, { "ENGINE", godot_host::MVF_ENGINE },
+                { "CONTROLS", godot_host::MVF_CONTROLS }, { "BED", godot_host::MVF_BED },
+                { "PROTRUSION", godot_host::MVF_PROTRUSION },
+            };
+            std::vector<godot_host::map_vehicle> &vehicles = godot_host::record_map_vehicles();
+            for( const wrapped_vehicle &w : here.get_vehicles() ) {
+                const vehicle &veh = *w.v;
+                godot_host::map_vehicle mv;
+                mv.face = static_cast<int>( std::lround( units::to_degrees( veh.face.dir() ) ) );
+                bool near = false;
+                for( const vpart_reference &vpr : veh.get_all_parts() ) {
+                    const vehicle_part &vp = vpr.part();
+                    if( vp.removed || vp.is_fake ) {
+                        continue;
+                    }
+                    const tripoint_bub_ms p = veh.bub_part_pos( here, vp );
+                    near = near || ( std::abs( p.x() - mid.x ) <= r && std::abs( p.y() - mid.y ) <= r );
+                    const vpart_info &info = vp.info();
+                    uint32_t flags = 0;
+                    for( const auto &[name, bit] : named ) {
+                        if( info.has_flag( name ) ) {
+                            flags |= bit;
+                        }
+                    }
+                    mv.parts.push_back( { p.x(), p.y(), p.z(), vp.mount.x(), vp.mount.y(),
+                                          "vp_" + info.id.str(), vp.variant, info.location.str(), flags,
+                                          vp.open, vp.is_broken() } );
+                }
+                if( near && !mv.parts.empty() ) {
+                    vehicles.push_back( std::move( mv ) );
+                }
             }
         }
         {
