@@ -254,6 +254,13 @@ struct map_object {
 struct map_objects_info {
     uint64_t generation = 0;  // bumped each time the game data is (re)loaded
     std::vector<map_object> objects;
+    // What gives light besides terrain and furniture (theirs is their
+    // numbers' light_emitted), for the 3D view's glow (2026-11-16): a
+    // field's per intensity level (index 0 is intensity 1), a monster
+    // type's luminance, an item type's light_emission. Only those above 0.
+    std::map<std::string, std::vector<float>> field_light;
+    std::map<std::string, float> monster_light;
+    std::map<std::string, float> item_light;
 };
 
 struct tileset_info {

@@ -220,6 +220,15 @@ void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
                 o.numbers["transparent"] = ft.intensity_levels.front().transparent ? 1 : 0;
                 o.numbers["dangerous"] = ft.intensity_levels.front().dangerous ? 1 : 0;
             }
+            std::vector<float> light;
+            bool lit = false;
+            for( const field_intensity_level &level : ft.intensity_levels ) {
+                light.push_back( level.light_emitted );
+                lit = lit || level.light_emitted > 0.0f;
+            }
+            if( lit ) {
+                objects.field_light[ft.id.str()] = std::move( light );
+            }
             objects.objects.push_back( std::move( o ) );
         }
         for( const vpart_info &vp : vehicles::parts::get_all() ) {
@@ -268,6 +277,16 @@ void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
             o.numbers["trap_radius"] = t.get_trap_radius();
             o.numbers["funnel"] = t.is_funnel() ? 1 : 0;
             objects.objects.push_back( std::move( o ) );
+        }
+        for( const mtype &m : MonsterGenerator::generator().get_all_mtypes() ) {
+            if( m.luminance > 0.0f ) {
+                objects.monster_light[m.id.str()] = m.luminance;
+            }
+        }
+        for( const itype *it : item_controller->all() ) {
+            if( it->light_emission > 0 ) {
+                objects.item_light[it->get_id().str()] = static_cast<float>( it->light_emission );
+            }
         }
         godot_host::publish_map_objects( std::move( objects ) );
     }
