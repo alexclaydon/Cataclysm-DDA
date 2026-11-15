@@ -481,7 +481,8 @@ bool take_boom_request( int &dx, int &dy, int &power );
 // Another (make vr-mouse "vehicle PROTO DX DY FACING"): a vehicle of that
 // prototype (car, pickup, bicycle...) DX, DY tiles from the avatar, facing
 // FACING degrees, intact, for testing how vehicles look (Dark Forest's
-// vehicles as groups, ADR 0020).
+// vehicles as groups, ADR 0020); PROTO "clear" removes every vehicle within
+// 40 tiles (the vehicle gallery).
 void request_vehicle( const std::string &proto, int dx, int dy, int facing );
 bool take_vehicle_request( std::string &proto, int &dx, int &dy, int &facing );
 // Whether a look, goto or wheel action request waits, without taking it:

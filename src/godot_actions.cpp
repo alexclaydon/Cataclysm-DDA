@@ -20,6 +20,7 @@
 #include "veh_type.h"
 #include "vehicle.h"
 #include "input_context.h"
+#include "line.h"
 #include "map.h"
 #include "map_scale_constants.h"
 #include "godot_actions.h"
@@ -163,6 +164,22 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
         std::string proto;
         int facing = 0;
         if( godot_host::take_vehicle_request( proto, dx, dy, facing ) ) {
+            if( proto == "clear" ) {
+                // Every vehicle within 40 tiles gone (the vehicle gallery's
+                // clean slate).
+                map &here = get_map();
+                std::vector<vehicle *> gone;
+                for( const wrapped_vehicle &w : here.get_vehicles() ) {
+                    if( rl_dist( w.pos, you.pos_bub() ) <= 40 ) {
+                        gone.push_back( w.v );
+                    }
+                }
+                for( vehicle *v : gone ) {
+                    here.destroy_vehicle( v );
+                }
+                add_msg( m_info, "VR vehicle: %d cleared.", static_cast<int>( gone.size() ) );
+                return false;
+            }
             const vproto_id id( proto );
             vehicle *veh = id.is_valid() ? get_map().add_vehicle( id, you.pos_bub() + tripoint_rel_ms( dx, dy, 0 ),
                            units::from_degrees( facing ), -1, veh_spawn_status::PRISTINE, true, true ) : nullptr;
