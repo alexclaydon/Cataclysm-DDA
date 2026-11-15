@@ -422,6 +422,11 @@ bool take_time_request( int &hour );
 // gas particles, ADR 0004).
 void request_field( const std::string &id, int radius, int intensity );
 bool take_field_request( std::string &id, int &radius, int &intensity );
+// Another (make vr-mouse "boom DX DY POWER"): an explosion DX, DY tiles from
+// the avatar, as a grenade's (explosion_handler::explosion), for testing
+// how hits and explosions look (Dark Forest's bursts).
+void request_boom( int dx, int dy, int power );
+bool take_boom_request( int &dx, int &dy, int &power );
 // Whether a look, goto or wheel action request waits, without taking it:
 // game::handle_mouseview stops there, or the mouse view's loop (and
 // get_player_input's, on timeouts) would keep it waiting until a key came.

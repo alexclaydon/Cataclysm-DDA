@@ -15,6 +15,7 @@
 #include "calendar.h"
 #include "coordinates.h"
 #include "game.h"
+#include "explosion.h"
 #include "field_type.h"
 #include "input_context.h"
 #include "map.h"
@@ -155,6 +156,13 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
                 }
             }
             add_msg( m_info, "VR field: %s on %d tiles.", field, placed );
+            return false;
+        }
+        int boom_power = 0;
+        if( godot_host::take_boom_request( dx, dy, boom_power ) ) {
+            explosion_handler::explosion( &you, you.pos_bub() + tripoint_rel_ms( dx, dy, 0 ),
+                                          static_cast<float>( boom_power ) );
+            add_msg( m_info, "VR boom: %d at %d, %d.", boom_power, dx, dy );
             return false;
         }
         std::string goto_type;

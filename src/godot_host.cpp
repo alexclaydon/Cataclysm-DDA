@@ -105,6 +105,9 @@ bool look_requested = false;  // request_look's, with its tile
 std::string goto_type;  // request_goto's, empty for none (under look_mutex)
 int time_hour = -1;     // request_time's, -1 for none (under look_mutex)
 std::string field_id;   // request_field's, empty for none (under look_mutex)
+int boom_power = 0;     // request_boom's, 0 for none (under look_mutex)
+int boom_dx = 0;
+int boom_dy = 0;
 int field_radius = 0;
 int field_intensity = 1;
 int look_dx = 0;
@@ -451,7 +454,7 @@ bool godot_host::look_pending()
         return true;
     }
     std::lock_guard<std::mutex> lock( look_mutex );
-    return look_requested || click_requested || !goto_type.empty() || time_hour >= 0 || !field_id.empty()
+    return look_requested || click_requested || !goto_type.empty() || time_hour >= 0 || !field_id.empty() || boom_power > 0
            || !action_requested.empty() || catalogue_requested || zoom_requested.load() != 0;
 }
 
@@ -705,6 +708,30 @@ bool godot_host::take_field_request( std::string &id, int &radius, int &intensit
     radius = field_radius;
     intensity = field_intensity;
     field_id.clear();
+    return true;
+}
+
+void godot_host::request_boom( int dx, int dy, int power )
+{
+    {
+        std::lock_guard<std::mutex> lock( look_mutex );
+        boom_dx = dx;
+        boom_dy = dy;
+        boom_power = std::max( 1, power );
+    }
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_boom_request( int &dx, int &dy, int &power )
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    if( boom_power <= 0 ) {
+        return false;
+    }
+    dx = boom_dx;
+    dy = boom_dy;
+    power = boom_power;
+    boom_power = 0;
     return true;
 }
 
