@@ -351,6 +351,7 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
             for( const wrapped_vehicle &w : here.get_vehicles() ) {
                 const vehicle &veh = *w.v;
                 godot_host::map_vehicle mv;
+                mv.proto = veh.type.is_null() ? std::string() : veh.type.str();
                 mv.face = static_cast<int>( std::lround( units::to_degrees( veh.face.dir() ) ) );
                 bool near = false;
                 for( const vpart_reference &vpr : veh.get_all_parts() ) {
