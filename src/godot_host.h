@@ -416,6 +416,12 @@ bool take_goto_request( std::string &type );
 // as the debug menu's Change time does, for night scenes.
 void request_time( int hour );
 bool take_time_request( int &hour );
+// Another (make vr-mouse "field ID [RADIUS] [INTENSITY]"): field ID on every
+// tile within RADIUS of the avatar (not the avatar's own), as the debug
+// menu's map editor draws one, for testing how fields look (Dark Forest's
+// gas particles, ADR 0004).
+void request_field( const std::string &id, int radius, int intensity );
+bool take_field_request( std::string &id, int &radius, int &intensity );
 // Whether a look, goto or wheel action request waits, without taking it:
 // game::handle_mouseview stops there, or the mouse view's loop (and
 // get_player_input's, on timeouts) would keep it waiting until a key came.

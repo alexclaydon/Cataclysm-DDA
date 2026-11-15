@@ -104,6 +104,9 @@ std::mutex look_mutex;
 bool look_requested = false;  // request_look's, with its tile
 std::string goto_type;  // request_goto's, empty for none (under look_mutex)
 int time_hour = -1;     // request_time's, -1 for none (under look_mutex)
+std::string field_id;   // request_field's, empty for none (under look_mutex)
+int field_radius = 0;
+int field_intensity = 1;
 int look_dx = 0;
 int look_dy = 0;
 bool click_requested = false;  // request_click's, with its tile
@@ -448,7 +451,7 @@ bool godot_host::look_pending()
         return true;
     }
     std::lock_guard<std::mutex> lock( look_mutex );
-    return look_requested || click_requested || !goto_type.empty() || time_hour >= 0
+    return look_requested || click_requested || !goto_type.empty() || time_hour >= 0 || !field_id.empty()
            || !action_requested.empty() || catalogue_requested || zoom_requested.load() != 0;
 }
 
@@ -678,6 +681,30 @@ bool godot_host::take_time_request( int &hour )
     }
     hour = time_hour;
     time_hour = -1;
+    return true;
+}
+
+void godot_host::request_field( const std::string &id, int radius, int intensity )
+{
+    {
+        std::lock_guard<std::mutex> lock( look_mutex );
+        field_id = id;
+        field_radius = radius;
+        field_intensity = intensity;
+    }
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_field_request( std::string &id, int &radius, int &intensity )
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    if( field_id.empty() ) {
+        return false;
+    }
+    id = field_id;
+    radius = field_radius;
+    intensity = field_intensity;
+    field_id.clear();
     return true;
 }
 

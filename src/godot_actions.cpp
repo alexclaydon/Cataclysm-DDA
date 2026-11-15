@@ -15,7 +15,9 @@
 #include "calendar.h"
 #include "coordinates.h"
 #include "game.h"
+#include "field_type.h"
 #include "input_context.h"
+#include "map.h"
 #include "map_scale_constants.h"
 #include "godot_actions.h"
 #include "godot_host.h"
@@ -134,6 +136,25 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
             }
             calendar::turn = target;
             add_msg( m_info, "VR time: %s.", to_string_time_of_day( target ) );
+            return false;
+        }
+        std::string field;
+        int field_radius = 0;
+        int field_intensity = 1;
+        if( godot_host::take_field_request( field, field_radius, field_intensity ) ) {
+            const field_type_id type( field );
+            if( !type.is_valid() ) {
+                add_msg( m_info, "VR field: no field %s.", field );
+                return false;
+            }
+            map &here = get_map();
+            int placed = 0;
+            for( const tripoint_bub_ms &p : here.points_in_radius( you.pos_bub(), field_radius ) ) {
+                if( p != you.pos_bub() && here.add_field( p, type, field_intensity ) ) {
+                    ++placed;
+                }
+            }
+            add_msg( m_info, "VR field: %s on %d tiles.", field, placed );
             return false;
         }
         std::string goto_type;
