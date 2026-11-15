@@ -83,6 +83,9 @@ void godot_host::pump_engine_state()
         const std::string *filter = waiting != nullptr ? godot_actions::filter_action( *waiting ) : nullptr;
         godot_host::set_filter_action( filter != nullptr ? *filter : std::string() );
         godot_host::set_counts( waiting != nullptr && godot_actions::count_action( *waiting, 1 ) != nullptr );
+        godot_host::set_menu_sides( waiting != nullptr && !waiting->is_iso() &&
+                                    waiting->input_category() != "DEFAULTMODE" &&
+                                    waiting->input_to_action( input_event( JOY_LB, input_event_t::gamepad ) ) != "ERROR" );
     }
     {
         // 3: on, and it just refused to attack a neutral creature.

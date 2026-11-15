@@ -1082,6 +1082,21 @@ bool godot_host::counts()
     return counts_now;
 }
 
+namespace
+{
+std::atomic<bool> menu_sides_now{ false };
+} // namespace
+
+void godot_host::set_menu_sides( bool on )
+{
+    menu_sides_now = on;
+}
+
+bool godot_host::menu_sides()
+{
+    return menu_sides_now;
+}
+
 void godot_host::request_count( int dir )
 {
     count_requested = dir;

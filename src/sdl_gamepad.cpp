@@ -469,6 +469,17 @@ static bool in_map_cursor()
     return top != nullptr && top->is_iso();
 }
 
+#if defined(CDDA_GODOT)
+// The touch pad's move pad pushed up-left or up-right on a screen where LB
+// and RB step something (godot_host::menu_sides): those bumpers' taps.
+static bool touch_menu_side( direction dir, SDL_JoystickID source )
+{
+    return ( dir == direction::NW || dir == direction::NE ) && godot_host::touch_pad() &&
+           godot_host::is_virtual_pad( source ) && godot_host::menu_sides() && is_in_menu() &&
+           !in_map_cursor() && !alt_modifier_held;
+}
+#endif
+
 // How far to turn a stick before reading it as a direction: in VR, by the
 // way the player faces (godot_host::view_yaw), so forward is "my forward"
 // however the table is turned. Only where the stick means a map direction,
@@ -1045,6 +1056,18 @@ static bool handle_axis_event( SDL_Event &event )
                 // just for sliding a thumb that never left the stick.
                 cancel_task( stick_task );
                 stick_sent[i] = -1;
+#if defined(CDDA_GODOT)
+            } else if( i == 0 && touch_menu_side( dir, event_source ) ) {
+                // The touch pad's up-left and up-right on a screen where LB and
+                // RB step something: those bumpers' taps, one a push (the user's
+                // call, 2026-11-15; godot_host::menu_sides).
+                const int bumper = dir == direction::NW ? JOY_LB : JOY_RB;
+                if( bumper != stick_sent[i] ) {
+                    cancel_task( stick_task );
+                    send_input( bumper );
+                    stick_sent[i] = bumper;
+                }
+#endif
             } else {
                 int joy_code = -1;
                 input_event_t itype = input_event_t::gamepad;

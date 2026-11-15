@@ -504,6 +504,12 @@ bool take_filter_request();
 // input_context's handle_input as Filter's is.
 void set_counts( bool on );
 bool counts();
+// The touch pad's move pad on a screen where LB and RB step something
+// (tabs, inventory columns, advanced inventory's panes: the screen binds an
+// action to the pad's LB), not a map cursor (2026-11-15): its up-left and
+// up-right send LB and RB, and it draws [ and ]. Set each event pump.
+void set_menu_sides( bool on );
+bool menu_sides();
 void request_count( int dir );
 int take_count_request();
 // Whether the list waiting for input filters (uilist::filtering, set each
