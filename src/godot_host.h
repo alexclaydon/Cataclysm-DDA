@@ -462,6 +462,12 @@ bool take_field_request( std::string &id, int &radius, int &intensity );
 // how hits and explosions look (Dark Forest's bursts).
 void request_boom( int dx, int dy, int power );
 bool take_boom_request( int &dx, int &dy, int &power );
+// Another (make vr-mouse "vehicle PROTO DX DY FACING"): a vehicle of that
+// prototype (car, pickup, bicycle...) DX, DY tiles from the avatar, facing
+// FACING degrees, intact, for testing how vehicles look (Dark Forest's
+// vehicles as groups, ADR 0020).
+void request_vehicle( const std::string &proto, int dx, int dy, int facing );
+bool take_vehicle_request( std::string &proto, int &dx, int &dy, int &facing );
 // Whether a look, goto or wheel action request waits, without taking it:
 // game::handle_mouseview stops there, or the mouse view's loop (and
 // get_player_input's, on timeouts) would keep it waiting until a key came.

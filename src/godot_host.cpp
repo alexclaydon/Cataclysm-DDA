@@ -106,6 +106,10 @@ std::string goto_type;  // request_goto's, empty for none (under look_mutex)
 int time_hour = -1;     // request_time's, -1 for none (under look_mutex)
 std::string field_id;   // request_field's, empty for none (under look_mutex)
 int boom_power = 0;     // request_boom's, 0 for none (under look_mutex)
+std::string vehicle_proto;  // request_vehicle's, empty for none (under look_mutex)
+int vehicle_dx = 0;
+int vehicle_dy = 0;
+int vehicle_facing = 0;
 int boom_dx = 0;
 int boom_dy = 0;
 int field_radius = 0;
@@ -454,7 +458,7 @@ bool godot_host::look_pending()
         return true;
     }
     std::lock_guard<std::mutex> lock( look_mutex );
-    return look_requested || click_requested || !goto_type.empty() || time_hour >= 0 || !field_id.empty() || boom_power > 0
+    return look_requested || click_requested || !goto_type.empty() || time_hour >= 0 || !field_id.empty() || boom_power > 0 || !vehicle_proto.empty()
            || !action_requested.empty() || catalogue_requested || zoom_requested.load() != 0;
 }
 
@@ -732,6 +736,32 @@ bool godot_host::take_boom_request( int &dx, int &dy, int &power )
     dy = boom_dy;
     power = boom_power;
     boom_power = 0;
+    return true;
+}
+
+void godot_host::request_vehicle( const std::string &proto, int dx, int dy, int facing )
+{
+    {
+        std::lock_guard<std::mutex> lock( look_mutex );
+        vehicle_proto = proto;
+        vehicle_dx = dx;
+        vehicle_dy = dy;
+        vehicle_facing = facing;
+    }
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_vehicle_request( std::string &proto, int &dx, int &dy, int &facing )
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    if( vehicle_proto.empty() ) {
+        return false;
+    }
+    proto = vehicle_proto;
+    dx = vehicle_dx;
+    dy = vehicle_dy;
+    facing = vehicle_facing;
+    vehicle_proto.clear();
     return true;
 }
 

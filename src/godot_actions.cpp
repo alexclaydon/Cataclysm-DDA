@@ -17,6 +17,8 @@
 #include "game.h"
 #include "explosion.h"
 #include "field_type.h"
+#include "veh_type.h"
+#include "vehicle.h"
 #include "input_context.h"
 #include "map.h"
 #include "map_scale_constants.h"
@@ -156,6 +158,15 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
                 }
             }
             add_msg( m_info, "VR field: %s on %d tiles.", field, placed );
+            return false;
+        }
+        std::string proto;
+        int facing = 0;
+        if( godot_host::take_vehicle_request( proto, dx, dy, facing ) ) {
+            const vproto_id id( proto );
+            vehicle *veh = id.is_valid() ? get_map().add_vehicle( id, you.pos_bub() + tripoint_rel_ms( dx, dy, 0 ),
+                           units::from_degrees( facing ), -1, veh_spawn_status::PRISTINE, true, true ) : nullptr;
+            add_msg( m_info, "VR vehicle: %s %s.", proto, veh != nullptr ? "placed" : "not placed" );
             return false;
         }
         int boom_power = 0;
