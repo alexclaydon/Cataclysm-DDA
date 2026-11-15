@@ -355,7 +355,7 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
                 bool near = false;
                 for( const vpart_reference &vpr : veh.get_all_parts() ) {
                     const vehicle_part &vp = vpr.part();
-                    if( vp.removed || vp.is_fake ) {
+                    if( vp.removed ) {
                         continue;
                     }
                     const tripoint_bub_ms p = veh.bub_part_pos( here, vp );
@@ -366,6 +366,9 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
                         if( info.has_flag( name ) ) {
                             flags |= bit;
                         }
+                    }
+                    if( vp.is_fake ) {
+                        flags |= godot_host::MVF_FAKE;
                     }
                     mv.parts.push_back( { p.x(), p.y(), p.z(), vp.mount.x(), vp.mount.y(),
                                           "vp_" + info.id.str(), vp.variant, info.location.str(), flags,
@@ -406,7 +409,8 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
                     };
                     std::set<std::pair<int, int>> seen;
                     for( const godot_host::map_vehicle_part &part : mv.parts ) {
-                        if( !seen.insert( { part.mount_x, part.mount_y } ).second ) {
+                        if( ( part.flags & godot_host::MVF_FAKE ) ||
+                            !seen.insert( { part.mount_x, part.mount_y } ).second ) {
                             continue;
                         }
                         const point_rel_ms m( part.mount_x, part.mount_y );

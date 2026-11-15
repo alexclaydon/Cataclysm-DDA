@@ -115,6 +115,9 @@ enum map_vehicle_flag : uint32_t {
     MVF_CONTROLS = 1u << 12,
     MVF_BED = 1u << 13,
     MVF_PROTRUSION = 1u << 14,
+    // A fake part: the engine's filler along a diagonal vehicle's outline,
+    // drawn but not real (Dark Forest hides its tile, builds nothing for it).
+    MVF_FAKE = 1u << 15,
 };
 struct map_vehicle_part {
     int x, y, z;            // tripoint_bub_ms
