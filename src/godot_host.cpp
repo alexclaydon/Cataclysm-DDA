@@ -2203,10 +2203,11 @@ bool godot_host::sprite_lookup_scope::recording() const
 }
 
 void godot_host::record_map_sprite( const std::string &id, const std::string &variant,
-                                    int category, int light, int x, int y, int z, int subtile, int rota, int height_3d )
+                                    int category, int light, int x, int y, int z, int subtile, int rota, int height_3d,
+                                    int intensity )
 {
     map_building.sprites.push_back( { id, variant, category, light, x, y, z, subtile, rota,
-                                      height_3d } );
+                                      height_3d, intensity } );
 }
 
 void godot_host::record_map_blit( int index, int angle, bool flip_h, bool flip_v, int offset_x,

@@ -42,6 +42,7 @@ struct map_sprite {
     int subtile;
     int rota;
     int height_3d;  // the tile's stack height so far, as cata_tiles has it
+    int intensity = 0;  // a field's intensity (1 to its levels), 0 for the rest
 };
 
 // One sprite image the engine blitted for a map_sprite, after looks_like,
@@ -881,7 +882,8 @@ class sprite_lookup_scope
         bool recording() const;
 };
 void record_map_sprite( const std::string &id, const std::string &variant, int category,
-                        int light, int x, int y, int z, int subtile, int rota, int height_3d );
+                        int light, int x, int y, int z, int subtile, int rota, int height_3d,
+                        int intensity );
 // A sprite image blitted for the most recently recorded map sprite. Called
 // from cata_tiles::draw_sprite_at; ignored outside a recorded lookup.
 void record_map_blit( int index, int angle, bool flip_h, bool flip_v, int offset_x,

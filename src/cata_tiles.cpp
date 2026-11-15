@@ -2900,7 +2900,8 @@ bool cata_tiles::draw_from_id_string_internal( const std::string &id, TILE_CATEG
     godot_host::sprite_lookup_scope godot_lookup;
     if( godot_lookup.recording() ) {
         godot_host::record_map_sprite( id, variant, static_cast<int>( category ),
-                                       static_cast<int>( ll ), pos.x(), pos.y(), pos.z(), subtile, rota, height_3d );
+                                       static_cast<int>( ll ), pos.x(), pos.y(), pos.z(), subtile, rota, height_3d,
+                                       intensity_level );
     }
 #endif
     bool nv_color_active = apply_night_vision_goggles && get_option<bool>( "NV_GREEN_TOGGLE" );
