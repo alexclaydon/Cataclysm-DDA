@@ -114,6 +114,10 @@ struct cata_timer {
             }
         }
     private:
+#if defined(CDDA_GODOT)
+        // Dark Forest reads the turn's timers for its logs (godot_host.cpp).
+        friend class godot_turn_timers;
+#endif
         timers_map::iterator timer;
         std::chrono::steady_clock::time_point current_start = std::chrono::steady_clock::now();
 

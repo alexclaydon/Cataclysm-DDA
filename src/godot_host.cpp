@@ -12,6 +12,7 @@
 #include "map_scale_constants.h"
 #include "color.h"
 #include "output.h"
+#include "perf.h"
 #include "sdl_utils.h"
 #include "string_formatter.h"
 
@@ -22,6 +23,7 @@
 #include <cstdio>
 #include <cstring>
 #include <deque>
+#include <map>
 #include <mutex>
 #include <vector>
 
@@ -2358,6 +2360,77 @@ godot_host::redraw_stats godot_host::take_redraw_stats()
     const int now = turn_now;
     s.turns = turn_taken >= 0 && now >= turn_taken ? now - turn_taken : 0;
     turn_taken = now;
+    return s;
+}
+
+// cata_timer's tree is the engine thread's; note_turn_timers copies the
+// totals under a lock for the host.
+class godot_turn_timers
+{
+    public:
+        static const cata_timer::timer_stats *game_turn() {
+            const cata_timer::timers_map &top = cata_timer::top_level_timer_map();
+            const auto it = top.find( "Game Turn" );
+            return it == top.end() ? nullptr : &it->second;
+        }
+};
+
+namespace
+{
+struct turn_totals {
+    int64_t count = 0;
+    int64_t usec = 0;
+    std::map<std::string, int64_t, std::less<>> parts;
+};
+std::mutex turn_mutex;
+turn_totals turn_noted;  // engine thread's, under turn_mutex
+turn_totals turn_taken_totals;  // host side
+int64_t busy_usec( const cata_timer::timer_stats &t )
+{
+    if( t.wait ) {
+        return 0;
+    }
+    return static_cast<int64_t>( t.duration ) - static_cast<int64_t>( t.wait_duration );
+}
+} // namespace
+
+void godot_host::note_turn_timers()
+{
+    const cata_timer::timer_stats *turn = godot_turn_timers::game_turn();
+    if( turn == nullptr ) {
+        return;
+    }
+    turn_totals t;
+    t.count = static_cast<int64_t>( turn->count );
+    t.usec = busy_usec( *turn );
+    for( const auto &[name, child] : turn->child_timers ) {
+        t.parts[name] = busy_usec( child );
+    }
+    std::lock_guard<std::mutex> lock( turn_mutex );
+    turn_noted = std::move( t );
+}
+
+godot_host::turn_stats godot_host::take_turn_stats()
+{
+    turn_totals now;
+    {
+        std::lock_guard<std::mutex> lock( turn_mutex );
+        now = turn_noted;
+    }
+    turn_stats s;
+    s.turns = static_cast<int>( std::max<int64_t>( 0, now.count - turn_taken_totals.count ) );
+    s.usec = std::max<int64_t>( 0, now.usec - turn_taken_totals.usec );
+    for( const auto &[name, usec] : now.parts ) {
+        const auto was = turn_taken_totals.parts.find( name );
+        const int64_t d = usec - ( was == turn_taken_totals.parts.end() ? 0 : was->second );
+        if( d > 0 ) {
+            s.parts.push_back( { name, d } );
+        }
+    }
+    std::sort( s.parts.begin(), s.parts.end(), []( const turn_part & a, const turn_part & b ) {
+        return a.usec > b.usec;
+    } );
+    turn_taken_totals = std::move( now );
     return s;
 }
 

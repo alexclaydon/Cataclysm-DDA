@@ -74,6 +74,7 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
         you.set_all_parts_hp_to_max();
     }
     godot_host::set_bubble_creatures( static_cast<int>( g.num_creatures() ) );
+    godot_host::note_turn_timers();
     // The touch pad's view radius slider, as the zoom actions.
     if( const int steps = godot_host::take_zoom_view_request() ) {
         godot_host::zoom_view( steps );

@@ -987,6 +987,25 @@ struct redraw_stats {
     int turns = 0;  // game turns passed
 };
 redraw_stats take_redraw_stats();
+// Where the game turns' time goes (2026-11-16): upstream's turn profiler
+// (cata_timer, perf.h) times each part of game::do_turn under "Game Turn"
+// (monmove, build_map_cache, process_fields, vehmove, the player's turn...),
+// and prints it only on leaving a game for the menu, which our runs never
+// do. note_turn_timers copies its totals each time the avatar acts (engine
+// thread); take_turn_stats gives the host what each part took since the
+// last take, the most first, without the time spent waiting for input. A
+// long wait or activity shows when the avatar next acts.
+void note_turn_timers();
+struct turn_part {
+    std::string name;
+    int64_t usec = 0;
+};
+struct turn_stats {
+    int turns = 0;         // game::do_turn calls finished
+    int64_t usec = 0;      // their time, input waits excluded
+    std::vector<turn_part> parts;  // do_turn's parts, the most first
+};
+turn_stats take_turn_stats();
 void note_storeys_usec( int usec );
 // The light grid for the snapshot being recorded: sized size x size, zeroed,
 // for cata_tiles::draw to fill.
