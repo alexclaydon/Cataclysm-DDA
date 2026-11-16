@@ -29,6 +29,10 @@
 #include "unicode.h"
 #include "wcwidth.h"
 
+#if defined(CDDA_GODOT)
+#include "godot_host.h"
+#endif
+
 static bool is_linebreak( const uint32_t uc )
 {
     return uc == '\n';
@@ -371,6 +375,9 @@ std::pair<bool, std::string> string_editor_window::query_string()
     if( _position == -1 ) {
         _position = _utext.length();
     }
+#if defined(CDDA_GODOT)
+    godot_host::set_prompt_text( ctxt.get(), _utext.str(), _position );
+#endif
 
     // fold the text
     bool refold = true;

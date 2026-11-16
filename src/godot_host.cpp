@@ -72,6 +72,11 @@ std::atomic<bool> filter_requested{ false };
 std::atomic<bool> list_filters_now{ true };
 std::mutex text_entry_mutex;
 std::string text_entry_now;
+std::pair<int, int> text_entry_cursor_now{ 0, 0 };
+int text_entry_serial_now = 0;
+const void *prompt_owner = nullptr;
+std::string prompt_text_now;
+int prompt_cursor_now = 0;
 std::mutex filter_mutex;
 std::string filter_action_now;
 // minute << 16 | format << 12 | weekday << 8 | day; -1 with no watch.
@@ -1413,16 +1418,49 @@ int godot_host::take_count_request()
     return count_requested.exchange( 0 );
 }
 
-void godot_host::set_text_entry( const std::string &text )
+void godot_host::set_prompt_text( const void *owner, const std::string &text, int cursor )
+{
+    std::lock_guard<std::mutex> lock( text_entry_mutex );
+    prompt_owner = owner;
+    prompt_text_now = text;
+    prompt_cursor_now = cursor;
+}
+
+bool godot_host::prompt_text( const void *owner, std::string &text, int &cursor )
+{
+    std::lock_guard<std::mutex> lock( text_entry_mutex );
+    if( owner == nullptr || owner != prompt_owner ) {
+        return false;
+    }
+    text = prompt_text_now;
+    cursor = prompt_cursor_now;
+    return true;
+}
+
+void godot_host::set_text_field( const std::string &text, int select_from, int cursor )
 {
     std::lock_guard<std::mutex> lock( text_entry_mutex );
     text_entry_now = text;
+    text_entry_cursor_now = { select_from, cursor };
+    ++text_entry_serial_now;
 }
 
 std::string godot_host::text_entry()
 {
     std::lock_guard<std::mutex> lock( text_entry_mutex );
     return text_entry_now;
+}
+
+std::pair<int, int> godot_host::text_entry_cursor()
+{
+    std::lock_guard<std::mutex> lock( text_entry_mutex );
+    return text_entry_cursor_now;
+}
+
+int godot_host::text_entry_serial()
+{
+    std::lock_guard<std::mutex> lock( text_entry_mutex );
+    return text_entry_serial_now;
 }
 
 void godot_host::set_list_filters( bool filters )

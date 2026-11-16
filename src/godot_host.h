@@ -663,12 +663,25 @@ int take_count_request();
 // so Filter mustn't show over them.
 void set_list_filters( bool filters );
 bool list_filters();
-// The text a prompt starts from (string_input_popup::query_string), for the
-// host's on-screen keyboard: iOS's keyboard deletes only what its own hidden
-// field holds, so it opens with this in it, or an edited filter's old text
-// couldn't be backspaced (2026-11-12).
-void set_text_entry( const std::string &text );
+// The text field the game is typing into, for the host's on-screen
+// keyboard: iOS's keyboard deletes only what its own hidden field holds, so
+// it opens with the field's text and cursor in it, or the text already
+// there couldn't be backspaced (2026-11-12, a filter; 2026-11-17, every
+// field: the character creator's stats, ImGui's fields, the diary).
+// The curses prompts publish theirs with set_prompt_text (one line in
+// string_input_popup::query_string and string_editor_window::query_string:
+// the prompt's input context, its text, the cursor in code points); the
+// pump (godot_pump.cpp) takes the field in use each pass, an ImGui field's
+// from ImGui itself, and publishes a new field's text with set_text_field,
+// counting it (text_entry_serial) so the host refills its keyboard when the
+// game moves to another field.
+void set_prompt_text( const void *owner, const std::string &text, int cursor );
+bool prompt_text( const void *owner, std::string &text, int &cursor );
+void set_text_field( const std::string &text, int select_from, int cursor );
 std::string text_entry();
+// [select_from, cursor] in code points: equal with no selection.
+std::pair<int, int> text_entry_cursor();
+int text_entry_serial();
 // The avatar's watch, for the host's digital watch (2026-11-11): shown only
 // when the game would tell the exact time (Character::has_watch: a watch, a
 // charged phone, a clock bionic, a vehicle's clock), as the sidebar's Time.

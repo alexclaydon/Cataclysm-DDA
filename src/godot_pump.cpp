@@ -5,6 +5,8 @@
 // here from CheckMessages unchanged (2026-11-09, ADR 0018), where upstream's
 // renderer coordinator kept conflicting with it.
 
+#include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -13,6 +15,7 @@
 #include "calendar.h"
 #include "cata_imgui.h"
 #include "cata_tiles.h"
+#include "catacharset.h"
 #include "coordinates.h"
 #include "game.h"
 #include "godot_actions.h"
@@ -25,6 +28,57 @@
 #include "point.h"
 #include "sdl_gamepad.h"
 #include "sdltiles.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
+
+// The text field the game types into (godot_host::set_text_field), for the
+// host's on-screen keyboard to hold its text and cursor: an ImGui field's
+// read from ImGui (every ImGui field: the number and text popups, the
+// filter boxes, last words, the debug console), a curses prompt's as it
+// published it (string_input_popup, string_editor_window). Published when
+// the field changes, not as it's typed in: the keyboard's own field follows
+// the typing from there.
+static void godot_text_field_publish( bool wanted )
+{
+    // The field in use: ImGui's active id (tagged odd), or the prompt's input
+    // context (a pointer, even); 0 for none.
+    static std::uintptr_t field_was = 0;
+    std::uintptr_t field = 0;
+    std::string text;
+    int select_from = 0;
+    int cursor = 0;
+    if( wanted && cataimgui::client::want_text_input() ) {
+        const ImGuiID id = ImGui::GetActiveID();
+        if( ImGuiInputTextState *state = ImGui::GetInputTextState( id ) ) {
+            field = ( static_cast<std::uintptr_t>( id ) << 1 ) | 1;
+            text.assign( state->TextA.Data != nullptr ? state->TextA.Data : "",
+                         static_cast<size_t>( std::max( 0, state->TextLen ) ) );
+            // ImGui's are byte offsets; the keyboard counts code points.
+            const auto cpts = [&text]( int bytes ) {
+                bytes = std::clamp( bytes, 0, static_cast<int>( text.size() ) );
+                return static_cast<int>( utf8_wrapper( text.substr( 0, bytes ) ).length() );
+            };
+            cursor = cpts( state->GetCursorPos() );
+            select_from = state->HasSelection() ? cpts( state->GetSelectionStart() ) : cursor;
+        }
+    }
+    if( field == 0 && wanted ) {
+        for( const input_context *ctxt : {
+                 static_cast<const input_context *>( input_context::polling ),
+                 static_cast<const input_context *>( input_context::input_context_stack.back() )
+             } ) {
+            if( ctxt != nullptr && godot_host::prompt_text( ctxt, text, cursor ) ) {
+                field = reinterpret_cast<std::uintptr_t>( ctxt );
+                select_from = cursor;
+                break;
+            }
+        }
+    }
+    if( field != field_was ) {
+        field_was = field;
+        godot_host::set_text_field( text, select_from, cursor );
+    }
+}
 
 // The watch (godot_host::set_watch), as display::time_string and
 // date_string read the time and the date.
@@ -70,6 +124,7 @@ void godot_host::pump_engine_state()
             wanted = wanted || category == "STRING_INPUT" || category == "STRING_EDITOR";
         }
         godot_host::set_text_wanted( wanted );
+        godot_text_field_publish( wanted );
     }
     godot_host::set_in_menu( gamepad::is_in_menu() );
     {

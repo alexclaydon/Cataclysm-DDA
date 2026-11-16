@@ -411,12 +411,12 @@ const std::string &string_input_popup::query_string( const bool loop, const bool
     _text_changed = false;
     utf8_wrapper ret( _text );
     utf8_wrapper edit( ctxt->get_edittext() );
-#if defined(CDDA_GODOT)
-    godot_host::set_text_entry( _text );
-#endif
     if( _position == -1 ) {
         _position = ret.length();
     }
+#if defined(CDDA_GODOT)
+    godot_host::set_prompt_text( ctxt, _text, _position );
+#endif
     const int scrmax = std::max( 0, _endx - _startx );
 
     std::unique_ptr<ui_adaptor> ui;
