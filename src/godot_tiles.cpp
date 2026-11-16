@@ -62,6 +62,16 @@ bool godot_tiles::animating( const cata_tiles &ct )
            ct.do_draw_hit || ct.do_draw_async_anim;
 }
 
+bool godot_tiles::note_hit( const Creature &c )
+{
+    if( godot_host::hit_redraw() ) {
+        return false;
+    }
+    const tripoint_rel_ms d = c.pos_bub() - get_avatar().pos_bub();
+    godot_host::push_hit( d.x(), d.y(), d.z() );
+    return true;
+}
+
 void godot_tiles::drop_one_shots( cata_tiles &ct )
 {
     ct.void_line();

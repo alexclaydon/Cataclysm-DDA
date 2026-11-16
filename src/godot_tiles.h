@@ -37,6 +37,13 @@ struct godot_tiles {
     // skipped as an unchanged map (sdltiles.cpp map_unchanged), or the 3D
     // view never sees it while the game still waits on it (2026-11-11).
     static bool animating( const cata_tiles &ct );
+    // A hit on a creature (game::draw_hit_player, draw_hit_mon): handed to
+    // the host as a burst at its tile (godot_host::take_hits) instead of
+    // upstream's hit animation, whose redraw and blocking pause per hit
+    // were most of a crowd fight's cost in Dark Forest (P25: ~9 redraws a
+    // turn, each a snapshot and a board rebuild). False when the host
+    // wants upstream's animation back (godot_host::set_hit_redraw, a test).
+    static bool note_hit( const Creature &c );
     // While a snapshot is recorded: the weather, the sky, the creatures the
     // avatar sees, the light on its storey, then the other storeys (what
     // the avatar remembers below it, the terrain above), recorded through

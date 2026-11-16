@@ -41,6 +41,9 @@
 #include "viewer.h"
 #include "weather.h"
 
+#if defined(CDDA_GODOT)
+#include "godot_tiles.h"
+#endif
 #if defined(TILES)
 #include "cata_tiles.h" // all animation functions will be pushed out to a cata_tiles function in some manner
 #include "sdltiles.h"
@@ -601,6 +604,11 @@ void game::draw_hit_mon( const tripoint_bub_ms &p, const monster &m, const bool 
         draw_hit_mon_curses( p, m, u, dead );
         return;
     }
+#if defined(CDDA_GODOT)
+    if( godot_tiles::note_hit( m ) ) {
+        return;
+    }
+#endif
 
     // Use creature reference to resolve sprite position at draw time
     tilecontext->init_draw_hit( m );
@@ -635,6 +643,11 @@ void game::draw_hit_player( const Character &p, const int dam ) const
         draw_hit_player_curses( *this, p, dam );
         return;
     }
+#if defined(CDDA_GODOT)
+    if( godot_tiles::note_hit( p ) ) {
+        return;
+    }
+#endif
     // Use creature reference to resolve sprite position at draw time
     tilecontext->init_draw_hit( p );
     // this creates a blocking delay in user inputs, to give the player time to mentally register the hit

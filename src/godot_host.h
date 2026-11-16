@@ -498,6 +498,15 @@ bool take_boom_request( int &dx, int &dy, int &power );
 // removes the hostiles within 60 and stops keeping it alive. A test world
 // only: never save after it.
 void request_crowd( const std::string &id, int count, int near, int far );
+// Hits for the host to show as bursts (godot_tiles::note_hit): each a tile
+// from the avatar, x y z, taken (and cleared) by the host each frame; at
+// most 256 kept. set_hit_redraw( true ) gives upstream's hit animation back
+// (a redraw and a pause per hit), for comparing (make df-mac-mouse
+// "hitanim 1").
+void push_hit( int dx, int dy, int dz );
+std::vector<std::array<int, 3>> take_hits();
+void set_hit_redraw( bool on );
+bool hit_redraw();
 bool take_crowd_request( std::string &id, int &count, int &near, int &far );
 // Another (make vr-mouse "vehicle PROTO DX DY FACING"): a vehicle of that
 // prototype (car, pickup, bicycle...) DX, DY tiles from the avatar, facing

@@ -108,6 +108,8 @@ int time_hour = -1;     // request_time's, -1 for none (under look_mutex)
 std::string field_id;   // request_field's, empty for none (under look_mutex)
 int boom_power = 0;     // request_boom's, 0 for none (under look_mutex)
 std::string crowd_id;   // request_crowd's, empty for none (under look_mutex)
+std::vector<std::array<int, 3>> hits;  // push_hit's, under look_mutex
+std::atomic<bool> hit_redraw_on{ false };
 int crowd_count = 0;
 int crowd_near = 3;
 int crowd_far = 8;
@@ -718,6 +720,32 @@ bool godot_host::take_field_request( std::string &id, int &radius, int &intensit
     intensity = field_intensity;
     field_id.clear();
     return true;
+}
+
+void godot_host::push_hit( int dx, int dy, int dz )
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    if( hits.size() < 256 ) {
+        hits.push_back( { dx, dy, dz } );
+    }
+}
+
+std::vector<std::array<int, 3>> godot_host::take_hits()
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    std::vector<std::array<int, 3>> out;
+    out.swap( hits );
+    return out;
+}
+
+void godot_host::set_hit_redraw( bool on )
+{
+    hit_redraw_on = on;
+}
+
+bool godot_host::hit_redraw()
+{
+    return hit_redraw_on;
 }
 
 void godot_host::request_crowd( const std::string &id, int count, int near, int far )
