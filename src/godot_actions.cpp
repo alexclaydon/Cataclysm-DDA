@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -17,6 +18,7 @@
 #include "coordinates.h"
 #include "creature_tracker.h"
 #include "game.h"
+#include "input.h"
 #include "explosion.h"
 #include "field_type.h"
 #include "veh_type.h"
@@ -489,6 +491,20 @@ const std::string *godot_actions::count_action( const input_context &ctxt, int d
         }
     }
     return nullptr;
+}
+
+bool godot_actions::scrolls_description( const input_context &ctxt )
+{
+    static const std::set<std::string> ups = {
+        "SCROLL_INFOBOX_UP", "SCROLL_ITEM_INFO_UP", "SCROLL_TRAIT_INFO_UP",
+        "SCROLL_UP_SPELL_MENU", "SCROLL_DESC_UP", "DESC_LIST_UP"
+    };
+    static const std::set<std::string> downs = {
+        "SCROLL_INFOBOX_DOWN", "SCROLL_ITEM_INFO_DOWN", "SCROLL_TRAIT_INFO_DOWN",
+        "SCROLL_DOWN_SPELL_MENU", "SCROLL_DESC_DOWN", "DESC_LIST_DOWN"
+    };
+    return ups.count( ctxt.input_to_action( input_event( JOY_ALT_UP, input_event_t::gamepad ) ) ) &&
+           downs.count( ctxt.input_to_action( input_event( JOY_ALT_DOWN, input_event_t::gamepad ) ) );
 }
 #endif // CDDA_GODOT
 

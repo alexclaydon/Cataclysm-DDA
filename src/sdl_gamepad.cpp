@@ -478,6 +478,20 @@ static bool touch_menu_side( direction dir, SDL_JoystickID source )
            godot_host::is_virtual_pad( source ) && godot_host::menu_sides() && is_in_menu() &&
            !in_map_cursor() && !alt_modifier_held;
 }
+
+// The touch pad's move pad pushed down-left or down-right on a screen with a
+// scrolling description (godot_host::menu_scroll): the pad's LT + d-pad up
+// and down, which scroll it, repeating while held (the user's call,
+// 2026-11-17: touch has no LT). 0 for anything else.
+static int touch_menu_scroll( direction dir, SDL_JoystickID source )
+{
+    if( ( dir != direction::SW && dir != direction::SE ) || !godot_host::touch_pad() ||
+        !godot_host::is_virtual_pad( source ) || !godot_host::menu_scroll() || !is_in_menu() ||
+        in_map_cursor() || alt_modifier_held ) {
+        return 0;
+    }
+    return dir == direction::SW ? JOY_ALT_UP : JOY_ALT_DOWN;
+}
 #endif
 
 // How far to turn a stick before reading it as a direction: in VR, by the
@@ -1078,6 +1092,10 @@ static bool handle_axis_event( SDL_Event &event )
                     // would lose the diagonals.
                     joy_code = direction_to_num_key( dir );
                     itype = input_event_t::keyboard_char;
+#if defined(CDDA_GODOT)
+                } else if( i == 0 && touch_menu_scroll( dir, event_source ) != 0 ) {
+                    joy_code = touch_menu_scroll( dir, event_source );
+#endif
                 } else if( i == 0 && is_in_menu() && !alt_modifier_held ) {
                     // Left stick in menus: the d-pad's arrow keys, repeating
                     // the same way, for controllers without a d-pad (the VR

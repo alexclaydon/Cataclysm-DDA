@@ -86,6 +86,8 @@ void godot_host::pump_engine_state()
         godot_host::set_menu_sides( waiting != nullptr && !waiting->is_iso() &&
                                     waiting->input_category() != "DEFAULTMODE" &&
                                     waiting->input_to_action( input_event( JOY_LB, input_event_t::gamepad ) ) != "ERROR" );
+        godot_host::set_menu_scroll( waiting != nullptr && !waiting->is_iso() &&
+                                     godot_actions::scrolls_description( *waiting ) );
     }
     {
         // 3: on, and it just refused to attack a neutral creature.

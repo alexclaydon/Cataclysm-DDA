@@ -28,6 +28,12 @@ struct godot_actions {
     // down (dir -1) or up (1): an item screen's DECREASE/INCREASE_COUNT,
     // crafting's BATCH_SIZE_DOWN/UP; nullptr for none.
     static const std::string *count_action( const input_context &ctxt, int dir );
+    // Whether the pad's LT + d-pad up and down scroll a description on the
+    // screen (the character creator's, item info, traits, spells...): the
+    // touch pad's down-left and down-right send them there (menu_scroll).
+    // By the actions they resolve to: other screens put stairs, counts or
+    // paging on those chords.
+    static bool scrolls_description( const input_context &ctxt );
     // A keyboard move on the map (play, or a map cursor: look-around,
     // aiming) turned with the view as the pad's are (godot_host::move_step;
     // the user's call, 2026-11-12): the turned action, or nullptr when it

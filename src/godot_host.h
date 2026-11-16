@@ -649,6 +649,13 @@ bool counts();
 // up-right send LB and RB, and it draws [ and ]. Set each event pump.
 void set_menu_sides( bool on );
 bool menu_sides();
+// The touch pad's move pad on a screen with a scrolling description (the
+// pad's LT + d-pad up/down scroll it: godot_actions::scrolls_description),
+// not a map cursor (2026-11-17, the user's call: touch has no LT): its
+// down-left and down-right scroll it up and down, repeating while held, and
+// it draws arrows there. Set each event pump.
+void set_menu_scroll( bool on );
+bool menu_scroll();
 void request_count( int dir );
 int take_count_request();
 // Whether the list waiting for input filters (uilist::filtering, set each

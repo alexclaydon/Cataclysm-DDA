@@ -1388,6 +1388,21 @@ bool godot_host::menu_sides()
     return menu_sides_now;
 }
 
+namespace
+{
+std::atomic<bool> menu_scroll_now{ false };
+} // namespace
+
+void godot_host::set_menu_scroll( bool on )
+{
+    menu_scroll_now = on;
+}
+
+bool godot_host::menu_scroll()
+{
+    return menu_scroll_now;
+}
+
 void godot_host::request_count( int dir )
 {
     count_requested = dir;
