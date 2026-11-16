@@ -107,6 +107,10 @@ std::string goto_type;  // request_goto's, empty for none (under look_mutex)
 int time_hour = -1;     // request_time's, -1 for none (under look_mutex)
 std::string field_id;   // request_field's, empty for none (under look_mutex)
 int boom_power = 0;     // request_boom's, 0 for none (under look_mutex)
+std::string crowd_id;   // request_crowd's, empty for none (under look_mutex)
+int crowd_count = 0;
+int crowd_near = 3;
+int crowd_far = 8;
 std::string vehicle_proto;  // request_vehicle's, empty for none (under look_mutex)
 int vehicle_dx = 0;
 int vehicle_dy = 0;
@@ -459,7 +463,7 @@ bool godot_host::look_pending()
         return true;
     }
     std::lock_guard<std::mutex> lock( look_mutex );
-    return look_requested || click_requested || !goto_type.empty() || time_hour >= 0 || !field_id.empty() || boom_power > 0 || !vehicle_proto.empty()
+    return look_requested || click_requested || !goto_type.empty() || time_hour >= 0 || !field_id.empty() || boom_power > 0 || !crowd_id.empty() || !vehicle_proto.empty()
            || !action_requested.empty() || catalogue_requested || zoom_requested.load() != 0;
 }
 
@@ -713,6 +717,32 @@ bool godot_host::take_field_request( std::string &id, int &radius, int &intensit
     radius = field_radius;
     intensity = field_intensity;
     field_id.clear();
+    return true;
+}
+
+void godot_host::request_crowd( const std::string &id, int count, int near, int far )
+{
+    {
+        std::lock_guard<std::mutex> lock( look_mutex );
+        crowd_id = id;
+        crowd_count = std::max( 0, count );
+        crowd_near = std::max( 1, near );
+        crowd_far = std::max( crowd_near, far );
+    }
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_crowd_request( std::string &id, int &count, int &near, int &far )
+{
+    std::lock_guard<std::mutex> lock( look_mutex );
+    if( crowd_id.empty() ) {
+        return false;
+    }
+    id = crowd_id;
+    count = crowd_count;
+    near = crowd_near;
+    far = crowd_far;
+    crowd_id.clear();
     return true;
 }
 

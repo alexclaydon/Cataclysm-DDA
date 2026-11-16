@@ -491,6 +491,14 @@ bool take_field_request( std::string &id, int &radius, int &intensity );
 // how hits and explosions look (Dark Forest's bursts).
 void request_boom( int dx, int dy, int power );
 bool take_boom_request( int &dx, int &dy, int &power );
+// Another (make df-mac-mouse "crowd ID COUNT [NEAR FAR]"): COUNT monsters of
+// type ID on free tiles NEAR to FAR from the avatar, and the avatar kept
+// alive from then on (every hit point back each action: hits still land
+// and draw, for measuring a crowd fight, Dark Forest's P25); "crowd clear"
+// removes the hostiles within 60 and stops keeping it alive. A test world
+// only: never save after it.
+void request_crowd( const std::string &id, int count, int near, int far );
+bool take_crowd_request( std::string &id, int &count, int &near, int &far );
 // Another (make vr-mouse "vehicle PROTO DX DY FACING"): a vehicle of that
 // prototype (car, pickup, bicycle...) DX, DY tiles from the avatar, facing
 // FACING degrees, intact, for testing how vehicles look (Dark Forest's

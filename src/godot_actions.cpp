@@ -15,6 +15,7 @@
 #include "avatar.h"
 #include "calendar.h"
 #include "coordinates.h"
+#include "creature_tracker.h"
 #include "game.h"
 #include "explosion.h"
 #include "field_type.h"
@@ -27,6 +28,9 @@
 #include "godot_actions.h"
 #include "godot_host.h"
 #include "messages.h"
+#include "monster.h"
+#include "mtype.h"
+#include "rng.h"
 #include "move_mode.h"
 #include "omdata.h"
 #include "overmapbuffer.h"
@@ -59,10 +63,16 @@ void godot_actions::before_input( game &g )
     godot_host::set_route_preview( !g.destination_preview.empty() );
 }
 
+// The crowd test hook's keep-alive (godot_host::request_crowd).
+static bool crowd_keep_alive = false;
+
 bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
                                    std::optional<tripoint_rel_ms> &wheel_aim,
                                    std::optional<tripoint_bub_ms> &host_click )
 {
+    if( crowd_keep_alive ) {
+        you.set_all_parts_hp_to_max();
+    }
     // The touch pad's view radius slider, as the zoom actions.
     if( const int steps = godot_host::take_zoom_view_request() ) {
         godot_host::zoom_view( steps );
@@ -185,6 +195,52 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
             vehicle *veh = id.is_valid() ? get_map().add_vehicle( id, you.pos_bub() + tripoint_rel_ms( dx, dy, 0 ),
                            units::from_degrees( facing ), -1, veh_spawn_status::PRISTINE, true, true ) : nullptr;
             add_msg( m_info, "VR vehicle: %s %s.", proto, veh != nullptr ? "placed" : "not placed" );
+            return false;
+        }
+        std::string crowd;
+        int crowd_count = 0;
+        int crowd_near = 0;
+        int crowd_far = 0;
+        if( godot_host::take_crowd_request( crowd, crowd_count, crowd_near, crowd_far ) ) {
+            map &here = get_map();
+            if( crowd == "clear" ) {
+                int gone = 0;
+                for( monster &m : g.all_monsters() ) {
+                    if( rl_dist( m.pos_bub(), you.pos_bub() ) <= 60 &&
+                        m.attitude_to( you ) == Creature::Attitude::HOSTILE ) {
+                        m.die( &here, nullptr );
+                        ++gone;
+                    }
+                }
+                g.cleanup_dead();
+                crowd_keep_alive = false;
+                add_msg( m_info, "VR crowd: %d cleared.", gone );
+                return false;
+            }
+            const mtype_id type( crowd );
+            if( !type.is_valid() ) {
+                add_msg( m_info, "VR crowd: no monster %s.", crowd );
+                return false;
+            }
+            std::vector<tripoint_bub_ms> spots;
+            for( const tripoint_bub_ms &p : here.points_in_radius( you.pos_bub(), crowd_far ) ) {
+                if( rl_dist( p, you.pos_bub() ) >= crowd_near && here.passable( p ) &&
+                    get_creature_tracker().creature_at( p ) == nullptr ) {
+                    spots.push_back( p );
+                }
+            }
+            std::shuffle( spots.begin(), spots.end(), rng_get_engine() );
+            int placed = 0;
+            for( const tripoint_bub_ms &p : spots ) {
+                if( placed >= crowd_count ) {
+                    break;
+                }
+                if( g.place_critter_at( type, p ) != nullptr ) {
+                    ++placed;
+                }
+            }
+            crowd_keep_alive = true;
+            add_msg( m_info, "VR crowd: %d %s, the avatar kept alive.", placed, crowd );
             return false;
         }
         int boom_power = 0;
