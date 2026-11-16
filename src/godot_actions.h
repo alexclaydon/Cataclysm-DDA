@@ -67,6 +67,12 @@ struct godot_actions {
     // tapped one, the view held where it was looking until it is settled.
     static void look_go_here( avatar &u, const tripoint_bub_ms &lp, const tripoint_bub_ms &center,
                               tripoint_rel_ms &prev_offset );
+    // Free look left with Confirm, the view kept (game::look_around's
+    // persist_offset): the offset to the cursor's tile, not to the view's
+    // centre, which follows the host's drag only in jumps or, with the
+    // whole map recorded, not at all (2026-11-16: since 2026-11-15 Confirm
+    // kept the centre, so the view went back to the avatar).
+    static void look_confirmed( avatar &u, const tripoint_bub_ms &lp );
     // The game's wait popup ("Wait till you wake up…", an activity's
     // progress) is up: on the UI stack, but taking no input, so not a menu
     // (gamepad::is_in_menu; the right stick stays the camera while sleeping

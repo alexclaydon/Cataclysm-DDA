@@ -326,6 +326,13 @@ bool godot_actions::flush_owed( const std::string &action )
     return false;
 }
 
+void godot_actions::look_confirmed( avatar &u, const tripoint_bub_ms &lp )
+{
+    const tripoint_bub_ms pos = u.pos_bub();
+    u.view_offset.x() = lp.x() - pos.x();
+    u.view_offset.y() = lp.y() - pos.y();
+}
+
 bool godot_actions::look_pass( avatar &u, tripoint_bub_ms &lp, tripoint_bub_ms &center,
                                tripoint_rel_ms &prev_offset, bool select_zone, std::string &action )
 {

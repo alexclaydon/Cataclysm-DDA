@@ -6480,6 +6480,11 @@ look_around_result game::look_around(
     // Free look leaves the camera where the player panned it if they confirmed
     // with A; QUIT puts it back. Pickers never persist, or choosing a tile
     // would park the camera on it.
+#if defined(CDDA_GODOT)
+    if( persist_offset && action == "CONFIRM" ) {
+        godot_actions::look_confirmed( u, lp );
+    }
+#endif
     if( !persist_offset || action != "CONFIRM" ) {
         u.view_offset = prev_offset;
     }
