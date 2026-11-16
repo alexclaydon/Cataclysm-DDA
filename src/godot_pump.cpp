@@ -152,6 +152,8 @@ void godot_host::pump_engine_state()
             safe = 3;
         }
         godot_host::set_safe_mode( safe );
+        godot_host::set_game_turn( g && g->is_core_data_loaded() ?
+                                   to_turns<int>( calendar::turn - calendar::turn_zero ) : -1 );
     }
     if( g && g->is_core_data_loaded() ) {
         const avatar &you = get_avatar();

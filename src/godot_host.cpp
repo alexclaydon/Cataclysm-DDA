@@ -1320,6 +1320,21 @@ int godot_host::safe_refusal_turn()
     return safe_refused_turn;
 }
 
+namespace
+{
+std::atomic<int> game_turn_now{ -1 };
+} // namespace
+
+void godot_host::set_game_turn( int turn )
+{
+    game_turn_now = turn;
+}
+
+int godot_host::game_turn()
+{
+    return game_turn_now;
+}
+
 void godot_host::set_safe_mode( int mode )
 {
     safe_mode_now = mode;

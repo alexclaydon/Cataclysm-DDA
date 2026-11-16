@@ -580,6 +580,11 @@ void set_safe_mode( int mode );
 // touch pad and the context cues offer Safe off (2026-11-11).
 void note_safe_refusal();
 int safe_refusal_turn();
+// The game's turn, set each pump (turns since turn_zero; -1 outside a
+// game): the touch pad's careful mode clears its cursor when a turn passes
+// by anything but its own step (2026-11-17).
+void set_game_turn( int turn );
+int game_turn();
 // The avatar's chosen movement mode id (walk, run, crouch, prone, or a
 // mod's; the desired one, which the next step takes up), empty out of play, for the touch pad's figure on its centre. The engine
 // thread sets it each event pump; the host reads it any time.
