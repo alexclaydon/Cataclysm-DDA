@@ -507,6 +507,12 @@ void push_hit( int dx, int dy, int dz );
 std::vector<std::array<int, 3>> take_hits();
 void set_hit_redraw( bool on );
 bool hit_redraw();
+// The creatures in the reality bubble (game::num_creatures, the avatar
+// and NPCs among them), set each time the avatar acts: monsters beyond
+// sight still cost their AI each turn (Dark Forest's P26), and the host's
+// Scene line reports them.
+void set_bubble_creatures( int n );
+int bubble_creatures();
 bool take_crowd_request( std::string &id, int &count, int &near, int &far );
 // Another (make vr-mouse "vehicle PROTO DX DY FACING"): a vehicle of that
 // prototype (car, pickup, bicycle...) DX, DY tiles from the avatar, facing

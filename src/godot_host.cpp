@@ -110,6 +110,7 @@ int boom_power = 0;     // request_boom's, 0 for none (under look_mutex)
 std::string crowd_id;   // request_crowd's, empty for none (under look_mutex)
 std::vector<std::array<int, 3>> hits;  // push_hit's, under look_mutex
 std::atomic<bool> hit_redraw_on{ false };
+std::atomic<int> bubble_creature_count{ 0 };
 int crowd_count = 0;
 int crowd_near = 3;
 int crowd_far = 8;
@@ -746,6 +747,16 @@ void godot_host::set_hit_redraw( bool on )
 bool godot_host::hit_redraw()
 {
     return hit_redraw_on;
+}
+
+void godot_host::set_bubble_creatures( int n )
+{
+    bubble_creature_count = n;
+}
+
+int godot_host::bubble_creatures()
+{
+    return bubble_creature_count;
 }
 
 void godot_host::request_crowd( const std::string &id, int count, int near, int far )
