@@ -24,6 +24,7 @@
 #include "coordinates.h"
 #include "creature.h"
 #include "debug.h"
+#include "enum_conversions.h"
 #include "field_type.h"
 #include "game.h"
 #include "godot_host.h"
@@ -226,6 +227,11 @@ void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
             o.numbers["is_splattering"] = ft.is_splattering ? 1 : 0;
             o.numbers["display_items"] = ft.display_items ? 1 : 0;
             o.numbers["display_field"] = ft.display_field ? 1 : 0;
+            // What the game says of a tile with it ("in", "covered_in", "on",
+            // "under"...): a field a tile is covered in is a coating on the
+            // floor whatever its phase (dust and debris are "gas"), so Dark
+            // Forest lays it flat (2026-11-18).
+            o.strings["affix"] = io::enum_to_string( ft.desc_affix );
             if( !ft.intensity_levels.empty() ) {
                 o.numbers["transparent"] = ft.intensity_levels.front().transparent ? 1 : 0;
                 o.numbers["dangerous"] = ft.intensity_levels.front().dangerous ? 1 : 0;
