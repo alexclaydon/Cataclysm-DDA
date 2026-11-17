@@ -596,7 +596,7 @@ static void send_direction_movement()
 // The host's shoulder wheels (ADR 0009). In play, where the host draws
 // wheels, a bare shoulder is a tap or a hold: let go before the wheel opens
 // and it sends its binding, as a press does without wheels; hold it
-// (wheel_hold_ms, or push a stick) and its wheel opens. While open the pad
+// (tap_hold_ms, or push a stick) and its wheel opens. While open the pad
 // is the wheel's: the sticks, A and B go to the host as wheel events, the
 // rest is swallowed, until the shoulder's release or the host's answer.
 // The engine knows nothing of slots or rings; the host picks and answers
@@ -609,19 +609,24 @@ static wheel_phase wheel_state = wheel_phase::none;
 static int wheel_button = -1;  // the shoulder (CATA_BUTTON_*) while not none
 static uint32_t wheel_pressed_at = 0;
 static int wheel_serial = 0;
+// The pad's one line between a tap and a hold, for every button that's
+// both (the user's call, 2026-11-18): the shoulders (a tap their binding,
+// a hold the wheel), Start (the game's menu, or Dark Forest's panel) and
+// Back (the full sidebar, or the map). Start and Back held 500 ms until
+// then; 250 was already the shoulders', and below about 200 a relaxed
+// tap starts to read as a hold.
+static constexpr uint32_t tap_hold_ms = 250;
 // Whether the left stick was pushed (aiming) when the shoulder went down:
 // then it neither opens the wheel nor picks until it re-centres.
 static std::array<bool, max_sticks> wheel_stick_was_pushed = {{false, false}};
-static constexpr uint32_t wheel_hold_ms = 250;
 // Start in play is a tap or a hold too: a tap the game's menu (sent on
 // release), a hold Dark Forest's settings panel (the user's call).
-static constexpr uint32_t start_hold_ms = 500;
 static bool start_pending = false;
 static bool start_held = false;  // the hold went to the host: its release is spent
 static uint32_t start_pressed_at = 0;
 #if defined(CDDA_GODOT)
 // Back in play while the dynamic sidebar is on (godot_host::side_toggle):
-// a tap toggles the full sidebar (on release), a hold (start_hold_ms) is
+// a tap toggles the full sidebar (on release), a hold (tap_hold_ms) is
 // Back's binding, the map (the user's call, 2026-11-15).
 static bool back_pending = false;
 static bool back_held = false;  // the hold sent the map: its release is spent
@@ -1510,10 +1515,10 @@ static void handle_device_event( SDL_Event &event )
 
 static void handle_scheduler_event( SDL_Event &/*event*/ )
 {
-    if( wheel_state == wheel_phase::pending && now_ms() - wheel_pressed_at >= wheel_hold_ms ) {
+    if( wheel_state == wheel_phase::pending && now_ms() - wheel_pressed_at >= tap_hold_ms ) {
         open_wheel();
     }
-    if( start_pending && now_ms() - start_pressed_at >= start_hold_ms ) {
+    if( start_pending && now_ms() - start_pressed_at >= tap_hold_ms ) {
         start_pending = false;
         start_held = true;
 #if defined(CDDA_GODOT)
@@ -1521,7 +1526,7 @@ static void handle_scheduler_event( SDL_Event &/*event*/ )
 #endif
     }
 #if defined(CDDA_GODOT)
-    if( back_pending && now_ms() - back_pressed_at >= start_hold_ms ) {
+    if( back_pending && now_ms() - back_pressed_at >= tap_hold_ms ) {
         back_pending = false;
         back_held = true;
         send_input( JOY_BACK );

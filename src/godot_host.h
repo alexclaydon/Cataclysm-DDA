@@ -302,7 +302,7 @@ bool touch_pad();
 // stick until the host lets go, reading the pad itself meanwhile.
 void set_pad_captured( bool on );
 bool pad_captured();
-// Start held in play (the pad layer's start_hold_ms): the host opens Dark
+// Start held in play (the pad layer's tap_hold_ms): the host opens Dark
 // Forest's settings panel. A tap is still the game's menu.
 void request_df_panel();
 bool take_df_panel_request();
