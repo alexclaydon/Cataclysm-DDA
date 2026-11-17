@@ -1157,6 +1157,9 @@ void bodypart::add_or_worsen_wound( const wound &wd )
 
                 remove_wound( *old_wound );
                 add_wound( new_wound );
+                // The wound is gone: a second progression (bruise_bad has
+                // two) found nothing and dereferenced the null (fork fix).
+                break;
             }
         }
 
