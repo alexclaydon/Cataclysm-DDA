@@ -914,8 +914,6 @@ void godot_tiles::record_catalogue( cata_tiles &ct, const std::string &spec )
     godot_host::take_tile_catalogue_request( repeated );
 }
 
-#endif // CDDA_GODOT
-
 bool godot_tiles::overlay_fallback( cata_tiles &ct, const bool male, const std::string &overlay,
                                     const std::string &variant, std::string &draw_id )
 {
@@ -953,3 +951,5 @@ bool godot_tiles::overlay_fallback( cata_tiles &ct, const bool male, const std::
     }
     return false;
 }
+
+#endif // CDDA_GODOT
