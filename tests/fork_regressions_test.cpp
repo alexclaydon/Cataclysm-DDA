@@ -1,6 +1,8 @@
 #include <string>
 #include <vector>
 
+#include "avatar.h"
+#include "bodypart.h"
 #include "cata_catch.h"
 #include "coordinates.h"
 #include "debug.h"
@@ -10,6 +12,7 @@
 #include "map_helpers_tests.h"
 #include "map_scale_constants.h"
 #include "monster.h"
+#include "player_helpers.h"
 #include "point.h"
 #include "type_id.h"
 
@@ -20,6 +23,8 @@
 static const furn_str_id furn_f_dumpster( "f_dumpster" );
 
 static const mtype_id mon_zombie( "mon_zombie" );
+
+static const wound_type_id wound_bruise_bad( "bruise_bad" );
 
 // 1f2290cf5f: a shot at a target two tiles away and one storey up, carried
 // on to a rifle's range, used to land a dozen storeys above the map.
@@ -65,4 +70,23 @@ TEST_CASE( "fork_non_climber_steps_off_climbable_furniture", "[monster][fork]" )
     CHECK( stepping_on == 0 );
     CHECK_FALSE( on_msg.empty() );
     clear_map();
+}
+
+// 988dcafb38: a wound with two progressions (bruise_bad: worse, or a
+// laceration) progressing twice in one hit looked for the wound the first
+// had removed: a debugmsg, then a null dereference that crashed the game.
+TEST_CASE( "fork_wound_progresses_once_per_hit", "[wounds][fork]" )
+{
+    clear_avatar();
+    bodypart *leg = get_avatar().get_part( body_part_leg_l );
+    REQUIRE( leg != nullptr );
+    // A hit on a bruised leg progresses half the time, and both of
+    // bruise_bad's progressions pass about a third of those: never all
+    // 400 tries without.
+    for( int i = 0; i < 400; ++i ) {
+        leg->get_wounds().clear();
+        leg->add_or_worsen_wound( wound_bruise_bad );
+        leg->add_or_worsen_wound( wound_bruise_bad );
+        CHECK( leg->get_wounds().size() <= 2 );
+    }
 }
