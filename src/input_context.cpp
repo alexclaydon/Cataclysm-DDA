@@ -587,6 +587,14 @@ const std::string &input_context::handle_input( const int timeout )
         }
 
 #if defined(TILES)
+        // A screen answering the pad's X and Y itself (take_pad_faces) gets
+        // them raw (the user's prompt's X opened the action list and its Y
+        // did nothing, 2026-11-18).
+        if( pad_faces_raw && next_action.type == input_event_t::gamepad && !next_action.sequence.empty() &&
+            ( next_action.get_first_input() == JOY_X || next_action.get_first_input() == JOY_Y ) ) {
+            result = &CATA_ERROR;
+            break;
+        }
         // The pad's X where nothing binds it: the action list (the fork's,
         // ported behaviour from the BN backlog). A cancel returns ERROR,
         // which screens ignore, so they redraw over the list.

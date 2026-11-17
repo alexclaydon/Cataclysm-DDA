@@ -475,6 +475,10 @@ query_popup::result query_popup::query_once()
         pad_y_option = pad.y;
         pad_all = pad.all;
     }
+    // Their presses come back here (below), not to the action list.
+    if( pad_x_option >= 0 || pad_y_option >= 0 ) {
+        ctxt.take_pad_faces();
+    }
 #endif
 
     result res;

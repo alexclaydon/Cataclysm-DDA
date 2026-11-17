@@ -166,6 +166,7 @@ class input_context
             preferred_keyboard_mode = std::forward<Rhs>( other ).preferred_keyboard_mode;
             action_name_overrides = std::forward<Rhs>( other ).action_name_overrides;
             action_palette_ok = std::forward<Rhs>( other ).action_palette_ok;
+            pad_faces_raw = std::forward<Rhs>( other ).pad_faces_raw;
             // NOLINTEND(bugprone-use-after-move)
         }
 
@@ -176,6 +177,13 @@ class input_context
         // keyboard hotkeys (item letters) opts in with this.
         void allow_action_palette() {
             action_palette_ok = true;
+        }
+        // The pad's X and Y, where nothing binds them, handed back raw
+        // (handle_input returns ERROR, get_raw_input the press) rather than
+        // opening the action list or being dropped: for a screen that
+        // answers them itself (query_popup's third and fourth options).
+        void take_pad_faces() {
+            pad_faces_raw = true;
         }
 
         // The input category, on every platform (get_category below is
@@ -540,6 +548,7 @@ class input_context
 
         bool registered_any_input;
         bool action_palette_ok = false;  // allow_action_palette
+        bool pad_faces_raw = false;  // take_pad_faces
         std::string palette_pick;  // the action list's pick, which handle_input returns
         // The pad's action list: this context's actions the pad can't reach
         // otherwise, as a menu, with `also` (an action the pad does reach,
