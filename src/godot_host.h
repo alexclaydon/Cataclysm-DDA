@@ -585,6 +585,11 @@ int safe_refusal_turn();
 // by anything but its own step (2026-11-17).
 void set_game_turn( int turn );
 int game_turn();
+// The game being played, "world/character" (the world's name and the
+// avatar's save id), empty outside a game: Dark Forest keeps per-game
+// settings under it, careful moves first (2026-11-17). Set each pump.
+void set_game_key( const std::string &key );
+std::string game_key();
 // The avatar's chosen movement mode id (walk, run, crouch, prone, or a
 // mod's; the desired one, which the next step takes up), empty out of play, for the touch pad's figure on its centre. The engine
 // thread sets it each event pump; the host reads it any time.

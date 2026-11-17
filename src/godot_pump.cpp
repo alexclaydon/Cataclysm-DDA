@@ -28,6 +28,7 @@
 #include "point.h"
 #include "sdl_gamepad.h"
 #include "sdltiles.h"
+#include "worldfactory.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_internal.h"
 
@@ -166,7 +167,11 @@ void godot_host::pump_engine_state()
         godot_host::set_activity_stoppable( ( unfinished && you.activity.is_interruptible_with_kb() ) ||
                                             you.has_destination() );
         godot_watch_publish( you );
+        // No world once a game is left (load_character's cleanup).
+        godot_host::set_game_key( world_generator->active_world != nullptr && !you.get_save_id().empty() ?
+                                  world_generator->active_world->world_name + "/" + you.get_save_id() : std::string() );
     } else {
+        godot_host::set_game_key( std::string() );
         godot_host::set_watch( -1, 0, 0, 0 );
         godot_host::set_move_mode( std::string(), false );
         godot_host::set_move_modes( {} );

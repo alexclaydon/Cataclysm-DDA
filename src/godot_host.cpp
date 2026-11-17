@@ -1335,6 +1335,26 @@ int godot_host::game_turn()
     return game_turn_now;
 }
 
+namespace
+{
+std::mutex game_key_mutex;
+std::string game_key_now;
+} // namespace
+
+void godot_host::set_game_key( const std::string &key )
+{
+    std::lock_guard<std::mutex> lock( game_key_mutex );
+    if( game_key_now != key ) {
+        game_key_now = key;
+    }
+}
+
+std::string godot_host::game_key()
+{
+    std::lock_guard<std::mutex> lock( game_key_mutex );
+    return game_key_now;
+}
+
 void godot_host::set_safe_mode( int mode )
 {
     safe_mode_now = mode;
