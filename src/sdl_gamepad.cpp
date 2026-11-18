@@ -1894,6 +1894,15 @@ bool handle_event( SDL_Event &event )
         }
         pad_was_captured = captured;
         host_has_pad = captured;
+        if( captured && event.type == CATA_CONTROLLERBUTTONDOWN &&
+            event.gbutton.button == CATA_BUTTON_LEFTSTICK ) {
+            // L3 stays the move wheel's while the host has the pad: its
+            // second press closes the wheel the first opened, in the same
+            // ordered stream (the host read it too, a frame later, and
+            // closed the wheel as it opened: the user, 2026-11-18).
+            godot_host::request_move_wheel();
+            return false;
+        }
         if( captured && pad_input ) {
             // The triggers through, to keep their state (handle_axis_event).
             const bool trigger = event.type == CATA_CONTROLLERAXISMOTION &&

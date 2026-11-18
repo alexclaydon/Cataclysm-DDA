@@ -619,7 +619,9 @@ void set_move_modes( std::vector<move_mode_entry> modes );
 std::vector<move_mode_entry> move_modes();
 // open_movement from a pad or a host's request (godot_actions::
 // open_movement), with the move wheel enabled: the host opens it. The keyboard keeps
-// upstream's menu.
+// upstream's menu. L3 pressed while the host has the pad asks too
+// (sdl_gamepad): the host closes the wheel if it's open, the one place
+// that reads L3 for it.
 void request_move_wheel();
 bool take_move_wheel_request();
 // The host draws the move wheel (its play mode: not VR yet), set before
