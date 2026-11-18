@@ -587,6 +587,10 @@ int safe_refusal_turn();
 // upstream's. look_around holds a peek_scope.
 void set_peeking( bool on );
 bool peeking();
+// The pad's line between a tap and a hold, ms (sdl_gamepad's tap_hold_ms):
+// Dark Forest's own pad holds take it, so there's one number (the user's
+// call, 2026-11-18). Its long hold is twice it.
+int tap_hold_ms();
 class peek_scope
 {
     public:

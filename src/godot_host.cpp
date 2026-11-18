@@ -5,6 +5,7 @@
 #endif
 
 #include "godot_host.h"
+#include "sdl_gamepad.h"
 
 #include <string_view>
 
@@ -1333,6 +1334,11 @@ void godot_host::set_peeking( bool on )
 bool godot_host::peeking()
 {
     return peeking_now;
+}
+
+int godot_host::tap_hold_ms()
+{
+    return gamepad::tap_hold_ms_value();
 }
 
 namespace

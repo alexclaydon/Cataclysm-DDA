@@ -628,12 +628,13 @@ static int wheel_button = -1;  // the shoulder (CATA_BUTTON_*) while not none
 static uint32_t wheel_pressed_at = 0;
 static int wheel_serial = 0;
 // The pad's one line between a tap and a hold, for every button that's
-// both (the user's call, 2026-11-18): the shoulders (a tap their binding,
-// a hold the wheel), Start (the game's menu, or Dark Forest's panel) and
-// Back (the full sidebar, or the map). Start and Back held 500 ms until
-// then; 250 was already the shoulders', and below about 200 a relaxed
-// tap starts to read as a hold.
-static constexpr uint32_t tap_hold_ms = 250;
+// both (the user's calls, 2026-11-18): the shoulders (a tap their binding,
+// a hold the wheel), Start (the game's menu, or Dark Forest's panel), Back
+// (the full sidebar, or the map), R3 (look-around, or the camera), and in
+// Dark Forest A on a hotbar slot (fire, or its picker), which reads it
+// (godot_host::tap_hold_ms). Start and Back were 500, the shoulders 250,
+// R3 300, the hotbar's A 500.
+static constexpr uint32_t tap_hold_ms = 200;
 // Whether the left stick was pushed (aiming) when the shoulder went down:
 // then it neither opens the wheel nor picks until it re-centres.
 static std::array<bool, max_sticks> wheel_stick_was_pushed = {{false, false}};
@@ -661,7 +662,6 @@ static bool host_has_pad = false;
 // R3 in play with the stick camera: a quick tap with the stick left alone
 // is its binding (look-around), sent on release; anything else is the
 // host's (held: the camera's zoom and reset).
-static constexpr uint32_t r3_tap_ms = 300;
 static bool r3_pending = false;
 static bool r3_stick_moved = false;
 static uint32_t r3_pressed_at = 0;
@@ -1218,7 +1218,7 @@ static bool handle_button_event( SDL_Event &event )
         }
         if( button == CATA_BUTTON_RIGHTSTICK && r3_pending ) {
             r3_pending = false;
-            if( !r3_stick_moved && now_ms() - r3_pressed_at < r3_tap_ms ) {
+            if( !r3_stick_moved && now_ms() - r3_pressed_at < tap_hold_ms ) {
                 send_input( JOY_RS );
             }
             return false;
@@ -1635,6 +1635,11 @@ bool move_due()
     const task_t &stick = all_tasks[sticks_task_index];
     return ( rt.counter > 0 && rt.button == -1 && stick_dir( 0 ) != direction::NONE && rt.when <= now ) ||
            ( stick.counter > 0 && stick.when <= now );
+}
+
+int tap_hold_ms_value()
+{
+    return static_cast<int>( tap_hold_ms );
 }
 
 bool is_in_menu()

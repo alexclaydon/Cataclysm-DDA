@@ -108,6 +108,8 @@ void test_advance( int ms );
 std::vector<int> test_take_wheel_events();
 bool wheel_is_open();
 bool is_in_menu();
+// The pad's line between a tap and a hold, ms (tap_hold_ms).
+int tap_hold_ms_value();
 bool is_active();
 
 // Button glyphs for hints (the fork's, from the BN backlog): the
