@@ -192,6 +192,24 @@ static void close_radials()
     stick_consumed[1] = right_stick_dir != direction::NONE;
 }
 
+// A stick held across a change between play and the menu plane is spent
+// until it re-centres (the user's call, 2026-11-18): the walking stick
+// still held as a prompt or a menu opens, or as one closes (B out of
+// look-around with the stick pushed), would drive what came next.
+// (Look-around's and aiming's slide is the host's own read of the stick,
+// which keeps the same rule: main.gd _update_stick_slide.)
+static void spend_sticks_on_screen_change()
+{
+    static bool was_menu = false;
+    const bool menu = is_in_menu();
+    if( menu == was_menu ) {
+        return;
+    }
+    was_menu = menu;
+    stick_consumed[0] = stick_consumed[0] || left_stick_dir != direction::NONE;
+    stick_consumed[1] = stick_consumed[1] || right_stick_dir != direction::NONE;
+}
+
 static Uint32 timer_func( void *, SDL_TimerID, Uint32 interval )
 {
     SDL_Event event;
@@ -1515,6 +1533,7 @@ static void handle_device_event( SDL_Event &event )
 
 static void handle_scheduler_event( SDL_Event &/*event*/ )
 {
+    spend_sticks_on_screen_change();
     if( wheel_state == wheel_phase::pending && now_ms() - wheel_pressed_at >= tap_hold_ms ) {
         open_wheel();
     }
@@ -1872,6 +1891,7 @@ static void reread_sticks_on_turn()
 bool handle_event( SDL_Event &event )
 {
     check_wheel();
+    spend_sticks_on_screen_change();
 #if defined(CDDA_GODOT)
     reread_sticks_on_turn();
     // The host has the pad (godot_host::set_pad_captured): it reads the pad
