@@ -1322,6 +1322,21 @@ int godot_host::safe_refusal_turn()
 
 namespace
 {
+std::atomic<bool> peeking_now{ false };
+} // namespace
+
+void godot_host::set_peeking( bool on )
+{
+    peeking_now = on;
+}
+
+bool godot_host::peeking()
+{
+    return peeking_now;
+}
+
+namespace
+{
 std::atomic<int> game_turn_now{ -1 };
 } // namespace
 

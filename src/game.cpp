@@ -6176,6 +6176,9 @@ look_around_result game::look_around(
         ctxt.register_action( "throw_blind" );
         ctxt.register_action( "throw_blind_wielded" );
     }
+#if defined(CDDA_GODOT)
+    const godot_host::peek_scope peek_hook( peeking );
+#endif
     if( !select_zone ) {
         ctxt.register_action( "TRAVEL_TO" );
         ctxt.register_action( "LIST_ITEMS" );

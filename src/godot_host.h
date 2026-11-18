@@ -580,6 +580,31 @@ void set_safe_mode( int mode );
 // touch pad and the context cues offer Safe off (2026-11-11).
 void note_safe_refusal();
 int safe_refusal_turn();
+// Upstream's autopeek (game::look_around peeking: a walking step that would
+// trip safe mode looks around from the new tile, Enter to move anyway,
+// Escape to go back): set while it's up, for the host's cues (A Move
+// anyway, B Go back; 2026-11-18). Reports only; the look-around is
+// upstream's. look_around holds a peek_scope.
+void set_peeking( bool on );
+bool peeking();
+class peek_scope
+{
+    public:
+        explicit peek_scope( bool on ) : on( on ) {
+            if( on ) {
+                set_peeking( true );
+            }
+        }
+        ~peek_scope() {
+            if( on ) {
+                set_peeking( false );
+            }
+        }
+        peek_scope( const peek_scope & ) = delete;
+        peek_scope &operator=( const peek_scope & ) = delete;
+    private:
+        bool on;
+};
 // The game's turn, set each pump (turns since turn_zero; -1 outside a
 // game): the touch pad's careful mode clears its cursor when a turn passes
 // by anything but its own step (2026-11-17).
