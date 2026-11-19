@@ -37,6 +37,7 @@
 #include "units.h"
 #include "avatar.h"
 #include "game.h"
+#include "godot_sound.h"
 
 #define dbg(x) DebugLog((x),D_SDL) << __FILE__ << ":" << __LINE__ << ": "
 
@@ -692,6 +693,11 @@ void sfx::play_variant_sound( std::string_view id, std::string_view variant,
     if( test_mode ) {
         return;
     }
+#if defined(CDDA_GODOT)
+    if( godot_sound::held_back( id, variant ) ) {
+        return;
+    }
+#endif
 
     add_msg_debug( debugmode::DF_SOUND, "sound id: %s, variant: %s, volume: %d ", id, variant, volume );
 
@@ -725,6 +731,11 @@ void sfx::play_variant_sound( std::string_view id, std::string_view variant,
     if( test_mode ) {
         return;
     }
+#if defined(CDDA_GODOT)
+    if( godot_sound::held_back( id, variant ) ) {
+        return;
+    }
+#endif
 
     add_msg_debug( debugmode::DF_SOUND, "sound id: %s, variant: %s, volume: %d ", id, variant, volume );
 
