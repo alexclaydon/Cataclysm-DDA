@@ -6373,7 +6373,10 @@ look_around_result game::look_around(
             // Go there as the touch pad's Go here does (the user's call, RT
             // on the pad): the route to the cursor's tile waits for a second
             // RT or A, B dropping it, and the view stays here until then.
-            godot_actions::look_go_here( u, lp, center, prev_offset );
+            // In an autopeek RT goes back, as B (the user's call, 2026-11-19).
+            if( !peeking ) {
+                godot_actions::look_go_here( u, lp, center, prev_offset );
+            }
             action = "QUIT";
             break;
 #endif
