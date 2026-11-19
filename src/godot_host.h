@@ -646,6 +646,22 @@ struct move_mode_entry {
 };
 void set_move_modes( std::vector<move_mode_entry> modes );
 std::vector<move_mode_entry> move_modes();
+// The avatar's vitals for the host's vitals strip (2026-11-19, the user's
+// call: chosen stats always on screen): each stat's id (hunger, thirst,
+// tired, pain, stamina, weariness, mood), the sidebar's own word for it
+// (upstream's display:: text, empty when there's nothing to say) and its
+// colour. Set by the engine thread each event pump (in play; empty out of
+// it).
+struct vital_entry {
+    std::string id;
+    std::string text;
+    std::array<uint8_t, 3> rgb = {};
+    bool operator==( const vital_entry &o ) const {
+        return id == o.id && text == o.text && rgb == o.rgb;
+    }
+};
+void set_vitals( std::vector<vital_entry> vitals );
+std::vector<vital_entry> vitals();
 // open_movement from a pad or a host's request (godot_actions::
 // open_movement), with the move wheel enabled: the host opens it. The keyboard keeps
 // upstream's menu. L3 pressed while the host has the pad asks too

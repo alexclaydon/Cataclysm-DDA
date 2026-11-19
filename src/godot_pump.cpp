@@ -16,7 +16,10 @@
 #include "cata_imgui.h"
 #include "cata_tiles.h"
 #include "catacharset.h"
+#include "color.h"
 #include "coordinates.h"
+#include "cursesport.h"
+#include "display.h"
 #include "game.h"
 #include "godot_actions.h"
 #include "godot_host.h"
@@ -24,10 +27,12 @@
 #include "input.h"
 #include "input_context.h"
 #include "options.h"
+#include "output.h"
 #include "player_activity.h"
 #include "point.h"
 #include "sdl_gamepad.h"
 #include "sdltiles.h"
+#include "string_formatter.h"
 #include "worldfactory.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_internal.h"
@@ -79,6 +84,37 @@ static void godot_text_field_publish( bool wanted )
         field_was = field;
         godot_host::set_text_field( text, select_from, cursor );
     }
+}
+
+// A curses colour as the palette's (r, g, b): its pair's foreground, bright
+// when bold, as cursesport's wattron reads it.
+static std::array<uint8_t, 3> godot_nc_rgb( const nc_color &c )
+{
+    int fg = static_cast<int>( cata_cursesport::colorpairs[c.to_color_pair_index()].FG );
+    if( c.is_bold() ) {
+        fg += 8;
+    }
+    return godot_host::palette_rgb( fg );
+}
+
+// The vitals strip's stats (godot_host::set_vitals), in the sidebar's words.
+static void godot_vitals_publish( const avatar &you )
+{
+    std::vector<godot_host::vital_entry> out;
+    const auto add = [&out]( const char *id, const std::pair<std::string, nc_color> &v ) {
+        out.push_back( { id, remove_color_tags( v.first ), godot_nc_rgb( v.second ) } );
+    };
+    add( "hunger", display::hunger_text_color( you ) );
+    add( "thirst", display::thirst_text_color( you ) );
+    add( "tired", display::sleepiness_text_color( you ) );
+    add( "pain", display::pain_text_color( you ) );
+    const int stamina_max = std::max( 1, you.get_stamina_max() );
+    const int stamina = you.get_stamina() * 100 / stamina_max;
+    add( "stamina", { string_format( "%d%%", stamina ),
+                      stamina >= 75 ? c_light_green : stamina >= 50 ? c_yellow : stamina >= 25 ? c_light_red : c_red } );
+    add( "weariness", display::weariness_text_color( you ) );
+    add( "mood", display::morale_face_color( you ) );
+    godot_host::set_vitals( std::move( out ) );
 }
 
 // The watch (godot_host::set_watch), as display::time_string and
@@ -168,12 +204,14 @@ void godot_host::pump_engine_state()
         godot_host::set_activity_stoppable( ( unfinished && you.activity.is_interruptible_with_kb() ) ||
                                             you.has_destination() );
         godot_watch_publish( you );
+        godot_vitals_publish( you );
         // No world once a game is left (load_character's cleanup).
         godot_host::set_game_key( world_generator->active_world != nullptr && !you.get_save_id().empty() ?
                                   world_generator->active_world->world_name + "/" + you.get_save_id() : std::string() );
     } else {
         godot_host::set_game_key( std::string() );
         godot_host::set_watch( -1, 0, 0, 0, 0 );
+        godot_host::set_vitals( {} );
         godot_host::set_move_mode( std::string(), false );
         godot_host::set_move_modes( {} );
         godot_host::set_activity_stoppable( false );

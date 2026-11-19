@@ -1118,6 +1118,26 @@ std::vector<godot_host::move_mode_entry> godot_host::move_modes()
     return move_modes_now;
 }
 
+namespace
+{
+std::mutex vitals_mutex;
+std::vector<godot_host::vital_entry> vitals_now;
+} // namespace
+
+void godot_host::set_vitals( std::vector<vital_entry> vitals )
+{
+    std::lock_guard<std::mutex> lock( vitals_mutex );
+    if( !( vitals_now == vitals ) ) {
+        vitals_now = std::move( vitals );
+    }
+}
+
+std::vector<godot_host::vital_entry> godot_host::vitals()
+{
+    std::lock_guard<std::mutex> lock( vitals_mutex );
+    return vitals_now;
+}
+
 void godot_host::request_move_wheel()
 {
     move_wheel_requested = true;
