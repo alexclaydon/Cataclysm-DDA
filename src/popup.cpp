@@ -90,9 +90,12 @@ std::vector<int> query_popup_impl::pad_glyphs() const
     // Each face button on the option it answers (query_once); A on the
     // highlighted button where the buttons don't answer every option and
     // there's no Yes.
-    const int a = parent->pad_a_option >= 0 &&
-                  ( parent->pad_all || parent->options[parent->pad_a_option].action == "YES" ) ?
-                  parent->pad_a_option : keyboard_selected_option;
+    int a = parent->pad_a_option >= 0 &&
+            ( parent->pad_all || parent->options[parent->pad_a_option].action == "YES" ) ?
+            parent->pad_a_option : keyboard_selected_option;
+    if( a == parent->pad_b_option ) {
+        a = -1;  // A never answers B's option (query_once)
+    }
     const int bits[] = { a, parent->pad_b_option, parent->pad_x_option, parent->pad_y_option };
     for( int k = 0; k < 4; ++k ) {
         if( bits[k] >= 0 && bits[k] < int( want.size() ) ) {
@@ -580,6 +583,14 @@ query_popup::result query_popup::query_once()
     if( pad_answer >= 0 && pad_answer < static_cast<int>( options.size() ) ) {
         res.action = options[pad_answer].action;
         res.wait_input = false;
+        return res;
+    }
+    // A never answers B's option, highlighted or not (the user's call,
+    // 2026-11-19): a lone Close or Cancel said B and closed on A too, and
+    // an A pressed in a fight dismissed what it hadn't read.
+    if( pad == gamepad::menu_press::a && res.action == "CONFIRM" && !anykey && pad_b_option >= 0 &&
+        static_cast<int>( cur ) == pad_b_option ) {
+        res.wait_input = true;
         return res;
     }
 #endif
