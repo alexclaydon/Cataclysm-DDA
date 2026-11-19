@@ -21,6 +21,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <deque>
@@ -80,8 +81,9 @@ std::string prompt_text_now;
 int prompt_cursor_now = 0;
 std::mutex filter_mutex;
 std::string filter_action_now;
-// minute << 16 | format << 12 | weekday << 8 | day; -1 with no watch.
-std::atomic<int> watch_now{ -1 };
+// second << 32 | minute << 16 | format << 12 | weekday << 8 | day; -1 with
+// no watch.
+std::atomic<int64_t> watch_now{ -1 };
 std::atomic<int> radial_sides_now{ 3 };
 std::atomic<bool> route_preview_now{ false };
 std::atomic<int> look_exit_requested{ 0 };  // request_look_exit's, 0 for none
@@ -1529,19 +1531,20 @@ bool godot_host::list_filters()
     return list_filters_now;
 }
 
-void godot_host::set_watch( int minute, int format, int weekday, int day )
+void godot_host::set_watch( int minute, int format, int weekday, int day, int second )
 {
-    watch_now = minute < 0 ? -1 : ( minute << 16 ) | ( ( format & 0xf ) << 12 ) |
-                ( ( weekday & 0xf ) << 8 ) | ( day & 0xff );
+    watch_now = minute < 0 ? -1 : ( static_cast<int64_t>( second & 0x3f ) << 32 ) |
+                ( minute << 16 ) | ( ( format & 0xf ) << 12 ) | ( ( weekday & 0xf ) << 8 ) | ( day & 0xff );
 }
 
-std::array<int, 4> godot_host::watch()
+std::array<int, 5> godot_host::watch()
 {
-    const int w = watch_now;
+    const int64_t w = watch_now;
     if( w < 0 ) {
-        return { -1, 0, 0, 0 };
+        return { -1, 0, 0, 0, 0 };
     }
-    return { w >> 16, ( w >> 12 ) & 0xf, ( w >> 8 ) & 0xf, w & 0xff };
+    const int lo = static_cast<int>( w & 0xffffffff );
+    return { lo >> 16, ( lo >> 12 ) & 0xf, ( lo >> 8 ) & 0xf, lo & 0xff, static_cast<int>( w >> 32 ) };
 }
 
 namespace

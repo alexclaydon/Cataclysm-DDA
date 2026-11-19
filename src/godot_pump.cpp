@@ -86,7 +86,7 @@ static void godot_text_field_publish( bool wanted )
 static void godot_watch_publish( const avatar &you )
 {
     if( !you.has_watch() ) {
-        godot_host::set_watch( -1, 0, 0, 0 );
+        godot_host::set_watch( -1, 0, 0, 0, 0 );
         return;
     }
     const std::string fmt = get_option<std::string>( "24_HOUR" );
@@ -96,7 +96,8 @@ static void godot_watch_publish( const avatar &you )
     if( calendar::year_length() == 364_days && get_option<bool>( "SHOW_MONTHS" ) ) {
         day = month_and_day( calendar::turn ).second;
     }
-    godot_host::set_watch( minute, format, static_cast<int>( day_of_week( calendar::turn ) ), day );
+    const int second = to_seconds<int>( time_past_midnight( calendar::turn ) ) % 60;
+    godot_host::set_watch( minute, format, static_cast<int>( day_of_week( calendar::turn ) ), day, second );
 }
 
 void godot_host::pump_engine_state()
@@ -172,7 +173,7 @@ void godot_host::pump_engine_state()
                                   world_generator->active_world->world_name + "/" + you.get_save_id() : std::string() );
     } else {
         godot_host::set_game_key( std::string() );
-        godot_host::set_watch( -1, 0, 0, 0 );
+        godot_host::set_watch( -1, 0, 0, 0, 0 );
         godot_host::set_move_mode( std::string(), false );
         godot_host::set_move_modes( {} );
         godot_host::set_activity_stoppable( false );
