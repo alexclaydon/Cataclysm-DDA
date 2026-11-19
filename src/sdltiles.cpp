@@ -52,6 +52,7 @@
 #if defined(CDDA_GODOT)
 #include "godot_actions.h"
 #include "godot_host.h"
+#include "godot_imgui.h"
 #include "godot_tiles.h"
 // From SDL_main.h, which would also redefine main() (see InitSDL).
 extern "C" SDL_DECLSPEC void SDLCALL SDL_SetMainReady( void );
@@ -4391,6 +4392,9 @@ void cata_cursesport::curses_drawwindow( const catacurses::window &w )
     }
     if( update ) {
         needupdate = true;
+#if defined(CDDA_GODOT)
+        godot_imgui::note_drawn_under();
+#endif
     }
     // Single ack point at the common exit covers every draw branch. Leave the
     // window stale if the inbox embargoed the frame mid-draw so the next
@@ -7446,7 +7450,14 @@ input_event input_manager::get_input_event( const keyboard_mode preferred_keyboa
     if( needupdate ) {
         refresh_display();
     } else if( ui_adaptor::has_imgui() ) {
+#if defined(CDDA_GODOT)
+        // Nothing to present when the ImGui frame was skipped (godot_imgui).
+        if( !godot_imgui::skipped() ) {
+            try_sdl_update();
+        }
+#else
         try_sdl_update();
+#endif
     }
 
 #if defined(EMSCRIPTEN)

@@ -262,6 +262,7 @@ RGBTuple color_loader<RGBTuple>::from_rgb( const int r, const int g, const int b
 #include "sdl_utils.h"
 #include "sdl_font.h"
 #include "sdltiles.h"
+#include "godot_imgui.h"
 #include "sdl_wrappers.h"
 #include "font_loader.h"
 #include <imgui/imgui_impl_sdl3.h>
@@ -619,7 +620,11 @@ void cataimgui::client::end_frame()
     ImGui::Render();
     // A watcher write can land after the outer-boundary drain passed but before
     // this paint. The draw list is finalized; skip only the backend paint.
-    if( !renderer_should_abort_frame() && unbind_sprite_shader() ) {
+    if( !renderer_should_abort_frame() && unbind_sprite_shader()
+#if defined(CDDA_GODOT)
+        && !godot_imgui::unchanged( ImGui::GetDrawData() )
+#endif
+      ) {
         ImGui_ImplSDLRenderer3_RenderDrawData( ImGui::GetDrawData(), sdl_renderer.get() );
     }
     ImGuiIO &io = ImGui::GetIO();
