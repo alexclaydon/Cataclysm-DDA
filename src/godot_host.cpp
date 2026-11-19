@@ -196,18 +196,44 @@ void push_mouse( const mouse_command &command )
     mouse_queue.push_back( command );
 }
 
+// SDL calls this on every joystick update, many times a second in the
+// engine's event wait: only what changed is sent (2026-11-19: all 26
+// buttons and 6 axes went every call, each a validated object lookup,
+// ~13% of a core on Nova with the virtual pad idle; the phone's touch pad
+// drives it whenever the game is open). SDL keeps the state between.
+SDL_JoystickID sent_pad = 0;
+uint32_t sent_buttons = 0;
+std::array<int, 6> sent_axes{};
+
 void SDLCALL update_virtual_pad( void * )
 {
+    const uint32_t buttons = virtual_buttons.load();
+    std::array<int, 6> axes{};
+    for( int a = 0; a < godot_host::virtual_pad_axes && a < 6; ++a ) {
+        axes[a] = virtual_axes[a].load();
+    }
+    const bool fresh = sent_pad != virtual_pad_id;
+    const float yaw_now = view_yaw_degrees.load();
+    static float yaw_seen = 0.0f;
+    if( !fresh && buttons == sent_buttons && axes == sent_axes && yaw_now == yaw_seen ) {
+        return;
+    }
+    yaw_seen = yaw_now;
     SDL_Joystick *joystick = SDL_GetJoystickFromID( virtual_pad_id );
     if( joystick == nullptr ) {
         return;
     }
-    const uint32_t buttons = virtual_buttons.load();
     for( int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT; ++b ) {
-        SDL_SetJoystickVirtualButton( joystick, b, ( buttons >> b ) & 1 );
+        const bool down = ( buttons >> b ) & 1;
+        if( fresh || down != static_cast<bool>( ( sent_buttons >> b ) & 1 ) ) {
+            SDL_SetJoystickVirtualButton( joystick, b, down );
+        }
     }
-    for( int a = 0; a < godot_host::virtual_pad_axes; ++a ) {
-        int value = virtual_axes[a].load();
+    for( int a = 0; a < godot_host::virtual_pad_axes && a < 6; ++a ) {
+        if( !fresh && axes[a] == sent_axes[a] ) {
+            continue;
+        }
+        int value = axes[a];
         if( a == SDL_GAMEPAD_AXIS_LEFT_TRIGGER || a == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER ) {
             // A virtual gamepad's triggers span the joystick's whole range,
             // released at the bottom: 0 would read as half pulled, and once
@@ -216,6 +242,9 @@ void SDLCALL update_virtual_pad( void * )
         }
         SDL_SetJoystickVirtualAxis( joystick, a, static_cast<Sint16>( value ) );
     }
+    sent_pad = virtual_pad_id;
+    sent_buttons = buttons;
+    sent_axes = axes;
     // A held stick turns with the view: SDL only reports a stick when it
     // moves, so when the view yaw changes while one is pushed, report it
     // again and the gamepad layer re-reads it with the new turn.
