@@ -48,8 +48,15 @@ uint64_t hash_of( const ImDrawData *data )
         mix( h, list->IdxBuffer.Data, static_cast<size_t>( list->IdxBuffer.Size ) * sizeof( ImDrawIdx ) );
         for( const ImDrawCmd &cmd : list->CmdBuffer ) {
             mix( h, &cmd.ClipRect, sizeof( cmd.ClipRect ) );
-            const ImTextureID tex = cmd.GetTexID();
-            mix( h, &tex, sizeof( tex ) );
+            // The reference as it stands, not GetTexID(): that asserts on a
+            // texture the backend hasn't created yet, and this runs before
+            // the render that creates it (a new font atlas texture, as the
+            // atlas grows: the phone's crafting screen crashed on it,
+            // 2026-11-20).
+            const void *tex_data = cmd.TexRef._TexData;
+            const ImTextureID tex_id = cmd.TexRef._TexID;
+            mix( h, &tex_data, sizeof( tex_data ) );
+            mix( h, &tex_id, sizeof( tex_id ) );
             mix( h, &cmd.VtxOffset, sizeof( cmd.VtxOffset ) );
             mix( h, &cmd.IdxOffset, sizeof( cmd.IdxOffset ) );
             mix( h, &cmd.ElemCount, sizeof( cmd.ElemCount ) );
