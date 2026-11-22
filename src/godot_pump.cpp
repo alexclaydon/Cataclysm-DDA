@@ -203,6 +203,8 @@ void godot_host::pump_engine_state()
                                 you.activity.moves_left > 0 );
         godot_host::set_activity_stoppable( ( unfinished && you.activity.is_interruptible_with_kb() ) ||
                                             you.has_destination() );
+        godot_host::set_activity_running( unfinished || you.has_destination(),
+                                          godot_actions::wait_popup_shown() );
         godot_watch_publish( you );
         godot_vitals_publish( you );
         // No world once a game is left (load_character's cleanup).
@@ -215,6 +217,7 @@ void godot_host::pump_engine_state()
         godot_host::set_move_mode( std::string(), false );
         godot_host::set_move_modes( {} );
         godot_host::set_activity_stoppable( false );
+        godot_host::set_activity_running( false, false );
     }
     // Which LT wheels the waiting context fills, for the touch pad.
     {

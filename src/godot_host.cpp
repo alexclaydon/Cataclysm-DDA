@@ -1447,6 +1447,25 @@ bool godot_host::activity_stoppable()
     return activity_stoppable_now;
 }
 
+static std::atomic<bool> activity_running_now{ false };
+static std::atomic<bool> wait_popup_now{ false };
+
+void godot_host::set_activity_running( bool running, bool wait_popup )
+{
+    activity_running_now = running;
+    wait_popup_now = wait_popup;
+}
+
+bool godot_host::activity_running()
+{
+    return activity_running_now;
+}
+
+bool godot_host::wait_popup_up()
+{
+    return wait_popup_now;
+}
+
 void godot_host::set_filter_action( const std::string &id )
 {
     std::lock_guard<std::mutex> lock( filter_mutex );

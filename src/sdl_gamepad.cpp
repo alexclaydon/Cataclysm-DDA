@@ -1657,8 +1657,23 @@ bool is_in_menu()
     if( godot_actions::wait_popup_shown() ) {
         play = 2;
     }
-#endif
+    // Nor the empty placeholder an activity's redraw pushes round the wait
+    // popup (do_turn's `dummy`, disable_uis_below, no area): counted, it
+    // made the game "in a menu" for each redraw, the hotbar and cues
+    // flickered and the right stick stopped being the camera for a moment
+    // (the user on the Deck, 2026-11-23).
+    size_t depth = 0;
+    for( const ui_adaptor::ui_rect &r : ui_adaptor::ui_rects() ) {
+        if( r.is_shim || ( r.disabling_uis_below && !r.is_imgui &&
+                           r.dimensions.p_min == r.dimensions.p_max ) ) {
+            continue;
+        }
+        ++depth;
+    }
+    return depth > play;
+#else
     return ui_adaptor::ui_stack_size() > play;
+#endif
 }
 
 bool is_active()

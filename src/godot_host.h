@@ -686,6 +686,17 @@ int safe_mode();
 // The engine thread sets it each event pump; the host reads it any time.
 void set_activity_stoppable( bool stoppable );
 bool activity_stoppable();
+// Whether an activity or an auto-move runs (as activity_stoppable, but
+// one that takes no keypress counts too), for the host's hotbar and
+// context cues, dimmed steadily through it rather than following the
+// wait popup's redraws (the user's call, 2026-11-23); and whether the
+// wait popup is still on the UI stack (game::wait_popup, cleared only at
+// the turn after its activity, or every 10 s after a walk): with no menu
+// open it is then the only UI above the game, which the host leaves out.
+// The engine thread sets both each event pump; the host reads them any time.
+void set_activity_running( bool running, bool wait_popup );
+bool activity_running();
+bool wait_popup_up();
 // The touch pad's Filter (2026-11-12): the text filter the screen waiting
 // for input offers (godot_actions::filter_action; empty for none), set each
 // event pump; and the host's request to use it, taken by input_context's
