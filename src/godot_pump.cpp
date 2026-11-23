@@ -108,6 +108,12 @@ static void godot_vitals_publish( const avatar &you )
     add( "thirst", display::thirst_text_color( you ) );
     add( "tired", display::sleepiness_text_color( you ) );
     add( "pain", display::pain_text_color( you ) );
+    // The sidebar's Heat: the most extreme body part's (2026-11-24). Not
+    // before the avatar has a body: display::temp_text_color starts from
+    // get_all_body_parts().front(), which a loading save's empty list
+    // crashed on (the pump runs from the title screen on).
+    add( "heat", you.get_all_body_parts().empty() ? std::pair<std::string, nc_color>( "", c_light_gray ) :
+         display::temp_text_color( you ) );
     const int stamina_max = std::max( 1, you.get_stamina_max() );
     const int stamina = you.get_stamina() * 100 / stamina_max;
     add( "stamina", { string_format( "%d%%", stamina ),
