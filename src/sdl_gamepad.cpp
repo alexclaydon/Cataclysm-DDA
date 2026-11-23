@@ -487,6 +487,43 @@ static bool in_map_cursor()
     return top != nullptr && top->is_iso();
 }
 
+// The right stick in a menu that isn't a map screen: the stick's own
+// events (JOY_RS_*), bound per screen like a button, the description pane's
+// scroll on every screen that has one (the user's call, 2026-11-23). Until
+// then it sent num keys, which screens read as their own keys (favourite,
+// select, a numbered entry). The advanced inventory keeps them: its num
+// keys pick the square a pane shows.
+static bool right_stick_sends_num_keys()
+{
+    input_context *top = input_context::input_context_stack.back();
+    return top != nullptr && top->input_category() == "ADVANCED_INVENTORY";
+}
+
+// The right stick's own event for a direction (play, and menus).
+static int right_stick_code( direction dir )
+{
+    switch( dir ) {
+        case direction::N:
+            return JOY_RS_UP;
+        case direction::NE:
+            return JOY_RS_UP_RIGHT;
+        case direction::E:
+            return JOY_RS_RIGHT;
+        case direction::SE:
+            return JOY_RS_DOWN_RIGHT;
+        case direction::S:
+            return JOY_RS_DOWN;
+        case direction::SW:
+            return JOY_RS_DOWN_LEFT;
+        case direction::W:
+            return JOY_RS_LEFT;
+        case direction::NW:
+            return JOY_RS_UP_LEFT;
+        default:
+            return -1;
+    }
+}
+
 #if defined(CDDA_GODOT)
 // The touch pad's move pad pushed up-left or up-right on a screen where LB
 // and RB step something (godot_host::menu_sides): those bumpers' taps.
@@ -498,9 +535,10 @@ static bool touch_menu_side( direction dir, SDL_JoystickID source )
 }
 
 // The touch pad's move pad pushed down-left or down-right on a screen with a
-// scrolling description (godot_host::menu_scroll): the pad's LT + d-pad up
-// and down, which scroll it, repeating while held (the user's call,
-// 2026-11-17: touch has no LT). 0 for anything else.
+// scrolling description (godot_host::menu_scroll): the right stick's up and
+// down, which scroll it (2026-11-23; LT + d-pad until then, which pages
+// now), repeating while held (the user's call, 2026-11-17). 0 for anything
+// else.
 static int touch_menu_scroll( direction dir, SDL_JoystickID source )
 {
     if( ( dir != direction::SW && dir != direction::SE ) || !godot_host::touch_pad() ||
@@ -508,7 +546,7 @@ static int touch_menu_scroll( direction dir, SDL_JoystickID source )
         in_map_cursor() || alt_modifier_held ) {
         return 0;
     }
-    return dir == direction::SW ? JOY_ALT_UP : JOY_ALT_DOWN;
+    return dir == direction::SW ? JOY_RS_UP : JOY_RS_DOWN;
 }
 #endif
 
@@ -1151,40 +1189,17 @@ static bool handle_axis_event( SDL_Event &event )
                     }
                     itype = input_event_t::keyboard_char;
                 } else if( i == 1 ) {
-                    // Right stick (i=1): Map to num keys in menu if the radial menu is not open, or JOY_R_* in gameplay
-                    if( is_in_menu() ) {
-                        if( !radial_right_open ) {
+                    // Right stick (i=1): in a menu (no wheel open) its own
+                    // events, or num keys on the advanced inventory
+                    // (right_stick_sends_num_keys); JOY_RS_* in gameplay.
+                    if( !is_in_menu() ) {
+                        joy_code = right_stick_code( dir );
+                    } else if( !radial_right_open ) {
+                        if( right_stick_sends_num_keys() ) {
                             joy_code = direction_to_num_key( dir );
                             itype = input_event_t::keyboard_char;
-                        }
-                    } else {
-                        switch( dir ) {
-                            case direction::N:
-                                joy_code = JOY_RS_UP;
-                                break;
-                            case direction::NE:
-                                joy_code = JOY_RS_UP_RIGHT;
-                                break;
-                            case direction::E:
-                                joy_code = JOY_RS_RIGHT;
-                                break;
-                            case direction::SE:
-                                joy_code = JOY_RS_DOWN_RIGHT;
-                                break;
-                            case direction::S:
-                                joy_code = JOY_RS_DOWN;
-                                break;
-                            case direction::SW:
-                                joy_code = JOY_RS_DOWN_LEFT;
-                                break;
-                            case direction::W:
-                                joy_code = JOY_RS_LEFT;
-                                break;
-                            case direction::NW:
-                                joy_code = JOY_RS_UP_LEFT;
-                                break;
-                            default:
-                                break;
+                        } else {
+                            joy_code = right_stick_code( dir );
                         }
                     }
                 }

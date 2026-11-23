@@ -17,7 +17,8 @@
 // gameplay plane (no menu open), but for A and B in a menu, which a
 // yes/no prompt answers Yes and No (query_popup), and the d-pad spinning a
 // number prompt (gamepad::number_step), and a which-way prompt taking map
-// directions while a list keeps its arrows, and pad bindings named as
+// directions while a list keeps its arrows, the right stick in a menu
+// sending its own events, and pad bindings named as
 // buttons ("LT+X", "LT+LS SW"). A rebase that loses one of these shows up
 // here before it reaches the Deck.
 
@@ -208,6 +209,35 @@ TEST_CASE( "gamepad_a_which_way_prompt_takes_map_directions", "[gamepad][fork]" 
         gamepad::test_axis( pad_axis::LEFT_Y, 0 );
         press( pad_button::DPAD_UP );
         CHECK( last_code() == KEY_UP );
+    }
+}
+
+TEST_CASE( "gamepad_right_stick_in_a_menu_sends_its_own_events", "[gamepad][fork]" )
+{
+    pad_session pad;
+    ui_adaptor game_ui;
+    ui_adaptor menu;
+    REQUIRE( gamepad::is_in_menu() );
+    SECTION( "a list: the stick's events, which scroll a description" ) {
+        // Num keys until 2026-11-23, which the inventory read as its own
+        // keys ('8' favourite, '6' select).
+        input_context ctxt( "INVENTORY" );
+        gamepad::test_axis( pad_axis::RIGHT_Y, -full );
+        CHECK( last_code() == JOY_RS_UP );
+        gamepad::test_axis( pad_axis::RIGHT_Y, 0 );
+        gamepad::test_axis( pad_axis::RIGHT_Y, full );
+        CHECK( last_code() == JOY_RS_DOWN );
+    }
+    SECTION( "the advanced inventory keeps its num keys (the squares)" ) {
+        input_context ctxt( "ADVANCED_INVENTORY" );
+        gamepad::test_axis( pad_axis::RIGHT_Y, -full );
+        CHECK( last_code() == '8' );
+    }
+    SECTION( "a map screen keeps its eight ways" ) {
+        input_context ctxt( "DEFAULTMODE" );
+        ctxt.set_iso( true );
+        gamepad::test_axis( pad_axis::RIGHT_Y, -full );
+        CHECK( last_code() == '8' );
     }
 }
 

@@ -503,8 +503,8 @@ bool godot_actions::scrolls_description( const input_context &ctxt )
         "SCROLL_INFOBOX_DOWN", "SCROLL_ITEM_INFO_DOWN", "SCROLL_TRAIT_INFO_DOWN",
         "SCROLL_DOWN_SPELL_MENU", "SCROLL_DESC_DOWN", "DESC_LIST_DOWN"
     };
-    return ups.count( ctxt.input_to_action( input_event( JOY_ALT_UP, input_event_t::gamepad ) ) ) &&
-           downs.count( ctxt.input_to_action( input_event( JOY_ALT_DOWN, input_event_t::gamepad ) ) );
+    return ups.count( ctxt.input_to_action( input_event( JOY_RS_UP, input_event_t::gamepad ) ) ) &&
+           downs.count( ctxt.input_to_action( input_event( JOY_RS_DOWN, input_event_t::gamepad ) ) );
 }
 #endif // CDDA_GODOT
 
