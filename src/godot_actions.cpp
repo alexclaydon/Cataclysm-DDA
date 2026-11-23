@@ -21,6 +21,7 @@
 #include "input.h"
 #include "explosion.h"
 #include "field_type.h"
+#include "veh_appliance.h"
 #include "veh_type.h"
 #include "vehicle.h"
 #include "input_context.h"
@@ -194,6 +195,16 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
                     here.destroy_vehicle( v );
                 }
                 add_msg( m_info, "VR vehicle: %d cleared.", static_cast<int>( gone.size() ) );
+                return false;
+            }
+            const vpart_id part( proto );
+            if( part.is_valid() && part->has_flag( "APPLIANCE" ) ) {
+                // An appliance part (ap_*): placed as the game places a
+                // plugged-in one, a one-tile vehicle (the 3D view's
+                // appliance check, 2026-11-24).
+                const bool placed = place_appliance( get_map(), you.pos_bub() + tripoint_rel_ms( dx, dy, 0 ), part,
+                                                     you );
+                add_msg( m_info, "VR vehicle: appliance %s %s.", proto, placed ? "placed" : "not placed" );
                 return false;
             }
             const vproto_id id( proto );
