@@ -23,11 +23,17 @@
 
 // ---- uilist (plan 0017) ----
 
-// Whether the host draws this list: its switch on, and no callback (a
-// callback may draw beside the list, which the host can't show).
+// Whether the host draws this list: its switch on, and no callback that
+// draws beside the list, which the host can't show (one asking for room
+// at a side: the spell menu's details, the advanced inventory's
+// destination). A callback that only acts on the selection (a map tile
+// highlighted for each creature or turret: pointmenu_cb) or takes keys
+// (the item action menu) works the same under the host (2026-11-23).
 bool uilist::host_menu()
 {
-    return godot_host::native_menus() && callback == nullptr && !entries.empty();
+    return godot_host::native_menus() && !entries.empty() &&
+           ( callback == nullptr || ( callback->desired_extra_space_left() <= 0.0f &&
+                                      callback->desired_extra_space_right() <= 0.0f ) );
 }
 
 void uilist::publish_host_menu()
@@ -109,9 +115,16 @@ bool uilist::take_host_requests()
                 fselected = r.value;
                 selected = previewing = fentries[fselected];
                 need_to_scroll = true;
+                // As the list's own moves and choices tell its callback.
+                if( callback != nullptr ) {
+                    callback->select( this );
+                }
                 if( r.kind == godot_host::menu_request_kind::confirm && allow_confirm &&
                     ( entries[selected].enabled || allow_disabled ) ) {
                     ret = entries[selected].retval;
+                    if( callback != nullptr ) {
+                        callback->confirm( this );
+                    }
                 }
                 break;
             case godot_host::menu_request_kind::cancel:
@@ -289,6 +302,23 @@ void request_menu( godot_host::menu_request_kind kind, int value, const std::str
     godot_host::request_menu( r );
 }
 
+// A callback that only acts on the selection (as pointmenu_cb), and one
+// that draws beside the list (as the spell menu's): counted, and its room.
+struct test_callback : uilist_callback {
+    float room = 0.0f;
+    int selects = 0;
+    int confirms = 0;
+    void select( uilist * ) override {
+        ++selects;
+    }
+    void confirm( uilist * ) override {
+        ++confirms;
+    }
+    float desired_extra_space_right() override {
+        return room;
+    }
+};
+
 void request_dialog( godot_host::dialog_request_kind kind, int value )
 {
     godot_host::dialog_request r;
@@ -372,6 +402,32 @@ int godot_menus_check::run()
         log.expect( m.ret == UILIST_CANCEL, "list: cancel" );
         godot_host::clear_menu( &m );
         log.expect( !godot_host::get_menu( s ), "list: cleared" );
+    }
+
+    // Lists with callbacks: one acting on the selection is the host's, and
+    // hears of the host's selections and choices; one drawing beside the
+    // list stays the engine's.
+    {
+        uilist m;
+        test_callback cb;
+        m.callback = &cb;
+        m.addentry( 20, true, 'a', "One" );
+        m.addentry( 21, true, 'b', "Two" );
+        m.filterlist();
+        log.expect( m.host_menu(), "callback: a selection-only callback's list is the host's" );
+        cb.room = 120.0f;
+        log.expect( !m.host_menu(), "callback: a side pane's list stays the engine's" );
+        cb.room = 0.0f;
+        m.ret = UILIST_WAIT_INPUT;
+        const int before = cb.selects;
+        request_menu( godot_host::menu_request_kind::select, 1 );
+        m.take_host_requests();
+        log.expect( cb.selects == before + 1 && m.selected == 1, "callback: told of a host selection" );
+        request_menu( godot_host::menu_request_kind::confirm, 0 );
+        m.take_host_requests();
+        log.expect( cb.confirms == 1 && m.ret == 20, "callback: told of a host choice" );
+        m.callback = nullptr;
+        godot_host::clear_menu( &m );
     }
 
     // A yes/no prompt: what the pad's buttons answer, the options' names,
