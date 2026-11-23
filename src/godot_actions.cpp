@@ -29,6 +29,7 @@
 #include "map_scale_constants.h"
 #include "godot_actions.h"
 #include "godot_host.h"
+#include "godot_menus.h"
 #include "messages.h"
 #include "monster.h"
 #include "mtype.h"
@@ -252,6 +253,10 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
             explosion_handler::explosion( &you, you.pos_bub() + tripoint_rel_ms( dx, dy, 0 ),
                                           static_cast<float>( boom_power ) );
             add_msg( m_info, "VR boom: %d at %d, %d.", boom_power, dx, dy );
+            return false;
+        }
+        if( godot_host::take_menus_check_request() ) {
+            godot_menus_check::run();
             return false;
         }
         std::string goto_type;

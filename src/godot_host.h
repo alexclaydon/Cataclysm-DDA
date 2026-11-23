@@ -476,6 +476,10 @@ int sidebar_band();
 // debug menu's teleport does; handled beside the look request.
 void request_goto( const std::string &type );
 bool take_goto_request( std::string &type );
+// Another (make df-mac-menus-check): the native menus and dialogs'
+// contract check (godot_menus.h), run in the play loop.
+void request_menus_check();
+bool take_menus_check_request();
 // Another (make vr-mouse "time HH"): move the clock on to the next HH:00,
 // as the debug menu's Change time does, for night scenes.
 void request_time( int hour );

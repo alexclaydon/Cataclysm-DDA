@@ -10,7 +10,6 @@
 #include "catacharset.h"
 #include "color.h"
 #include "imgui/imgui.h"
-#include "input.h"
 #include "input_context.h"
 #include "output.h"
 #include "string_formatter.h"
@@ -446,42 +445,7 @@ query_popup::result query_popup::query_once()
     }
 
 #if defined(TILES)
-    // What the pad's B answers (below): the option taking Escape, else No
-    // where nothing can cancel. Its glyph goes on that button.
-    pad_b_option = -1;
-    const std::string &escape_action = ctxt.input_to_action( input_event( KEY_ESCAPE,
-                                       input_event_t::keyboard_code ) );
-    for( size_t i = 0; i < options.size(); ++i ) {
-        if( options[i].action == escape_action ) {
-            pad_b_option = int( i );
-        }
-    }
-    for( size_t i = 0; i < options.size() && pad_b_option < 0 && !cancel; ++i ) {
-        if( options[i].action == "NO" ) {
-            pad_b_option = int( i );
-        }
-    }
-    // Else a Cancel that Escape doesn't take (a character template's).
-    for( size_t i = 0; i < options.size() && pad_b_option < 0 && !cancel; ++i ) {
-        if( options[i].action == "CANCEL" ) {
-            pad_b_option = int( i );
-        }
-    }
-    {
-        std::vector<std::string> actions;
-        for( const query_option &o : options ) {
-            actions.push_back( o.action );
-        }
-        const gamepad::prompt_answers pad = gamepad::answer_buttons( actions, pad_b_option );
-        pad_a_option = pad.a;
-        pad_x_option = pad.x;
-        pad_y_option = pad.y;
-        pad_all = pad.all;
-    }
-    // Their presses come back here (below), not to the action list.
-    if( pad_x_option >= 0 || pad_y_option >= 0 ) {
-        ctxt.take_pad_faces();
-    }
+    find_pad_answers( ctxt );
 #endif
 
     result res;
@@ -489,45 +453,18 @@ query_popup::result query_popup::query_once()
     res.wait_input = !anykey;
     bool by_mouse = false;
 #if defined(CDDA_GODOT)
-    // The host draws it (plan 0018): published, hidden, and its answers
-    // taken each pass (the wait polls every 50 ms).
-    host_drawn = godot_host::native_menus();
+    open_host_dialog( ctxt );
     impl->set_host_drawn( host_drawn );
-    if( host_drawn ) {
-        godot_host::dialog_state s;
-        s.kind = 0;
-        s.message = godot_host::bbcode( text );
-        // Each option by its name (no key in it: the host shows the pad
-        // button answering it as a glyph, gamepad::answer_buttons).
-        for( size_t i = 0; i < options.size(); ++i ) {
-            const int at = static_cast<int>( i );
-            s.options.push_back( ctxt.get_action_name( options[i].action ) );
-            s.option_glyphs.emplace_back( at == pad_b_option ? "B" :
-                                          at == pad_x_option ? "X" : at == pad_y_option ? "Y" :
-                                          at == pad_a_option && ( pad_all || options[i].action == "YES" ) ? "A" : "" );
-        }
-        s.cancel = cancel;
-        s.anykey = anykey;
-        godot_host::publish_dialog( this, std::move( s ) );
-    }
 #endif
     do {
 #if defined(CDDA_GODOT)
-        if( host_drawn ) {
-            // None outlined while the pad's face buttons answer every
-            // option (its d-pad moves nothing there: pad_arrow below).
-            const bool pad_answers = gamepad::last_input_was_pad() && pad_all;
-            godot_host::set_dialog_selected( this, pad_answers ? -1 : impl->keyboard_selected_option );
-        }
+        follow_host_dialog( impl->keyboard_selected_option );
 #endif
         ui_manager::redraw();
         res.action = ctxt.handle_input( 50 );
         res.evt = ctxt.get_raw_input();
 #if defined(CDDA_GODOT)
-        if( host_drawn && take_host_dialog( res ) ) {
-            if( res.action == "CONFIRM" ) {
-                by_mouse = true;
-            }
+        if( host_drawn && take_host_dialog( res, by_mouse ) ) {
             break;
         }
 #endif
@@ -557,44 +494,10 @@ query_popup::result query_popup::query_once()
         res.evt.type == input_event_t::timeout
     );
 
-    const auto has_option = [&]( const std::string & action ) {
-        return std::any_of( options.begin(), options.end(), [&]( const query_option & o ) {
-            return o.action == action;
-        } );
-    };
 #if defined(TILES)
-    // The pad (the fork's controller scheme): each face button answers its
-    // option (gamepad::answer_buttons), whatever is highlighted: A Yes (or
-    // the first option, where the buttons answer them all), B the one
-    // Escape takes or No or Cancel, X and Y the third and fourth. The
-    // keyboard's Enter and Escape keep the prompt's own default.
-    const gamepad::menu_press pad = by_mouse ? gamepad::menu_press::none : gamepad::last_menu_press();
-    int pad_answer = -1;
-    if( pad == gamepad::menu_press::a && res.action == "CONFIRM" && pad_a_option >= 0 &&
-        ( pad_all || options[pad_a_option].action == "YES" ) ) {
-        pad_answer = pad_a_option;
-    } else if( pad == gamepad::menu_press::b && !cancel && res.evt.type == input_event_t::keyboard_code &&
-               res.evt.get_first_input() == KEY_ESCAPE && !has_option( res.action ) ) {
-        pad_answer = pad_b_option;
-    } else if( !by_mouse && res.evt.type == input_event_t::gamepad ) {
-        const int button = res.evt.get_first_input();
-        pad_answer = button == JOY_X ? pad_x_option : button == JOY_Y ? pad_y_option : -1;
-    }
-    if( pad_answer >= 0 && pad_answer < static_cast<int>( options.size() ) ) {
-        res.action = options[pad_answer].action;
-        res.wait_input = false;
+    if( pad_answered( res, by_mouse ) ) {
         return res;
     }
-    // A never answers B's option, highlighted or not (the user's call,
-    // 2026-11-19): a lone Close or Cancel said B and closed on A too, and
-    // an A pressed in a fight dismissed what it hadn't read.
-    if( pad == gamepad::menu_press::a && res.action == "CONFIRM" && !anykey && pad_b_option >= 0 &&
-        static_cast<int>( cur ) == pad_b_option ) {
-        res.wait_input = true;
-        return res;
-    }
-#endif
-#if defined(TILES)
     // Where the face buttons answer every option the d-pad (arrow keys in
     // a menu) moves nothing: the glyphs stay put.
     const bool pad_arrow = ( res.action == "LEFT" || res.action == "RIGHT" ) &&

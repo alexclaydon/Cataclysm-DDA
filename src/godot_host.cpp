@@ -499,6 +499,9 @@ namespace
 std::atomic<bool> move_mode_waiting{ false };
 } // namespace
 
+// request_menus_check's, taken by the play loop.
+static std::atomic<bool> menus_check_wanted{ false };
+
 bool godot_host::look_pending()
 {
     if( move_mode_waiting ) {
@@ -506,7 +509,7 @@ bool godot_host::look_pending()
     }
     std::lock_guard<std::mutex> lock( look_mutex );
     return look_requested || click_requested || !goto_type.empty() || time_hour >= 0 || !field_id.empty() || boom_power > 0 || !crowd_id.empty() || !vehicle_proto.empty()
-           || !action_requested.empty() || catalogue_requested || zoom_requested.load() != 0;
+           || !action_requested.empty() || catalogue_requested || zoom_requested.load() != 0 || menus_check_wanted.load();
 }
 
 void godot_host::enable_wheels()
@@ -872,6 +875,18 @@ bool godot_host::take_vehicle_request( std::string &proto, int &dx, int &dy, int
     facing = vehicle_facing;
     vehicle_proto.clear();
     return true;
+}
+
+
+void godot_host::request_menus_check()
+{
+    menus_check_wanted = true;
+    push_mouse( { mouse_command::nudge, 0, 0, 0, 0 } );
+}
+
+bool godot_host::take_menus_check_request()
+{
+    return menus_check_wanted.exchange( false );
 }
 
 bool godot_host::take_goto_request( std::string &type )

@@ -551,11 +551,16 @@ class uilist // NOLINT(cata-xy)
         size_t switch_to_category = 0;
 
 #if defined(CDDA_GODOT)
-        // Native menus (plan 0017): this list is the host's to draw.
+        // Native menus (plan 0017): this list is the host's to draw
+        // (godot_menus.cpp): published before each wait, hidden, the host's
+        // requests taken as keys are, cleared once answered.
         bool host_drawn = false;
         bool host_menu();
         void publish_host_menu();
         bool take_host_requests();
+        void host_before_wait( uilist_impl &ui );
+        void host_after_wait();
+        friend struct godot_menus_check;
 #endif
 
     public:

@@ -16,6 +16,9 @@
 #include "string_formatter.h"
 
 class query_popup_impl;
+#if defined(TILES)
+class input_context;  // the pad's answers (gamepad_prompts.cpp)
+#endif
 
 /**
  * UI class for displaying messages or querying player input with popups.
@@ -227,6 +230,13 @@ class query_popup
         int pad_x_option = -1;
         int pad_y_option = -1;
         bool pad_all = false;
+#if defined(TILES)
+        // The pad's answers, in gamepad_prompts.cpp (ours): which option
+        // each face button answers in this context; and a press turned
+        // into its answer after the wait, true when res is final.
+        void find_pad_answers( input_context &ctxt );
+        bool pad_answered( result &res, bool by_mouse ) const;
+#endif
 
         struct button {
             button( const std::string &text, const point & );
@@ -239,9 +249,15 @@ class query_popup
 
         std::weak_ptr<query_popup_impl> p_impl;
 #if defined(CDDA_GODOT)
-        // Native dialogs (plan 0018): drawn by the host, which answers.
+        // Native dialogs (plan 0018): drawn by the host, which answers
+        // (godot_menus.cpp): published as the wait begins, the option the
+        // keys are on followed, its answer taken (by_mouse: a button
+        // chosen, not a key).
         bool host_drawn = false;
-        bool take_host_dialog( result &res );
+        void open_host_dialog( const input_context &ctxt );
+        void follow_host_dialog( int keyboard_selected ) const;
+        bool take_host_dialog( result &res, bool &by_mouse );
+        friend struct godot_menus_check;
 #endif
 
         // UI caches

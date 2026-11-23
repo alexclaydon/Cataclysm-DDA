@@ -938,37 +938,14 @@ shared_ptr_fast<uilist_impl> uilist::query( bool loop, int timeout, bool allow_u
     shared_ptr_fast<uilist_impl> ui = create_or_get_ui();
     do {
 #if defined(CDDA_GODOT)
-        // The host draws it (plan 0017): published, not drawn.
-        const bool host = host_menu();
-        if( host != host_drawn ) {
-            host_drawn = host;
-            ui->hide_ui = host;
-        }
-        if( host ) {
-            publish_host_menu();
-        } else {
-            godot_host::clear_menu( this );
-        }
-        godot_host::set_list_filters( filtering );
+        host_before_wait( *ui );
 #endif
         ui_manager::redraw();
         query_once( ctxt, timeout, allow_unfiltered_hotkeys );
 #if defined(CDDA_GODOT)
-        if( host_drawn && switch_to_category < categories.size() &&
-            switch_to_category != current_category ) {
-            // A tab changed from the pad: the hidden window's tab bar
-            // doesn't run, so apply it here.
-            current_category = switch_to_category;
-            switch_to_category = static_cast<size_t>( -1 );
-            filterlist();
-        }
+        host_after_wait();
 #endif
     } while( loop && ret == UILIST_WAIT_INPUT );
-#if defined(CDDA_GODOT)
-    if( ret != UILIST_WAIT_INPUT ) {
-        godot_host::clear_menu( this );
-    }
-#endif
     return ui;
 }
 
