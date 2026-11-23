@@ -258,6 +258,9 @@ void godot_tiles::publish_tileset_and_objects( cata_tiles &ct )
             o.name = vp.name();
             o.flag_names.assign( vp.get_flags().begin(), vp.get_flags().end() );
             o.strings["location"] = vp.location.str();
+            if( !vp.looks_like.empty() ) {
+                o.strings["looks_like"] = vp.looks_like;
+            }
             std::string categories;
             for( const std::string &c : vp.get_categories() ) {
                 categories += ( categories.empty() ? "" : "," ) + c;
@@ -388,6 +391,7 @@ void godot_tiles::record_extras( cata_tiles &ct, map &here, const tripoint_bub_m
                 godot_host::map_vehicle mv;
                 mv.proto = veh.type.is_null() ? std::string() : veh.type.str();
                 mv.face = static_cast<int>( std::lround( units::to_degrees( veh.face.dir() ) ) );
+                mv.appliance = veh.is_appliance();
                 bool near = false;
                 for( const vpart_reference &vpr : veh.get_all_parts() ) {
                     const vehicle_part &vp = vpr.part();

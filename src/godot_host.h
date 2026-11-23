@@ -147,6 +147,10 @@ struct map_vehicle {
     std::string proto;      // its prototype (car, schoolbus...), empty for a player's build
     int face;               // degrees, clockwise from east (the engine's tileray)
     int pivot_x, pivot_y, pivot_z;  // tripoint_bub_ms of mount (0, 0)
+    // An appliance (vehicle::is_appliance: furniture plugged into the grid
+    // becomes a one-tile vehicle): Dark Forest draws it as furniture, not
+    // as a vehicle model.
+    bool appliance = false;
     std::vector<map_vehicle_part> parts;
     std::vector<map_vehicle_mount> mounts;
 };
