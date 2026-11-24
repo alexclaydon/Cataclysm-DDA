@@ -229,6 +229,9 @@ cataimgui::bounds dialogue_imgui_impl::get_bounds()
 {
     // This allows us to occupy all space except the sidebar.
     ImVec2 viewport = ImGui::GetMainViewport()->WorkSize;
+#if defined(CDDA_GODOT)
+    return { godot_screens::centred_x( viewport.x, window_width ), 0, window_width, viewport.y };
+#endif
     return { 0,
              0,
              window_width,

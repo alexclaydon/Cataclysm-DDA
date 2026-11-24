@@ -10,6 +10,9 @@
 #include "dialogue.h"
 #include "imgui/imgui.h"
 #include "panels.h"
+#if defined(CDDA_GODOT)
+#include "godot_screens.h"
+#endif
 #include "translations.h"
 
 class dialogue_imgui
@@ -39,6 +42,9 @@ class dialogue_imgui_impl : public cataimgui::window
             if( !remote_name.empty() ) {
                 is_remote = true;
             }
+#if defined(CDDA_GODOT)
+            window_width = godot_screens::centred_width( ImGui::GetMainViewport()->WorkSize.x );
+#endif
         }
 
     private:

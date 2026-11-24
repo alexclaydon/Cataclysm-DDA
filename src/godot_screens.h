@@ -28,6 +28,12 @@ struct godot_screens {
     // the room left was empty and those screens sat to one side: they
     // leave the same margin on both sides instead, centred at max_share.
     static int beside_sidebar( int panel_width );
+
+    // H, for ImGui screens laid out in pixels (the conversation, which was
+    // the viewport's width less the sidebar's, at its left edge): the
+    // width max_share of the viewport's, and the left that centres it.
+    static float centred_width( float viewport_width );
+    static float centred_x( float viewport_width, float width );
 };
 
 #endif // CDDA_GODOT

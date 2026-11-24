@@ -24,4 +24,14 @@ int godot_screens::beside_sidebar( int /* panel_width */ )
     return std::max( 0, ( TERMX - share_of_terminal() ) / 2 );
 }
 
+float godot_screens::centred_width( const float viewport_width )
+{
+    return viewport_width * static_cast<float>( max_share );
+}
+
+float godot_screens::centred_x( const float viewport_width, const float width )
+{
+    return std::max( 0.0f, ( viewport_width - width ) / 2.0f );
+}
+
 #endif // CDDA_GODOT
