@@ -33,6 +33,10 @@
 #include "godot_menus.h"
 #include "messages.h"
 #include "monster.h"
+#include "npc.h"
+#include "recipe_dictionary.h"
+#include "item.h"
+#include "itype.h"
 #include "mtype.h"
 #include "rng.h"
 #include "move_mode.h"
@@ -195,6 +199,14 @@ bool godot_actions::take_requests( game &g, avatar &you, std::string &action,
                     here.destroy_vehicle( v );
                 }
                 add_msg( m_info, "VR vehicle: %d cleared.", static_cast<int>( gone.size() ) );
+                return false;
+            }
+            if( proto == "stage" ) {
+                // The menu catalogue's scene (plan 0028): what the game's
+                // screens need to show something (items carried and on
+                // the ground, a corpse to butcher, a follower to talk to,
+                // every recipe known). A test hook; never save after it.
+                stage_for_menus();
                 return false;
             }
             const vpart_id part( proto );
@@ -543,3 +555,54 @@ const std::string *godot_actions::turned_move( const input_context &ctxt, const 
     return nullptr;
 }
 #endif // CDDA_GODOT
+
+#if defined(CDDA_GODOT)
+// The menu catalogue's scene (the mouse command "vehicle stage"; plan 0028).
+// Ids checked as it goes: one upstream renames is skipped, not fatal.
+void godot_actions::stage_for_menus()
+{
+    static const faction_id faction_your_followers( "your_followers" );
+    avatar &you = get_avatar();
+    map &here = get_map();
+    int carried = 0;
+    for( const char *id : { "can_beans", "water_clean", "bandages", "aspirin", "flashlight", "hammer",
+                            "screwdriver", "duct_tape", "rag", "lighter", "knife_hunting", "glock_19", "9mm",
+                            "smartphone", "rope_30", "cooking_pot"
+                          } ) {
+        const itype_id it( id );
+        if( it.is_valid() ) {
+            you.i_add( item( it, calendar::turn ) );
+            ++carried;
+        }
+    }
+    int on_ground = 0;
+    const tripoint_bub_ms beside = you.pos_bub() + tripoint_rel_ms( 1, 0, 0 );
+    for( const char *id : { "2x4", "2x4", "2x4", "nail", "pipe", "rock", "scrap", "jacket_leather" } ) {
+        const itype_id it( id );
+        if( it.is_valid() ) {
+            here.add_item_or_charges( beside, item( it, calendar::turn ) );
+            ++on_ground;
+        }
+    }
+    const mtype_id zombie( "mon_zombie" );
+    if( zombie.is_valid() ) {
+        // Underfoot, where Butcher looks first.
+        here.add_item_or_charges( you.pos_bub(), item::make_corpse( zombie ) );
+    }
+    shared_ptr_fast<npc> follower = make_shared_fast<npc>();
+    follower->normalize();
+    follower->randomize();
+    follower->spawn_at_precise( you.pos_abs() + point( -1, 0 ) );
+    overmap_buffer.insert_npc( follower );
+    follower->form_opinion( you );
+    follower->set_attitude( NPCATT_FOLLOW );
+    follower->set_fac( faction_your_followers );
+    follower->mission = NPC_MISSION_NULL;
+    g->load_npcs();
+    for( const auto &e : recipe_dict ) {
+        you.learn_recipe( &e.second );
+    }
+    add_msg( m_info, "VR stage: %d carried, %d on the ground, a corpse, %s following, every recipe.",
+             carried, on_ground, follower->get_name() );
+}
+#endif

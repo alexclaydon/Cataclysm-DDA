@@ -53,6 +53,9 @@ struct godot_actions {
     static bool take_requests( game &g, avatar &you, std::string &action,
                                std::optional<tripoint_rel_ms> &wheel_aim,
                                std::optional<tripoint_bub_ms> &host_click );
+    // The menu catalogue's scene (the vehicle hook's "stage"; plan 0028):
+    // items carried and on the ground, a corpse, a follower, every recipe.
+    static void stage_for_menus();
     // On the play loop's idle TIMEOUT: a snapshot owed (a held walk's
     // skipped one), the view turned 2D or 3D, or the native sidebar
     // switched: flush and invalidate the main UI. True if it did.
