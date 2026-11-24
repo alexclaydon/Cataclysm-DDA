@@ -12,12 +12,17 @@ struct godot_screens {
     // centred, so a screen keeps a margin and its columns stay near
     // their names.
     static constexpr double max_share = 0.85;
+    // Terminals this narrow (the phone's 80-column portrait section) give
+    // a picker their whole width: the share is for wide ones, where a
+    // row's numbers drifted far from its name.
+    static constexpr int narrow_columns = 100;
     // The fewest rows a picker is drawn with (its header, a few rows,
     // the footer), however few items it holds.
     static constexpr int min_picker_rows = 12;
 
     // F: a picker (inventory_selector, unless it was given a fixed size)
-    // as wide as its columns need up to max_share of the terminal, and as
+    // as wide as its columns need up to max_share of the terminal (all of
+    // it up to narrow_columns), and as
     // tall as its rows, at least min_picker_rows, at most the terminal
     // (upstream: at least FULL_SCREEN_HEIGHT, and snapped to the
     // terminal's width or height when within a few cells of it).

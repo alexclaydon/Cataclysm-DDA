@@ -15,7 +15,7 @@ static int share_of_terminal()
 void godot_screens::picker_size( int &width, int &height, const int content_width,
                                  const int content_height )
 {
-    width = std::min( { content_width, share_of_terminal(), TERMX } );
+    width = std::min( { content_width, std::max( share_of_terminal(), narrow_columns ), TERMX } );
     height = std::clamp( content_height, std::min( min_picker_rows, TERMY ), TERMY );
 }
 
