@@ -4,6 +4,10 @@
 
 #if defined(CDDA_GODOT)
 
+#include <utility>
+
+#include "point.h"
+
 // The engine's own screens shaped for Dark Forest (plan 0028, the menu
 // catalogue's principles, the user's calls of 2026-11-24): hooks in the
 // screens' layout code call these, the rules living here.
@@ -39,6 +43,16 @@ struct godot_screens {
     // width max_share of the viewport's, and the left that centres it.
     static float centred_width( float viewport_width );
     static float centred_x( float viewport_width, float width );
+
+    // The diary's box (its begin and size, as upstream's
+    // diary_window_position): upstream centres the box, and its pages
+    // panel (3/10 of its width and 5 columns) hangs off its left, so the
+    // pair sat left of centre; the box moves right by half the panel.
+    static std::pair<point, point> diary_position();
+
+    // The character sheet's left (upstream draws it from the terminal's
+    // left edge, FULL_SCREEN_WIDTH + 1 wide): the offset that centres it.
+    static point sheet_origin();
 };
 
 #endif // CDDA_GODOT

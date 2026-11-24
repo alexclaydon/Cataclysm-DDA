@@ -58,6 +58,14 @@
 #include "units_utility.h"
 #include "weather.h"
 
+#if defined(CDDA_GODOT)
+#include "godot_screens.h"
+// Every window here is the character sheet's, made from the terminal's
+// left edge: in Dark Forest they're offset to centre it (a hook for the
+// file's nineteen newwin calls; the screens it opens are other files').
+#define newwin( h, w, p ) newwin( h, w, godot_screens::sheet_origin() + ( p ) )
+#endif
+
 static const bionic_id bio_cqb( "bio_cqb" );
 
 static const skill_id skill_bashing( "bashing" );

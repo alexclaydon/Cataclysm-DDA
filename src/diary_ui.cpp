@@ -10,6 +10,9 @@
 #include "color.h"
 #include "cursesdef.h"
 #include "diary.h"
+#if defined(CDDA_GODOT)
+#include "godot_screens.h"
+#endif
 #include "input_context.h"
 #include "output.h"
 #include "point.h"
@@ -166,6 +169,9 @@ void draw_diary_border( catacurses::window &win )
 
 static std::pair<point, point> diary_window_position()
 {
+#if defined(CDDA_GODOT)
+    return godot_screens::diary_position();
+#endif
     return {
         point( TERMX / 4, TERMY / 4 ),
         point( TERMX / 2, TERMY / 2 )

@@ -34,4 +34,17 @@ float godot_screens::centred_x( const float viewport_width, const float width )
     return std::max( 0.0f, ( viewport_width - width ) / 2.0f );
 }
 
+std::pair<point, point> godot_screens::diary_position()
+{
+    const point size( TERMX / 2, TERMY / 2 );
+    // The pages panel: size.x * 3 / 10 + 1 wide, 5 columns off the box.
+    const int panel = size.x * 3 / 10 + 5;
+    return { point( TERMX / 4 + panel / 2, TERMY / 4 ), size };
+}
+
+point godot_screens::sheet_origin()
+{
+    return point( std::max( 0, ( TERMX - ( FULL_SCREEN_WIDTH + 1 ) ) / 2 ), 0 );
+}
+
 #endif // CDDA_GODOT
