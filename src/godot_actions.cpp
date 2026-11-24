@@ -592,7 +592,6 @@ void godot_actions::stage_for_menus()
     you.worn.on_takeoff( you );
     you.clear_worn();
     you.remove_weapon();
-    you.clear_effects();
     you.set_all_parts_hp_to_max();
     for( const char *id : { "tshirt", "jeans", "socks", "sneakers", "hoodie", "backpack" } ) {
         const itype_id it( id );
