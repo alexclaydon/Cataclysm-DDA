@@ -26,6 +26,9 @@
 #include "options.h"
 #include "output.h"
 #include "panels.h"
+#if defined(CDDA_GODOT)
+#include "godot_screens.h"
+#endif
 #include "point.h"
 #include "rng.h"
 #include "string_formatter.h"
@@ -600,8 +603,15 @@ Messages::dialog::dialog()
 
 void Messages::dialog::init( ui_adaptor &ui )
 {
+#if defined(CDDA_GODOT)
+    const int left_panel_width =
+        godot_screens::beside_sidebar( panel_manager::get_manager().get_width_left() );
+    const int right_panel_width =
+        godot_screens::beside_sidebar( panel_manager::get_manager().get_width_right() );
+#else
     const int left_panel_width = panel_manager::get_manager().get_width_left();
     const int right_panel_width = panel_manager::get_manager().get_width_right();
+#endif
     w_height = TERMY;
     w_y = 0;
     // try to center and not obscure sidebar

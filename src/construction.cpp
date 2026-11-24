@@ -58,6 +58,9 @@
 #include "overmap.h"
 #include "overmapbuffer.h"
 #include "panels.h"
+#if defined(CDDA_GODOT)
+#include "godot_screens.h"
+#endif
 #include "player_activity.h"
 #include "point.h"
 #include "requirements.h"
@@ -802,8 +805,15 @@ construction_id construction_menu( const bool blueprint )
     };
 
     ui.on_screen_resize( [&]( ui_adaptor & ui ) {
+#if defined(CDDA_GODOT)
+        const int left_panel_width =
+            godot_screens::beside_sidebar( panel_manager::get_manager().get_width_left() );
+        const int right_panel_width =
+            godot_screens::beside_sidebar( panel_manager::get_manager().get_width_right() );
+#else
         const int left_panel_width = panel_manager::get_manager().get_width_left();
         const int right_panel_width = panel_manager::get_manager().get_width_right();
+#endif
 
         // 3 tiles of valid construction locations around the player character,
         // plus 2 tiles of padding.

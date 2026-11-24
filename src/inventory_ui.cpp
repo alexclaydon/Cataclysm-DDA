@@ -1,5 +1,9 @@
 #include "inventory_ui.h"
 
+#if defined(CDDA_GODOT)
+#include "godot_screens.h"
+#endif
+
 #include <chrono>
 #include <optional>
 #include <stdexcept>
@@ -2619,12 +2623,18 @@ void inventory_selector::prepare_layout()
 
     prepare_layout( TERMX - nc_width, TERMY - nc_height );
 
-    int const win_width =
+    int win_width =
         _fixed_size.x < 0 ? snap( get_layout_width() + nc_width, TERMX ) : _fixed_size.x;
-    int const win_height =
+    int win_height =
         _fixed_size.y < 0
         ? snap( std::max<int>( get_layout_height() + nc_height, FULL_SCREEN_HEIGHT ), TERMY )
         : _fixed_size.y;
+#if defined(CDDA_GODOT)
+    if( _fixed_size.x < 0 && _fixed_size.y < 0 ) {
+        godot_screens::picker_size( win_width, win_height, get_layout_width() + nc_width,
+                                    get_layout_height() + nc_height );
+    }
+#endif
 
     prepare_layout( win_width - nc_width, win_height - nc_height );
 
