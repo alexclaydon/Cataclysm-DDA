@@ -217,10 +217,17 @@ void dialogue_imgui_impl::draw_controls()
 
     ImGui::SetWindowSize( ImVec2( window_width, window_height ), ImGuiCond_Once );
     draw_dialogue_sidebar();
-    ImGui::SetNextWindowPos( ImVec2( sidebar_width() + border_size() * 3,
+#if defined(CDDA_GODOT)
+    // The panes are placed in screen coordinates: from the window's left,
+    // which Dark Forest moves off the screen's edge (godot_screens).
+    const float left = ImGui::GetWindowPos().x;
+#else
+    const float left = 0.0f;
+#endif
+    ImGui::SetNextWindowPos( ImVec2( left + sidebar_width() + border_size() * 3,
                                      border_size() * 2 ) );
     draw_dialogue_history();
-    ImGui::SetNextWindowPos( ImVec2( sidebar_width() + border_size() * 3,
+    ImGui::SetNextWindowPos( ImVec2( left + sidebar_width() + border_size() * 3,
                                      horizontal_separator_pos_y( window_height ) + border_size() * 2 ) );
     draw_dialogue_responses();
 }
