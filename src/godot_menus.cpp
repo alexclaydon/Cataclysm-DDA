@@ -72,10 +72,15 @@ void uilist::publish_host_menu()
 void uilist::host_before_wait( uilist_impl &ui )
 {
     const bool host = host_menu();
-    if( host != host_drawn ) {
-        host_drawn = host;
+    // Hidden every pass while ours draws it, not only when that changes: a
+    // list queried a pass at a time (query( false ), the item menu's) gets a
+    // new window each pass, which drew beside our native copy (the menu
+    // catalogue, 2026-11-24). Shown again only on the switch back, so a
+    // window the engine hid itself stays hidden.
+    if( host || host != host_drawn ) {
         ui.hide_ui = host;
     }
+    host_drawn = host;
     if( host ) {
         publish_host_menu();
     } else {
