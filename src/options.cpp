@@ -1562,13 +1562,16 @@ void options_manager::init()
     add_options_world_default();
     add_options_debug();
     add_options_android();
-#if defined(CDDA_GODOT)
-    godot_options::hide_hosted( *this );
-#endif
 
     for( Page &p : pages_ ) {
         p.removeRepeatedEmptyLines();
     }
+#if defined(CDDA_GODOT)
+    // After the tidy: it counts a hidden option as an empty line and keeps
+    // only the first of a run, and the save writes only what's on a page,
+    // so TERMINAL_Y and the font heights were never saved.
+    godot_options::hide_hosted( *this );
+#endif
 }
 
 void options_manager::add_options_general()
