@@ -43,6 +43,7 @@
 #include "omdata.h"
 #include "overmapbuffer.h"
 #include "point.h"
+#include "profession.h"
 #include "sdl_gamepad.h"
 #include "sdltiles.h"
 #include "type_id.h"
@@ -564,6 +565,43 @@ void godot_actions::stage_for_menus()
     static const faction_id faction_your_followers( "your_followers" );
     avatar &you = get_avatar();
     map &here = get_map();
+    // One character every run (Play Now's is random, so the screens
+    // differed run to run): the same name, stats, no traits or skills,
+    // the same clothes and kit, and the follower from a fixed seed.
+    you.name = "Catalogue Tester";
+    you.play_name.reset();
+    you.male = false;
+    you.set_str_base( 8 );
+    you.set_dex_base( 8 );
+    you.set_int_base( 8 );
+    you.set_per_base( 8 );
+    you.clear_mutations();
+    you.clear_bionics();
+    you.empty_skills();
+    you.hobbies.clear();
+    for( const proficiency_id &prof : you.known_proficiencies() ) {
+        you.lose_proficiency( prof, true );
+    }
+    you.set_base_age( 30 );
+    you.set_base_height( 170 );
+    you.prof = profession::generic();
+    you.my_blood_type = blood_type::blood_O;
+    you.blood_rh_factor = true;
+    you.set_stored_kcal( you.get_healthy_kcal() );
+    you.clear_morale();
+    you.worn.on_takeoff( you );
+    you.clear_worn();
+    you.remove_weapon();
+    you.clear_effects();
+    you.set_all_parts_hp_to_max();
+    for( const char *id : { "tshirt", "jeans", "socks", "sneakers", "hoodie", "backpack" } ) {
+        const itype_id it( id );
+        if( it.is_valid() ) {
+            you.wear_item( item( it, calendar::turn ), false );
+        }
+    }
+    you.recalc_hp();
+    you.calc_encumbrance();
     int carried = 0;
     for( const char *id : { "can_beans", "water_clean", "bandages", "aspirin", "flashlight", "hammer",
                             "screwdriver", "duct_tape", "rag", "lighter", "knife_hunting", "glock_19", "9mm",
@@ -589,6 +627,9 @@ void godot_actions::stage_for_menus()
         // Underfoot, where Butcher looks first.
         here.add_item_or_charges( you.pos_bub(), item::make_corpse( zombie ) );
     }
+    // Seeded here, after everything that depends on Play Now's random
+    // character, so the follower comes out the same each run.
+    rng_set_engine_seed( 20261124 );
     shared_ptr_fast<npc> follower = make_shared_fast<npc>();
     follower->normalize();
     follower->randomize();
@@ -602,6 +643,7 @@ void godot_actions::stage_for_menus()
     for( const auto &e : recipe_dict ) {
         you.learn_recipe( &e.second );
     }
+    you.invalidate_crafting_inventory();
     add_msg( m_info, "VR stage: %d carried, %d on the ground, a corpse, %s following, every recipe.",
              carried, on_ground, follower->get_name() );
 }
